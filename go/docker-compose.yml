@@ -18,7 +18,3 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # This maps host.docker.internal to the host IP
     restart: unless-stopped
-
-networks:
-  agent-net:
-    driver: bridge
