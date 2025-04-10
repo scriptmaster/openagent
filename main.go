@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +22,10 @@ var (
 	templates *template.Template
 	// Session key for maintenance mode authentication
 	maintenanceSessionKey = "maintenance_auth"
+	// Current application version
+	appVersion string
+	// Session salt derived from version
+	sessionSalt string
 )
 
 // Template helper functions
@@ -83,11 +89,14 @@ type JSONResponse struct {
 
 // Page data for templates
 type PageData struct {
-	AppName   string
-	PageTitle string
-	User      User
-	Error     string
-	Projects  []interface{}
+	AppName    string
+	PageTitle  string
+	User       User
+	Error      string
+	Projects   []interface{}
+	Project    interface{}
+	AdminEmail string
+	AppVersion string
 }
 
 // Maintenance session for secure access
@@ -98,8 +107,11 @@ func isMaintenanceAuthenticated(r *http.Request) bool {
 		return false
 	}
 
-	// Validate cookie value
-	return cookie.Value == "authenticated"
+	// Expected value with current version salt
+	expected := "authenticated_" + sessionSalt[:8]
+
+	// Validate cookie value matches current version
+	return cookie.Value == expected
 }
 
 // MaintenanceHandler handles requests when in maintenance mode
@@ -111,9 +123,15 @@ func MaintenanceHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Allow access to maintenance authentication endpoints
+		// Always allow access to maintenance endpoints
 		if r.URL.Path == "/maintenance" || r.URL.Path == "/maintenance/auth" {
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Special handling for login page - in maintenance mode redirect to /maintenance
+		if r.URL.Path == "/login" && IsMaintenanceMode() {
+			http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
 			return
 		}
 
@@ -153,10 +171,15 @@ func MaintenanceHandler(next http.Handler) http.Handler {
 func StartServer() {
 	log.Println("--- Server Starting ---")
 
-	// Load environment variables
-	err := godotenv.Load(".env")
+	// Load environment variables from .env file
+	err := godotenv.Load()
 	if err != nil {
-		log.Println("Warning: .env file not found, using environment variables")
+		log.Printf("Warning: .env file not found, using environment variables.")
+	}
+
+	// Increment build version on startup - this will also invalidate all previous sessions
+	if err := incrementBuildVersion(); err != nil {
+		log.Printf("Warning: failed to increment build version: %v", err)
 	}
 
 	// Initialize database
@@ -171,6 +194,9 @@ func StartServer() {
 
 	// Initialize template engine
 	templates = template.Must(template.New("").Funcs(templateFuncs).ParseGlob("tpl/*.html"))
+
+	// Initialize agent templates
+	InitAgentTemplates(templates)
 
 	// Setup static file server
 	fs := http.FileServer(http.Dir("static"))
@@ -187,8 +213,10 @@ func StartServer() {
 	// Page handlers
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		data := PageData{
-			AppName:   "OpenAgent",
-			PageTitle: "Login - OpenAgent",
+			AppName:    "OpenAgent",
+			PageTitle:  "Login - OpenAgent",
+			AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+			AppVersion: appVersion,
 		}
 		if err := templates.ExecuteTemplate(w, "login.html", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -212,7 +240,10 @@ func StartServer() {
 
 	// Maintenance handlers
 	http.HandleFunc("/maintenance", handleMaintenance)
+	http.HandleFunc("/maintenance/auth", handleMaintenanceAuth)
+	http.HandleFunc("/maintenance/config", handleMaintenanceConfig)
 	http.HandleFunc("/maintenance/configure", handleMaintenanceConfigure)
+	http.HandleFunc("/maintenance/initialize-schema", handleInitializeSchema)
 
 	// Start the server
 	port := os.Getenv("PORT")
@@ -360,15 +391,43 @@ func sendJSONResponse(w http.ResponseWriter, success bool, message string, data 
 
 // Placeholder handlers for authenticated routes
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to the dashboard!")
+	data := PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Dashboard - OpenAgent",
+		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+		AppVersion: appVersion,
+		Project:    nil, // Include Project field with nil value
+	}
+
+	if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func handleProjects(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Projects page")
+	data := PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Projects - OpenAgent",
+		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+		AppVersion: appVersion,
+	}
+
+	if err := templates.ExecuteTemplate(w, "projects.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func handleAdmin(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Admin dashboard")
+	data := PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Admin Dashboard - OpenAgent",
+		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+		AppVersion: appVersion,
+	}
+
+	if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // handleMaintenance displays the maintenance login page
@@ -381,9 +440,13 @@ func handleMaintenance(w http.ResponseWriter, r *http.Request) {
 
 	// Show login page
 	data := struct {
-		Error string
+		Error      string
+		AdminEmail string
+		AppVersion string
 	}{
-		Error: r.URL.Query().Get("error"),
+		Error:      r.URL.Query().Get("error"),
+		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+		AppVersion: appVersion,
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance-login.html", data); err != nil {
@@ -416,7 +479,7 @@ func handleMaintenanceAuth(w http.ResponseWriter, r *http.Request) {
 	// Set authentication cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     maintenanceSessionKey,
-		Value:    "authenticated",
+		Value:    "authenticated_" + sessionSalt[:8], // Add partial version salt to invalidate on restart
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   r.TLS != nil,
@@ -436,20 +499,65 @@ func handleMaintenanceConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get error from query parameters if present
+	errorMsg := r.URL.Query().Get("error")
+
+	// If in maintenance mode and no specific error provided, check the database connection
+	if IsMaintenanceMode() && errorMsg == "" {
+		// Try connecting to the database to get a more specific error
+		_, dbErr := InitDB()
+		if dbErr != nil {
+			errorMsg = fmt.Sprintf("Database Error: %v", dbErr)
+		}
+	}
+
+	// Parse current version
+	versionParts := []string{"1", "0", "0", "0"} // Default
+	if appVersion != "" {
+		parts := strings.Split(appVersion, ".")
+		if len(parts) == 4 {
+			versionParts = parts
+		}
+	}
+
+	major, _ := strconv.Atoi(versionParts[0])
+	minor, _ := strconv.Atoi(versionParts[1])
+	patch, _ := strconv.Atoi(versionParts[2])
+	build, _ := strconv.Atoi(versionParts[3])
+
+	// Get current migration start number - always retrieve the latest from environment
+	migrationStart := os.Getenv("MIGRATION_START")
+	if migrationStart == "" {
+		migrationStart = "000" // Ensure consistent formatting with leading zeros
+	}
+
 	data := struct {
-		DBHost     string
-		DBPort     string
-		DBUser     string
-		DBPassword string
-		DBName     string
-		Error      string
-		Success    string
+		DBHost         string
+		DBPort         string
+		DBUser         string
+		DBPassword     string
+		DBName         string
+		Error          string
+		Success        string
+		AdminEmail     string
+		VersionMajor   int
+		VersionMinor   int
+		VersionPatch   int
+		VersionBuild   int
+		MigrationStart string
 	}{
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBUser:     os.Getenv("DB_USER"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBName:     os.Getenv("DB_NAME"),
+		DBHost:         os.Getenv("DB_HOST"),
+		DBPort:         os.Getenv("DB_PORT"),
+		DBUser:         os.Getenv("DB_USER"),
+		DBPassword:     os.Getenv("DB_PASSWORD"),
+		DBName:         os.Getenv("DB_NAME"),
+		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		Error:          errorMsg,
+		VersionMajor:   major,
+		VersionMinor:   minor,
+		VersionPatch:   patch,
+		VersionBuild:   build,
+		MigrationStart: migrationStart,
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance.html", data); err != nil {
@@ -476,60 +584,195 @@ func handleMaintenanceConfigure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get form values
+	// Get database form values
 	host := r.FormValue("db_host")
 	port := r.FormValue("db_port")
 	user := r.FormValue("db_user")
 	password := r.FormValue("db_password")
 	dbname := r.FormValue("db_name")
+	resetMigrations := r.FormValue("reset_migrations") == "1"
+	migrationStart := r.FormValue("migration_start")
 
-	// Validate required fields
+	// Get version components
+	majorStr := r.FormValue("version_major")
+	minorStr := r.FormValue("version_minor")
+	patchStr := r.FormValue("version_patch")
+
+	// Validate database fields
 	if host == "" || port == "" || user == "" || dbname == "" {
-		handleMaintenanceError(w, r, "All fields except password are required")
+		handleMaintenanceError(w, r, "All database fields except password are required")
 		return
 	}
 
-	// Update .env file
+	// Validate version inputs
+	major, err := strconv.Atoi(majorStr)
+	if err != nil || major < 0 {
+		handleMaintenanceError(w, r, "Invalid major version number")
+		return
+	}
+
+	minor, err := strconv.Atoi(minorStr)
+	if err != nil || minor < 0 {
+		handleMaintenanceError(w, r, "Invalid minor version number")
+		return
+	}
+
+	patch, err := strconv.Atoi(patchStr)
+	if err != nil || patch < 0 {
+		handleMaintenanceError(w, r, "Invalid patch version number")
+		return
+	}
+
+	// Handle migration tracking
+	if resetMigrations {
+		// Reset migration tracking to apply all migrations
+		log.Println("Migration tracking reset requested")
+		if err := UpdateMigrationStart(0); err != nil {
+			log.Printf("Warning: Failed to reset migration tracking: %v", err)
+		} else {
+			log.Println("Migration tracking reset to 0")
+		}
+	} else if migrationStart != "" {
+		// Parse migration start number, handling different formats (4, 04, 004)
+		migNum, err := strconv.Atoi(migrationStart)
+		if err != nil {
+			handleMaintenanceError(w, r, "Invalid migration number: "+err.Error())
+			return
+		}
+
+		// Update migration tracking to the specified number
+		log.Printf("Setting migration tracking to %d", migNum)
+		if err := UpdateMigrationStart(migNum); err != nil {
+			log.Printf("Warning: Failed to update migration tracking: %v", err)
+		}
+	}
+
+	// Update database configuration
 	if err := UpdateDatabaseConfig(host, port, user, password, dbname); err != nil {
-		handleMaintenanceError(w, r, "Failed to update configuration: "+err.Error())
+		handleMaintenanceError(w, r, "Failed to update database configuration: "+err.Error())
 		return
 	}
 
-	// Update environment variables
+	// Update environment variables for database
 	os.Setenv("DB_HOST", host)
 	os.Setenv("DB_PORT", port)
 	os.Setenv("DB_USER", user)
 	os.Setenv("DB_PASSWORD", password)
 	os.Setenv("DB_NAME", dbname)
 
-	// Try to reconnect to database
+	// Try to connect to database
 	db, err := InitDB()
 	if err != nil {
 		handleMaintenanceError(w, r, "Failed to connect to database: "+err.Error())
 		return
 	}
-
 	// Close the test connection
 	if db != nil {
 		db.Close()
 	}
 
+	// Handle version update
+	// Parse current version to get build number
+	buildNumber := 0
+	if appVersion != "" {
+		parts := strings.Split(appVersion, ".")
+		if len(parts) == 4 {
+			buildNumber, _ = strconv.Atoi(parts[3])
+		}
+	}
+
+	// Construct new version
+	newVersion := fmt.Sprintf("%d.%d.%d.%d", major, minor, patch, buildNumber)
+
+	// Update .env file with version
+	envPath := ".env"
+	content, err := os.ReadFile(envPath)
+	if err != nil && !os.IsNotExist(err) {
+		handleMaintenanceError(w, r, "Failed to read .env file: "+err.Error())
+		return
+	}
+
+	// Parse .env content line by line
+	lines := strings.Split(string(content), "\n")
+	versionLineFound := false
+	for i, line := range lines {
+		if strings.HasPrefix(line, "APP_VERSION=") {
+			lines[i] = "APP_VERSION=" + newVersion
+			versionLineFound = true
+			break
+		}
+	}
+
+	// If APP_VERSION line not found, add it
+	if !versionLineFound {
+		lines = append(lines, "APP_VERSION="+newVersion)
+	}
+
+	// Write back to .env
+	err = os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0644)
+	if err != nil {
+		handleMaintenanceError(w, r, "Failed to update .env file: "+err.Error())
+		return
+	}
+
+	// Update global variables
+	appVersion = newVersion
+	sessionSalt = generateSessionSalt(appVersion)
+	os.Setenv("APP_VERSION", newVersion)
+
+	// Build success message
+	successMsg := "Configuration updated successfully!"
+	if resetMigrations {
+		successMsg += " Migration tracking reset to apply all migrations."
+	} else if migrationStart != "" {
+		successMsg += fmt.Sprintf(" Migration tracking set to %s.", migrationStart)
+	}
+	successMsg += " Server will restart in 5 seconds..."
+
+	log.Printf("Application configuration updated. Version: %s, Database: %s@%s:%s/%s",
+		newVersion, user, host, port, dbname)
+
+	// Parse current version for template
+	versionParts := strings.Split(newVersion, ".")
+	vMajor, _ := strconv.Atoi(versionParts[0])
+	vMinor, _ := strconv.Atoi(versionParts[1])
+	vPatch, _ := strconv.Atoi(versionParts[2])
+	vBuild, _ := strconv.Atoi(versionParts[3])
+
+	// Get updated migration start - always retrieve the latest from environment
+	updatedMigrationStart := os.Getenv("MIGRATION_START")
+	if updatedMigrationStart == "" {
+		updatedMigrationStart = "000" // Ensure consistent formatting with leading zeros
+	}
+
 	// Show success message and redirect to home after a delay
 	data := struct {
-		DBHost     string
-		DBPort     string
-		DBUser     string
-		DBPassword string
-		DBName     string
-		Error      string
-		Success    string
+		DBHost         string
+		DBPort         string
+		DBUser         string
+		DBPassword     string
+		DBName         string
+		Error          string
+		Success        string
+		AdminEmail     string
+		VersionMajor   int
+		VersionMinor   int
+		VersionPatch   int
+		VersionBuild   int
+		MigrationStart string
 	}{
-		DBHost:     host,
-		DBPort:     port,
-		DBUser:     user,
-		DBPassword: password,
-		DBName:     dbname,
-		Success:    "Configuration updated successfully! Server will restart in 5 seconds...",
+		DBHost:         host,
+		DBPort:         port,
+		DBUser:         user,
+		DBPassword:     password,
+		DBName:         dbname,
+		Success:        successMsg,
+		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		VersionMajor:   vMajor,
+		VersionMinor:   vMinor,
+		VersionPatch:   vPatch,
+		VersionBuild:   vBuild,
+		MigrationStart: updatedMigrationStart,
 	}
 
 	w.Header().Set("Refresh", "5;url=/")
@@ -546,26 +789,164 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, errorMsg str
 		return
 	}
 
+	// Parse current version
+	versionParts := []string{"1", "0", "0", "0"} // Default
+	if appVersion != "" {
+		parts := strings.Split(appVersion, ".")
+		if len(parts) == 4 {
+			versionParts = parts
+		}
+	}
+
+	major, _ := strconv.Atoi(versionParts[0])
+	minor, _ := strconv.Atoi(versionParts[1])
+	patch, _ := strconv.Atoi(versionParts[2])
+	build, _ := strconv.Atoi(versionParts[3])
+
+	// Get current migration start or use form value if present
+	migrationStart := r.FormValue("migration_start")
+	if migrationStart == "" {
+		migrationStart = os.Getenv("MIGRATION_START")
+		if migrationStart == "" {
+			migrationStart = "000" // Ensure consistent formatting with leading zeros
+		}
+	}
+
 	data := struct {
-		DBHost     string
-		DBPort     string
-		DBUser     string
-		DBPassword string
-		DBName     string
-		Error      string
-		Success    string
+		DBHost         string
+		DBPort         string
+		DBUser         string
+		DBPassword     string
+		DBName         string
+		Error          string
+		Success        string
+		AdminEmail     string
+		VersionMajor   int
+		VersionMinor   int
+		VersionPatch   int
+		VersionBuild   int
+		MigrationStart string
 	}{
-		DBHost:     r.FormValue("db_host"),
-		DBPort:     r.FormValue("db_port"),
-		DBUser:     r.FormValue("db_user"),
-		DBPassword: r.FormValue("db_password"),
-		DBName:     r.FormValue("db_name"),
-		Error:      errorMsg,
+		DBHost:         r.FormValue("db_host"),
+		DBPort:         r.FormValue("db_port"),
+		DBUser:         r.FormValue("db_user"),
+		DBPassword:     r.FormValue("db_password"),
+		DBName:         r.FormValue("db_name"),
+		Error:          errorMsg,
+		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		VersionMajor:   major,
+		VersionMinor:   minor,
+		VersionPatch:   patch,
+		VersionBuild:   build,
+		MigrationStart: migrationStart,
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// incrementBuildVersion increases the build number in APP_VERSION and updates the .env file
+func incrementBuildVersion() error {
+	// Read current version from environment
+	currentVersion := os.Getenv("APP_VERSION")
+	if currentVersion == "" {
+		currentVersion = "1.0.0.0" // Default if not set
+	}
+
+	// Parse version
+	parts := strings.Split(currentVersion, ".")
+	if len(parts) != 4 {
+		// Invalid format, initialize to default
+		parts = []string{"1", "0", "0", "0"}
+	}
+
+	// Increment build number (last part)
+	buildNumber, err := strconv.Atoi(parts[3])
+	if err != nil {
+		buildNumber = 0 // Reset if parsing failed
+	}
+	buildNumber++
+	parts[3] = strconv.Itoa(buildNumber)
+
+	// Reassemble version string
+	newVersion := strings.Join(parts, ".")
+	appVersion = newVersion
+
+	// Update session salt
+	sessionSalt = generateSessionSalt(appVersion)
+
+	// Load current .env content
+	envPath := ".env"
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to read .env file: %v", err)
+		}
+		// File doesn't exist, create it with just the version
+		content = []byte("")
+	}
+
+	// Parse .env content line by line
+	lines := strings.Split(string(content), "\n")
+	versionLineFound := false
+	for i, line := range lines {
+		if strings.HasPrefix(line, "APP_VERSION=") {
+			lines[i] = "APP_VERSION=" + newVersion
+			versionLineFound = true
+			break
+		}
+	}
+
+	// If APP_VERSION line not found, add it
+	if !versionLineFound {
+		lines = append(lines, "APP_VERSION="+newVersion)
+	}
+
+	// Write back to .env
+	err = os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to update .env file: %v", err)
+	}
+
+	// Update environment variable
+	os.Setenv("APP_VERSION", newVersion)
+	log.Printf("Application version updated to %s", newVersion)
+	return nil
+}
+
+// generateSessionSalt creates a unique salt based on the app version
+func generateSessionSalt(version string) string {
+	h := sha256.New()
+	h.Write([]byte(version))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// handleInitializeSchema manually executes the database schema initialization
+func handleInitializeSchema(w http.ResponseWriter, r *http.Request) {
+	// Verify authentication
+	if !isMaintenanceAuthenticated(r) {
+		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
+		return
+	}
+
+	// Reset migration tracking to apply all migrations
+	if err := UpdateMigrationStart(0); err != nil {
+		http.Redirect(w, r, "/maintenance/config?error="+url.QueryEscape("Failed to reset migration tracking: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+
+	// Get database connection
+	db, err := InitDB()
+	if err != nil {
+		// Return to maintenance config with error
+		http.Redirect(w, r, "/maintenance/config?error="+url.QueryEscape("Failed to connect to database: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	defer db.Close()
+
+	// Return to maintenance config with success message
+	http.Redirect(w, r, "/maintenance/config?success=Database+schema+initialized+successfully", http.StatusSeeOther)
 }
 
 // Main function - wrapper that calls StartServer

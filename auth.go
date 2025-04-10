@@ -2,8 +2,8 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/smtp"
@@ -152,14 +152,20 @@ func sendEmail(to, subject, body string) error {
 	return nil
 }
 
-// generateSessionToken creates a random session token
+// generateSessionToken creates a secure random token with version salt
 func generateSessionToken() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return "", err
 	}
-	return base64.StdEncoding.EncodeToString(b), nil
+
+	// Add the version salt to invalidate tokens on restart
+	h := sha256.New()
+	h.Write(randomBytes)
+	h.Write([]byte(sessionSalt)) // Add version-based salt
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
 // Sessions

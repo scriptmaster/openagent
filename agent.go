@@ -468,10 +468,31 @@ func (a *Agent) executeInternal(action string) (string, bool, string) {
 // Global template variable
 var tpl *template.Template
 
+// InitAgentTemplates initializes the agent templates from the main template engine
+func InitAgentTemplates(mainTemplates *template.Template) {
+	tpl = mainTemplates
+}
+
 func handleAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err := tpl.ExecuteTemplate(w, "index.html", nil) // Execute the named template
-	if err != nil {
+
+	// Get the current app version
+	appVersion := os.Getenv("APP_VERSION")
+	if appVersion == "" {
+		appVersion = "1.0.0.0" // Default if not set
+	}
+
+	// Create template data with version
+	data := struct {
+		AppVersion string
+		Project    interface{}
+	}{
+		AppVersion: appVersion,
+		Project:    nil,
+	}
+
+	// Use the imported template from main.go rather than the local tpl
+	if err := tpl.ExecuteTemplate(w, "agent.html", data); err != nil {
 		http.Error(w, "Internal Server Error: Could not execute template", http.StatusInternalServerError)
 		log.Printf("Error executing template: %v", err)
 	}

@@ -117,8 +117,9 @@
             </div>
             
             <div class="text-center text-muted mt-3">
-                <p>Need help? Contact your system administrator.</p>
+                <p>Need help? Contact your <a href="mailto:{{.AdminEmail}}">system administrator</a>.</p>
                 <p class="restricted-link" @click="showAuth = true">Restricted: Maintenance Administration</p>
+                <p class="text-muted small">Version {{.AppVersion}}</p>
             </div>
         </div>
     </div>

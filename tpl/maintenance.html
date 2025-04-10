@@ -10,11 +10,9 @@
     <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
     <style>
         body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
             background: #f5f7fb;
+            min-height: 100vh;
+            padding-top: 2rem;
         }
         .config-container {
             max-width: 600px;
@@ -25,12 +23,15 @@
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
         }
+        .header-container {
+            margin-bottom: 2rem;
+        }
     </style>
 </head>
-<body class="border-top-wide border-primary d-flex flex-column">
-    <div class="page page-center">
+<body>
+    <div class="page">
         <div class="container container-tight py-4">
-            <div class="text-center mb-4">
+            <div class="header-container text-center">
                 <h1 class="navbar-brand navbar-brand-autodark">
                     <img src="/static/img/logo.svg" height="36" alt="OpenAgent">
                 </h1>
@@ -56,8 +57,11 @@
                     </div>
                     {{end}}
 
-                    <h2 class="card-title text-center mb-4">PostgreSQL Configuration</h2>
-                    <form action="/maintenance/configure{{if .Token}}?token={{.Token}}{{end}}" method="post">
+                    <form action="/maintenance/configure" method="post">
+                        <h2 class="card-title text-center mb-4">Configuration & Version</h2>
+                        
+                        <!-- Database Configuration Section -->
+                        <h4 class="mt-4 mb-3">PostgreSQL Configuration</h4>
                         <div class="mb-3">
                             <label class="form-label">PostgreSQL Host</label>
                             <div class="input-group input-group-flat">
@@ -108,9 +112,103 @@
                             </div>
                         </div>
                         
+                        <hr class="my-4">
+                        
+                        <!-- App Version Section -->
+                        <h4 class="mt-4 mb-3">App Version</h4>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label class="form-label">Major</label>
+                                <div class="input-group input-group-flat">
+                                    <span class="input-group-text">
+                                        <i class="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" class="form-control" name="version_major" value="{{.VersionMajor}}" required>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Minor</label>
+                                <div class="input-group input-group-flat">
+                                    <span class="input-group-text">
+                                        <i class="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" class="form-control" name="version_minor" value="{{.VersionMinor}}" required>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Patch</label>
+                                <div class="input-group input-group-flat">
+                                    <span class="input-group-text">
+                                        <i class="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" class="form-control" name="version_patch" value="{{.VersionPatch}}" required>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Build (Auto)</label>
+                                <div class="input-group input-group-flat">
+                                    <span class="input-group-text">
+                                        <i class="ti ti-refresh"></i>
+                                    </span>
+                                    <input type="number" class="form-control bg-light" value="{{.VersionBuild}}" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-muted small mb-3">
+                            <i class="ti ti-info-circle me-1"></i> The build number is automatically incremented on each server restart.
+                        </div>
+                        
+                        <!-- Database Tools Section -->
+                        <hr class="my-4">
+                        <h4 class="mt-4 mb-3">Database Tools</h4>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Current Migration Number</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-database-import"></i>
+                                </span>
+                                <input type="text" class="form-control" name="migration_start" id="migration_start" value="{{.MigrationStart}}" placeholder="e.g. 007">
+                            </div>
+                            <div class="form-text text-muted small">
+                                <i class="ti ti-info-circle me-1"></i> The last applied migration number (format: 001-999). Will apply migrations after this number.
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="reset_migrations" name="reset_migrations" value="1" onchange="toggleMigrationStart()">
+                            <label class="form-check-label" for="reset_migrations">
+                                Reset migration tracking (apply all migrations from beginning)
+                            </label>
+                            <div class="form-text text-muted small">
+                                <i class="ti ti-info-circle me-1"></i> Use this if you've deleted or recreated the database.
+                            </div>
+                        </div>
+                        
+                        <script>
+                        function toggleMigrationStart() {
+                            const checkbox = document.getElementById('reset_migrations');
+                            const migrationField = document.getElementById('migration_start');
+                            
+                            if (checkbox.checked) {
+                                migrationField.disabled = true;
+                                migrationField.value = '0';
+                            } else {
+                                migrationField.disabled = false;
+                                migrationField.value = '{{.MigrationStart}}';
+                            }
+                        }
+                        </script>
+                        
+                        <div class="form-text text-muted mb-3">
+                            <i class="ti ti-tool me-1"></i> The "Initialize Database Schema" option will be automatically run if needed after saving configuration.
+                        </div>
+                        
+                        <!-- Submit Button -->
                         <div class="form-footer">
                             <button type="submit" class="btn btn-primary w-100">
-                                Save Configuration & Restart
+                                <i class="ti ti-device-floppy me-1"></i> Save Configuration & Restart
                             </button>
                         </div>
                     </form>
@@ -119,6 +217,7 @@
             
             <div class="text-center text-muted mt-3">
                 <p>Need help? Contact your system administrator.</p>
+                <p class="text-muted small">Version {{.VersionMajor}}.{{.VersionMinor}}.{{.VersionPatch}}.{{.VersionBuild}}</p>
             </div>
         </div>
     </div>

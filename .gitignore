@@ -1,3 +1,5 @@
 .private
 Auto-GPT
 temp*
+tmp*
+*.log*

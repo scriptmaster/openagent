@@ -87,6 +87,10 @@
         <!-- Project-specific footer scripts -->
         {{.Project.FooterTags | safeHTML}}
     {{end}}
+    
+    <div class="text-center text-muted mt-3">
+        <p class="text-muted small">Version {{.AppVersion}}</p>
+    </div>
 </body>
 </html>
 

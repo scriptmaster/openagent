@@ -133,7 +133,7 @@
             </div>
             
             <div class="text-center text-muted mt-3">
-                Don't have an account yet? <a href="mailto:admin@example.com" tabindex="-1">Contact administrator</a>
+                Don't have an account yet? <a href="mailto:{{.AdminEmail}}" tabindex="-1">Contact administrator</a>
             </div>
         </div>
     </div>
@@ -271,5 +271,8 @@
             }));
         });
     </script>
+    <div class="text-center text-muted mt-5">
+        <p class="text-muted small">Version {{.AppVersion}}</p>
+    </div>
 </body>
 </html>

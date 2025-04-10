@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,89 +22,6 @@ var (
 	db     *sql.DB
 	dbOnce sync.Once
 )
-
-// Database schema initialization SQL
-const initSchema = `
--- Create schema if not exists
-CREATE SCHEMA IF NOT EXISTS ai;
-
--- Users table
-CREATE TABLE IF NOT EXISTS ai.users (
-    id SERIAL PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_logged_in TIMESTAMP WITH TIME ZONE
-);
-
--- Projects table
-CREATE TABLE IF NOT EXISTS ai.projects (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    domain_name TEXT,
-    created_by INTEGER REFERENCES ai.users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Project database connections
-CREATE TABLE IF NOT EXISTS ai.project_dbs (
-    id SERIAL PRIMARY KEY,
-    project_id INTEGER REFERENCES ai.projects(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    description TEXT,
-    db_type TEXT NOT NULL, -- postgresql, mysql, etc.
-    connection_string TEXT NOT NULL, -- base64 encoded
-    schema_name TEXT NOT NULL DEFAULT 'public',
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(project_id, name)
-);
-
--- Tables metadata
-CREATE TABLE IF NOT EXISTS ai.managed_tables (
-    id SERIAL PRIMARY KEY,
-    project_id INTEGER REFERENCES ai.projects(id) ON DELETE CASCADE,
-    project_db_id INTEGER REFERENCES ai.project_dbs(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    schema_name TEXT NOT NULL DEFAULT 'public',
-    description TEXT,
-    initialized BOOLEAN NOT NULL DEFAULT FALSE,
-    read_only BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(project_db_id, schema_name, name)
-);
-
--- Columns metadata (helpful for UI display customization)
-CREATE TABLE IF NOT EXISTS ai.managed_columns (
-    id SERIAL PRIMARY KEY,
-    table_id INTEGER REFERENCES ai.managed_tables(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    display_name TEXT,
-    type TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    visible BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(table_id, name)
-);
-
--- Settings
-CREATE TABLE IF NOT EXISTS ai.settings (
-    id SERIAL PRIMARY KEY,
-    key TEXT NOT NULL,
-    value TEXT,
-    description TEXT,
-    scope TEXT NOT NULL CHECK (scope IN ('system', 'project', 'user')),
-    scope_id INTEGER, -- NULL for system, project_id for project, user_id for user
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(key, scope, COALESCE(scope_id, 0))
-);
-
--- Initial settings
-INSERT INTO ai.settings (key, value, description, scope) 
-VALUES ('app_name', 'Data Manager', 'Application name', 'system') 
-ON CONFLICT (key, scope, COALESCE(scope_id, 0)) DO NOTHING;
-`
 
 // Project represents a project
 type Project struct {
@@ -126,6 +46,181 @@ type ProjectDB struct {
 	CreatedAt        time.Time
 }
 
+// applySchema runs the SQL in migrations directory to initialize the database
+func applySchema(db *sql.DB) error {
+	// First check if the ai schema exists - if not, reset migration tracking
+	var schemaExists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = 'ai')").Scan(&schemaExists)
+	if err != nil {
+		return fmt.Errorf("failed to check if schema exists: %v", err)
+	}
+
+	if !schemaExists {
+		log.Println("AI schema does not exist - resetting migration tracking to apply all migrations")
+		if err := UpdateMigrationStart(0); err != nil {
+			log.Printf("Warning: Failed to reset MIGRATION_START in .env: %v", err)
+		}
+	}
+
+	// Read and execute migration files in order
+	files, err := os.ReadDir("migrations")
+	if err != nil {
+		return fmt.Errorf("failed to read migrations directory: %v", err)
+	}
+
+	// Sort filenames to ensure they're applied in order
+	fileNames := make([]string, 0, len(files))
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
+			continue
+		}
+
+		// Include numbered migration files (supports 001_*.sql format)
+		if strings.HasPrefix(file.Name(), "0") || strings.HasPrefix(file.Name(), "1") {
+			fileNames = append(fileNames, file.Name())
+		}
+	}
+	sort.Strings(fileNames)
+
+	if len(fileNames) == 0 {
+		return fmt.Errorf("no migration files found in migrations directory")
+	}
+
+	// Check for last applied migration number
+	lastApplied := 0
+	if !schemaExists {
+		// Schema doesn't exist, so start from scratch
+		lastApplied = 0
+	} else if migStart := os.Getenv("MIGRATION_START"); migStart != "" {
+		// Parse the migration start number, handle both "007" and "7" formats
+		lastApplied, err = strconv.Atoi(migStart)
+		if err != nil {
+			log.Printf("Warning: Invalid MIGRATION_START value: %s", migStart)
+			lastApplied = 0
+		}
+	}
+
+	// Filter migrations to only include those higher than lastApplied
+	var pendingMigrations []string
+	var highestApplied int
+
+	for _, fileName := range fileNames {
+		// Extract migration number from filename (e.g., "001" from "001_schema.sql")
+		numStr := strings.SplitN(fileName, "_", 2)[0]
+		num, err := strconv.Atoi(numStr)
+		if err != nil {
+			log.Printf("Warning: Invalid migration filename format: %s", fileName)
+			continue
+		}
+
+		// Only apply migrations with higher numbers than last applied
+		if num > lastApplied {
+			pendingMigrations = append(pendingMigrations, fileName)
+		}
+
+		// Track highest migration number
+		if num > highestApplied {
+			highestApplied = num
+		}
+	}
+
+	// No new migrations to apply
+	if len(pendingMigrations) == 0 {
+		log.Printf("No new migrations to apply (last applied: %d)", lastApplied)
+		return nil
+	}
+
+	log.Printf("Found %d pending migrations to apply", len(pendingMigrations))
+
+	// Execute each pending migration
+	for _, fileName := range pendingMigrations {
+		log.Printf("Applying migration: %s", fileName)
+
+		// Read migration file
+		migrationPath := filepath.Join("migrations", fileName)
+		migration, err := os.ReadFile(migrationPath)
+		if err != nil {
+			return fmt.Errorf("failed to read migration %s: %v", fileName, err)
+		}
+
+		// Execute migration
+		if _, err := db.Exec(string(migration)); err != nil {
+			return fmt.Errorf("failed to apply migration %s: %v", fileName, err)
+		}
+	}
+
+	// Update MIGRATION_START in .env file
+	if highestApplied > lastApplied {
+		if err := UpdateMigrationStart(highestApplied); err != nil {
+			log.Printf("Warning: Failed to update MIGRATION_START in .env: %v", err)
+		} else {
+			log.Printf("Updated MIGRATION_START to %d", highestApplied)
+		}
+	}
+
+	log.Println("All migrations applied successfully")
+	return nil
+}
+
+// updateMigrationStart updates the MIGRATION_START value in the .env file
+func updateMigrationStart(migrationNum int) error {
+	// Format migration number with leading zeros for consistent display
+	formattedNum := fmt.Sprintf("%03d", migrationNum)
+
+	// Read existing .env file
+	content, err := os.ReadFile(".env")
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error reading .env file: %v", err)
+	}
+
+	// Parse existing content
+	lines := strings.Split(string(content), "\n")
+	newLines := []string{}
+	migrationStartFound := false
+
+	// Update existing MIGRATION_START line if found
+	for _, line := range lines {
+		if line == "" {
+			newLines = append(newLines, line)
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			newLines = append(newLines, line)
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		if key == "MIGRATION_START" {
+			newLines = append(newLines, fmt.Sprintf("MIGRATION_START=%s", formattedNum))
+			migrationStartFound = true
+		} else {
+			newLines = append(newLines, line)
+		}
+	}
+
+	// Add MIGRATION_START if not found
+	if !migrationStartFound {
+		newLines = append(newLines, fmt.Sprintf("MIGRATION_START=%s", formattedNum))
+	}
+
+	// Write back to .env file
+	return os.WriteFile(".env", []byte(strings.Join(newLines, "\n")), 0644)
+}
+
+// UpdateMigrationStart updates the MIGRATION_START value in the .env file (exported version)
+func UpdateMigrationStart(migrationNum int) error {
+	// Format migration number with leading zeros
+	formattedNum := fmt.Sprintf("%03d", migrationNum)
+
+	// Update the environment variable in the current process
+	os.Setenv("MIGRATION_START", formattedNum)
+
+	// Update the .env file
+	return updateMigrationStart(migrationNum)
+}
+
 // InitDB initializes the database connection
 func InitDB() (*sql.DB, error) {
 	var err error
@@ -143,23 +238,109 @@ func InitDB() (*sql.DB, error) {
 			return
 		}
 
-		// Create connection string
-		connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		// Create connection string with additional parameters
+		connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=10",
 			host, port, user, password, dbname)
 
 		// Connect to the database with retry
 		var dbErr error
 		for attempts := 0; attempts < 3; attempts++ {
-			log.Printf("Connecting to PostgreSQL (attempt %d)...", attempts+1)
+			log.Printf("Connecting to PostgreSQL %s@%s:%s (attempt %d)...", user, host, port, attempts+1)
 			db, dbErr = sql.Open("postgres", connStr)
 			if dbErr == nil {
 				// Test the connection
 				if err := db.Ping(); err == nil {
 					break
+				} else {
+					dbErr = err
+					log.Printf("Connection established but ping failed: %v", err)
 				}
 			}
 			log.Printf("Failed to connect: %v. Retrying in 2 seconds...", dbErr)
 			time.Sleep(2 * time.Second)
+		}
+
+		if dbErr != nil {
+			// Check if the error is "database does not exist"
+			if strings.Contains(dbErr.Error(), "does not exist") {
+				log.Printf("Database %q does not exist, attempting to create it...", dbname)
+
+				// Try to connect to default postgres database (same as username) to create the missing database
+				defaultConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=10",
+					host, port, user, password, user)
+
+				// Open connection to default database
+				defaultDB, err := sql.Open("postgres", defaultConnStr)
+				pingErr := err
+				if err == nil {
+					pingErr = defaultDB.Ping()
+				}
+
+				// If we couldn't connect to the user's default database, try the 'postgres' database
+				if pingErr != nil {
+					log.Printf("Failed to connect to user's default database: %v, trying 'postgres' database...", pingErr)
+
+					// Try connecting to the standard 'postgres' database
+					defaultConnStr = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=disable connect_timeout=10",
+						host, port, user, password)
+					defaultDB, err = sql.Open("postgres", defaultConnStr)
+					if err == nil {
+						pingErr = defaultDB.Ping()
+						if pingErr != nil {
+							log.Printf("Failed to ping 'postgres' database: %v", pingErr)
+							err = pingErr // Set err for the next check
+							if defaultDB != nil {
+								defaultDB.Close()
+							}
+						}
+					} else {
+						log.Printf("Failed to connect to 'postgres' database: %v", err)
+					}
+				}
+
+				// If we have a valid connection to either database, try to create the target database
+				if err == nil && pingErr == nil {
+					defer defaultDB.Close()
+
+					// Create the database
+					createSQL := fmt.Sprintf("CREATE DATABASE %s", dbname)
+					_, err := defaultDB.Exec(createSQL)
+					if err != nil {
+						// Check if error is because database already exists
+						if strings.Contains(err.Error(), "already exists") {
+							log.Printf("Database %q already exists, continuing with connection", dbname)
+
+							// Try connecting to the existing database
+							db, dbErr = sql.Open("postgres", connStr)
+							if dbErr == nil {
+								if err := db.Ping(); err == nil {
+									log.Printf("Successfully connected to existing database %q", dbname)
+								} else {
+									dbErr = err
+									log.Printf("Failed to connect to existing database: %v", err)
+								}
+							}
+						} else {
+							log.Printf("Failed to create database %q: %v", dbname, err)
+						}
+					} else {
+						log.Printf("Successfully created database %q", dbname)
+
+						// Try connecting to the newly created database
+						db, dbErr = sql.Open("postgres", connStr)
+						if dbErr == nil {
+							if err := db.Ping(); err == nil {
+								log.Printf("Successfully connected to newly created database %q", dbname)
+							} else {
+								dbErr = err
+								log.Printf("Failed to connect to newly created database: %v", err)
+							}
+						}
+					}
+				} else {
+					log.Printf("Could not connect to any database to create %q", dbname)
+				}
+			}
 		}
 
 		if dbErr != nil {
@@ -173,7 +354,8 @@ func InitDB() (*sql.DB, error) {
 		db.SetConnMaxLifetime(5 * time.Minute)
 
 		// Initialize database schema
-		if _, err := db.Exec(initSchema); err != nil {
+		if err := applySchema(db); err != nil {
+			log.Printf("SCHEMA INITIALIZATION ERROR: %v", err)
 			err = fmt.Errorf("failed to initialize PostgreSQL schema: %v", err)
 			return
 		}
