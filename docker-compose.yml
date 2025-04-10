@@ -5,13 +5,14 @@ services:
     build: . # Build the image from the Dockerfile in the current directory
     container_name: openagent-service
     ports:
-      - "8080:8080" # Map host port 8080 to container port 8080
+      - "8800:8800" # Map host port 8800 to container port 8800
     volumes:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
       - ./static:/app/static # Map static assets
+      - ./tpl:/app/tpl # Map template files
     environment:
       # --- Application Settings ---
-      PORT: 8080
+      PORT: 8800
       DATA_DIR: /app/data
       # --- PostgreSQL Connection (Optional) ---
       DB_HOST: postgres

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.AppName}} - Admin Dashboard</title>
+    <!-- Tabler Core -->
+    <link rel="stylesheet" href="/static/css/tabler.min.css">
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
+</head>
+<body>
+    <div class="page" x-data="adminDashboard()">
+        <!-- Navbar -->
+        <header class="navbar navbar-expand-md navbar-light d-print-none">
+            <div class="container-xl">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
+                    <a href=".">
+                        <img src="/static/img/logo.svg" width="110" height="32" alt="{{.AppName}}" class="navbar-brand-image">
+                    </a>
+                </h1>
+                <div class="navbar-nav flex-row order-md-last">
+                    <div class="nav-item dropdown">
+                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                            <div class="d-none d-xl-block ps-2">
+                                <div>{{.User.Email}}</div>
+                                <div class="mt-1 small text-muted">Administrator</div>
+                            </div>
+                            <span class="avatar avatar-sm bg-blue-lt ms-2">
+                                <i class="ti ti-user"></i>
+                            </span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <a href="/profile" class="dropdown-item">Profile</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Navbar menu -->
+        <div class="navbar-expand-md">
+            <div class="collapse navbar-collapse" id="navbar-menu">
+                <div class="navbar navbar-light">
+                    <div class="container-xl">
+                        <ul class="navbar-nav">
+                            <li class="nav-item active">
+                                <a class="nav-link" href="/admin">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-dashboard"></i>
+                                    </span>
+                                    <span class="nav-link-title">Dashboard</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/projects">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-folder"></i>
+                                    </span>
+                                    <span class="nav-link-title">Projects</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/connections">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-database"></i>
+                                    </span>
+                                    <span class="nav-link-title">Database Connections</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/tables">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-table"></i>
+                                    </span>
+                                    <span class="nav-link-title">Tables</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/users">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-users"></i>
+                                    </span>
+                                    <span class="nav-link-title">Users</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/settings">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-settings"></i>
+                                    </span>
+                                    <span class="nav-link-title">Settings</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/agent.html">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-robot"></i>
+                                    </span>
+                                    <span class="nav-link-title">Agent Interface</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Page content -->
+        <div class="page-wrapper">
+            <div class="page-header d-print-none">
+                <div class="container-xl">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <h2 class="page-title">
+                                Admin Dashboard
+                            </h2>
+                            <div class="text-muted mt-1">Database Management System</div>
+                        </div>
+                        <!-- Page actions -->
+                        <div class="col-auto ms-auto d-print-none">
+                            <div class="btn-list">
+                                <a href="/tables/new" class="btn btn-primary d-none d-sm-inline-block">
+                                    <i class="ti ti-plus"></i> New Table
+                                </a>
+                                <a href="/connections/new" class="btn btn-success d-none d-sm-inline-block">
+                                    <i class="ti ti-plus"></i> New Connection
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page body -->
+            <div class="page-body">
+                <div class="container-xl">
+                    <div class="row row-deck row-cards">
+                        <!-- Stats cards -->
+                        <div class="col-sm-6 col-lg-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="subheader">Projects</div>
+                                        <div class="ms-auto lh-1">
+                                            <a href="/projects" class="text-muted">View all</a>
+                                        </div>
+                                    </div>
+                                    <div class="h1 mb-3">{{.Stats.ProjectCount}}</div>
+                                    <div class="d-flex mb-2">
+                                        <div>Active projects</div>
+                                        <div class="ms-auto">
+                                            <span class="text-green d-inline-flex align-items-center lh-1">
+                                                <i class="ti ti-trending-up"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-sm-6 col-lg-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="subheader">Database Connections</div>
+                                        <div class="ms-auto lh-1">
+                                            <a href="/connections" class="text-muted">View all</a>
+                                        </div>
+                                    </div>
+                                    <div class="h1 mb-3">{{.Stats.ConnectionCount}}</div>
+                                    <div class="d-flex mb-2">
+                                        <div>Active connections</div>
+                                        <div class="ms-auto">
+                                            <span class="text-green d-inline-flex align-items-center lh-1">
+                                                <i class="ti ti-trending-up"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-sm-6 col-lg-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="subheader">Managed Tables</div>
+                                        <div class="ms-auto lh-1">
+                                            <a href="/tables" class="text-muted">View all</a>
+                                        </div>
+                                    </div>
+                                    <div class="h1 mb-3">{{.Stats.TableCount}}</div>
+                                    <div class="d-flex mb-2">
+                                        <div>Initialized tables</div>
+                                        <div class="ms-auto">
+                                            <span class="text-green d-inline-flex align-items-center lh-1">
+                                                <i class="ti ti-trending-up"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-sm-6 col-lg-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="subheader">Users</div>
+                                        <div class="ms-auto lh-1">
+                                            <a href="/users" class="text-muted">View all</a>
+                                        </div>
+                                    </div>
+                                    <div class="h1 mb-3">{{.Stats.UserCount}}</div>
+                                    <div class="d-flex mb-2">
+                                        <div>Active users</div>
+                                        <div class="ms-auto">
+                                            <span class="text-green d-inline-flex align-items-center lh-1">
+                                                <i class="ti ti-trending-up"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent projects -->
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Recent Projects</h3>
+                                </div>
+                                <div class="card-table table-responsive">
+                                    <table class="table table-vcenter">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Domain</th>
+                                                <th>Connections</th>
+                                                <th>Tables</th>
+                                                <th>Created</th>
+                                                <th>Created By</th>
+                                                <th class="w-1"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {{range .Projects}}
+                                            <tr>
+                                                <td>{{.Name}}</td>
+                                                <td>{{.DomainName}}</td>
+                                                <td>{{.ConnectionCount}}</td>
+                                                <td>{{.TableCount}}</td>
+                                                <td>{{.CreatedAt | formatTime}}</td>
+                                                <td>{{.Creator.Email}}</td>
+                                                <td>
+                                                    <a href="/projects/{{.ID}}" class="btn btn-sm btn-primary">View</a>
+                                                </td>
+                                            </tr>
+                                            {{else}}
+                                            <tr>
+                                                <td colspan="7" class="text-center">No projects found</td>
+                                            </tr>
+                                            {{end}}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent database activity -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Recent Database Activity</h3>
+                                </div>
+                                <div class="list-group list-group-flush overflow-auto" style="max-height: 35rem">
+                                    {{range .RecentActivity}}
+                                    <div class="list-group-item">
+                                        <div class="row">
+                                            <div class="col-auto">
+                                                <span class="avatar bg-{{.ActionColor}}-lt">
+                                                    <i class="ti ti-{{.ActionIcon}}"></i>
+                                                </span>
+                                            </div>
+                                            <div class="col">
+                                                <div class="text-truncate">
+                                                    {{.Description}}
+                                                </div>
+                                                <div class="text-muted">{{.UserEmail}} • {{.Timestamp | formatTime}}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {{else}}
+                                    <div class="list-group-item">
+                                        <div class="row">
+                                            <div class="col text-center">
+                                                No recent activity
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- System health -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">System Health</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="d-flex mb-1">
+                                            <div>Database Connections</div>
+                                            <div class="ms-auto">
+                                                <span class="text-{{if ge .SystemHealth.DBConnectionsPercent 90}}green{{else if ge .SystemHealth.DBConnectionsPercent 70}}yellow{{else}}red{{end}}">{{.SystemHealth.DBConnectionsPercent}}%</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-{{if ge .SystemHealth.DBConnectionsPercent 90}}green{{else if ge .SystemHealth.DBConnectionsPercent 70}}yellow{{else}}red{{end}}" style="width: {{.SystemHealth.DBConnectionsPercent}}%" role="progressbar" aria-valuenow="{{.SystemHealth.DBConnectionsPercent}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{.SystemHealth.DBConnectionsPercent}}% Complete">
+                                                <span class="visually-hidden">{{.SystemHealth.DBConnectionsPercent}}% Complete</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <div class="d-flex mb-1">
+                                            <div>API Response Time</div>
+                                            <div class="ms-auto">
+                                                <span class="text-{{if le .SystemHealth.APIResponseTime 200}}green{{else if le .SystemHealth.APIResponseTime 500}}yellow{{else}}red{{end}}">{{.SystemHealth.APIResponseTime}}ms</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-{{if le .SystemHealth.APIResponseTime 200}}green{{else if le .SystemHealth.APIResponseTime 500}}yellow{{else}}red{{end}}" style="width: {{.SystemHealth.APIResponseTimePercent}}%" role="progressbar" aria-valuenow="{{.SystemHealth.APIResponseTimePercent}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{.SystemHealth.APIResponseTimePercent}}% Complete">
+                                                <span class="visually-hidden">{{.SystemHealth.APIResponseTimePercent}}% Complete</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <div class="d-flex mb-1">
+                                            <div>Memory Usage</div>
+                                            <div class="ms-auto">
+                                                <span class="text-{{if le .SystemHealth.MemoryUsagePercent 70}}green{{else if le .SystemHealth.MemoryUsagePercent 90}}yellow{{else}}red{{end}}">{{.SystemHealth.MemoryUsagePercent}}%</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-{{if le .SystemHealth.MemoryUsagePercent 70}}green{{else if le .SystemHealth.MemoryUsagePercent 90}}yellow{{else}}red{{end}}" style="width: {{.SystemHealth.MemoryUsagePercent}}%" role="progressbar" aria-valuenow="{{.SystemHealth.MemoryUsagePercent}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{.SystemHealth.MemoryUsagePercent}}% Complete">
+                                                <span class="visually-hidden">{{.SystemHealth.MemoryUsagePercent}}% Complete</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div class="d-flex mb-1">
+                                            <div>CPU Usage</div>
+                                            <div class="ms-auto">
+                                                <span class="text-{{if le .SystemHealth.CPUUsagePercent 70}}green{{else if le .SystemHealth.CPUUsagePercent 90}}yellow{{else}}red{{end}}">{{.SystemHealth.CPUUsagePercent}}%</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-{{if le .SystemHealth.CPUUsagePercent 70}}green{{else if le .SystemHealth.CPUUsagePercent 90}}yellow{{else}}red{{end}}" style="width: {{.SystemHealth.CPUUsagePercent}}%" role="progressbar" aria-valuenow="{{.SystemHealth.CPUUsagePercent}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{.SystemHealth.CPUUsagePercent}}% Complete">
+                                                <span class="visually-hidden">{{.SystemHealth.CPUUsagePercent}}% Complete</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <footer class="footer footer-transparent d-print-none">
+                <div class="container-xl">
+                    <div class="row text-center align-items-center flex-row-reverse">
+                        <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    {{.AppName}} &copy; {{.CurrentYear}}
+                                </li>
+                                <li class="list-inline-item">
+                                    <a href="https://tabler.io" class="link-secondary" target="_blank">UI powered by Tabler</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <!-- Alpine.js -->
+    <script src="/static/js/alpine.min.js" defer></script>
+    <!-- Tabler Core -->
+    <script src="/static/js/tabler.min.js"></script>
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('adminDashboard', () => ({
+                init() {
+                    // You can initialize charts or other dashboard components here
+                    this.initCharts();
+                },
+                
+                initCharts() {
+                    // Chart initialization can be added here if needed
+                    // This is just a placeholder for now
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

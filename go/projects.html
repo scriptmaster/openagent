@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.PageTitle}}</title>
+    <!-- Tabler Core -->
+    <link rel="stylesheet" href="/static/css/tabler.min.css">
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
+</head>
+<body>
+    <div class="page" x-data="projectsManager()">
+        <!-- Navbar -->
+        <header class="navbar navbar-expand-md navbar-light d-print-none">
+            <div class="container-xl">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
+                    <a href=".">
+                        <img src="/static/img/logo.svg" width="110" height="32" alt="{{.AppName}}" class="navbar-brand-image">
+                    </a>
+                </h1>
+                <div class="navbar-nav flex-row order-md-last">
+                    <div class="nav-item dropdown">
+                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                            <div class="d-none d-xl-block ps-2">
+                                <div>{{.User.Email}}</div>
+                                <div class="mt-1 small text-muted">{{if .User.IsAdmin}}Administrator{{else}}User{{end}}</div>
+                            </div>
+                            <span class="avatar avatar-sm bg-blue-lt ms-2">
+                                <i class="ti ti-user"></i>
+                            </span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <a href="/profile" class="dropdown-item">Profile</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Navbar menu -->
+        <div class="navbar-expand-md">
+            <div class="collapse navbar-collapse" id="navbar-menu">
+                <div class="navbar navbar-light">
+                    <div class="container-xl">
+                        <ul class="navbar-nav">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{if .User.IsAdmin}}/admin{{else}}/agent.html{{end}}">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-dashboard"></i>
+                                    </span>
+                                    <span class="nav-link-title">Dashboard</span>
+                                </a>
+                            </li>
+                            <li class="nav-item active">
+                                <a class="nav-link" href="/projects">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-folder"></i>
+                                    </span>
+                                    <span class="nav-link-title">Projects</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/connections">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-database"></i>
+                                    </span>
+                                    <span class="nav-link-title">Database Connections</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/tables">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-table"></i>
+                                    </span>
+                                    <span class="nav-link-title">Tables</span>
+                                </a>
+                            </li>
+                            {{if .User.IsAdmin}}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/users">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-users"></i>
+                                    </span>
+                                    <span class="nav-link-title">Users</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/settings">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-settings"></i>
+                                    </span>
+                                    <span class="nav-link-title">Settings</span>
+                                </a>
+                            </li>
+                            {{end}}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/agent.html">
+                                    <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                        <i class="ti ti-robot"></i>
+                                    </span>
+                                    <span class="nav-link-title">Agent Interface</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Page content -->
+        <div class="page-wrapper">
+            <!-- Page header -->
+            <div class="page-header d-print-none">
+                <div class="container-xl">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <h2 class="page-title">
+                                Projects
+                            </h2>
+                            <div class="text-muted mt-1">Manage your web projects</div>
+                        </div>
+                        <div class="col-auto ms-auto d-print-none">
+                            <div class="btn-list">
+                                <button type="button" class="btn btn-primary" @click="openNewProjectModal()">
+                                    <i class="ti ti-plus"></i> New Project
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page body -->
+            <div class="page-body">
+                <div class="container-xl">
+                    <!-- Projects List View -->
+                    <div class="row row-cards" x-show="!selectedProject">
+                        <!-- Project cards -->
+                        {{range .Projects}}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <h3 class="card-title mb-1">{{.Name}}</h3>
+                                            <div class="text-muted">
+                                                <a href="https://{{.DomainName}}" target="_blank" class="text-reset">{{.DomainName}}</a>
+                                            </div>
+                                        </div>
+                                        <div class="ms-auto">
+                                            <span class="badge bg-{{if .IsActive}}green{{else}}gray{{end}}">
+                                                {{if .IsActive}}Active{{else}}Inactive{{end}}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="row g-2">
+                                            <div class="col-auto">
+                                                <a href="#" class="btn btn-primary btn-sm" @click.prevent="editProject('{{.ID}}')">
+                                                    <i class="ti ti-edit"></i> Edit
+                                                </a>
+                                            </div>
+                                            <div class="col-auto">
+                                                <a href="#" class="btn btn-info btn-sm" 
+                                                    @click.prevent="previewProject('{{.ID}}')">
+                                                    <i class="ti ti-eye"></i> Preview
+                                                </a>
+                                            </div>
+                                            <div class="col-auto ms-auto">
+                                                <a href="#" class="btn btn-danger btn-sm" 
+                                                    @click.prevent="confirmDeleteProject('{{.ID}}')">
+                                                    <i class="ti ti-trash"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {{else}}
+                        <div class="col-12">
+                            <div class="empty">
+                                <div class="empty-img">
+                                    <i class="ti ti-folder-off" style="font-size: 4rem;"></i>
+                                </div>
+                                <p class="empty-title">No projects found</p>
+                                <p class="empty-subtitle text-muted">
+                                    Get started by creating your first project.
+                                </p>
+                                <div class="empty-action">
+                                    <button type="button" class="btn btn-primary" @click="openNewProjectModal()">
+                                        <i class="ti ti-plus"></i>
+                                        Create new project
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                    
+                    <!-- Project Detail View -->
+                    <div x-show="selectedProject">
+                        <!-- Project Editing Tabs -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center w-100">
+                                    <h3 class="card-title" x-text="selectedProject ? selectedProject.name : ''"></h3>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn btn-outline-primary" @click="closeProjectEditor()">
+                                            <i class="ti ti-arrow-left"></i> Back to Projects
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex mb-4">
+                                    <div class="text-muted">
+                                        <span class="ti ti-world me-1"></span>
+                                        <a x-bind:href="'https://' + (selectedProject ? selectedProject.domainName : '')" 
+                                           target="_blank" x-text="selectedProject ? selectedProject.domainName : ''"></a>
+                                    </div>
+                                    
+                                    <div class="ms-auto">
+                                        <button class="btn btn-success" @click="saveProjectChanges()">
+                                            <i class="ti ti-device-floppy"></i> Save Changes
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tabs -->
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="tabs-menu">
+                                            <ul class="nav nav-tabs" role="tablist">
+                                                <li class="nav-item" role="presentation">
+                                                    <a href="#general" class="nav-link active" 
+                                                       data-bs-toggle="tab" aria-selected="true" role="tab">
+                                                        <i class="ti ti-settings me-1"></i> General Settings
+                                                    </a>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <a href="#home-page" class="nav-link" 
+                                                       data-bs-toggle="tab" aria-selected="false" role="tab">
+                                                        <i class="ti ti-home me-1"></i> Home Page
+                                                    </a>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <a href="#pages" class="nav-link" 
+                                                       data-bs-toggle="tab" aria-selected="false" role="tab">
+                                                        <i class="ti ti-files me-1"></i> Pages
+                                                    </a>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <a href="#connections" class="nav-link" 
+                                                       data-bs-toggle="tab" aria-selected="false" role="tab">
+                                                        <i class="ti ti-database me-1"></i> Database Connections
+                                                    </a>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <a href="#logo" class="nav-link" 
+                                                       data-bs-toggle="tab" aria-selected="false" role="tab">
+                                                        <i class="ti ti-brand-svg me-1"></i> Logo
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div class="tab-content">
+                                            <!-- General settings tab content -->
+                                            <div id="general" class="tab-pane active show" role="tabpanel">
+                                                <div class="mt-3">
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Project Name</label>
+                                                                <input type="text" class="form-control" x-model="selectedProject.name" 
+                                                                       @input="updateSlug" placeholder="My Project">
+                                                                <small class="form-hint">The name of your project</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Domain Name</label>
+                                                                <input type="text" class="form-control" x-model="selectedProject.domainName" 
+                                                                       placeholder="example.com">
+                                                                <small class="form-hint">The domain where this project will be hosted</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Slug</label>
+                                                                <input type="text" class="form-control" x-model="selectedProject.slug" 
+                                                                       placeholder="my-project" readonly>
+                                                                <small class="form-hint">URL-friendly version of the name (auto-generated)</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Status</label>
+                                                                <select class="form-select" x-model="selectedProject.isActive">
+                                                                    <option value="true">Active</option>
+                                                                    <option value="false">Inactive</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Description</label>
+                                                                <textarea class="form-control" x-model="selectedProject.description" 
+                                                                          rows="4" placeholder="Project description..."></textarea>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Home page tab content -->
+                                            <div id="home-page" class="tab-pane" role="tabpanel">
+                                                <div class="mt-3">
+                                                    <div class="alert alert-info" role="alert">
+                                                        <i class="ti ti-info-circle me-2"></i>
+                                                        The home page is served at <code>https://<span x-text="selectedProject.domainName"></span></code> and <code>/app/<span x-text="selectedProject.slug"></span>/</code>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <ul class="nav nav-tabs nav-fill" data-bs-toggle="tabs">
+                                                            <li class="nav-item">
+                                                                <a href="#home-header" class="nav-link active" data-bs-toggle="tab">
+                                                                    <i class="ti ti-code me-1"></i> Header Tags
+                                                                </a>
+                                                            </li>
+                                                            <li class="nav-item">
+                                                                <a href="#home-content" class="nav-link" data-bs-toggle="tab">
+                                                                    <i class="ti ti-layout-board-split me-1"></i> Content
+                                                                </a>
+                                                            </li>
+                                                            <li class="nav-item">
+                                                                <a href="#home-footer" class="nav-link" data-bs-toggle="tab">
+                                                                    <i class="ti ti-code me-1"></i> Footer Scripts
+                                                                </a>
+                                                            </li>
+                                                            <li class="nav-item">
+                                                                <a href="#home-preview" class="nav-link" data-bs-toggle="tab">
+                                                                    <i class="ti ti-eye me-1"></i> Preview
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                        
+                                                        <div class="card">
+                                                            <div class="card-body">
+                                                                <div class="tab-content">
+                                                                    <div class="tab-pane active show" id="home-header">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">
+                                                                                Meta Tags & Header Content
+                                                                                <span class="form-help" data-bs-toggle="popover" data-bs-html="true"
+                                                                                      data-bs-content="Include meta tags, SEO tags, Open Graph tags, etc. <br><strong>Example:</strong><br><pre>&lt;meta name=&quot;description&quot; content=&quot;...&quot;&gt;</pre>">?</span>
+                                                                            </label>
+                                                                            <textarea class="form-control font-monospace" x-model="selectedProject.homePage.headerTags" 
+                                                                                      rows="10" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="tab-pane" id="home-content">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">
+                                                                                Page Content
+                                                                                <span class="form-help" data-bs-toggle="popover" data-bs-html="true"
+                                                                                      data-bs-content="HTML content for the home page. This will be inserted in the body.<br><strong>Example:</strong><br><pre>&lt;div class=&quot;container&quot;&gt;...&lt;/div&gt;</pre>">?</span>
+                                                                            </label>
+                                                                            <div class="btn-group mb-2">
+                                                                                <button type="button" class="btn btn-sm btn-outline-primary" @click="editWithAgent('homePage.content')">
+                                                                                    <i class="ti ti-robot me-1"></i> Edit with Agent
+                                                                                </button>
+                                                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="formatCode('homePage.content')">
+                                                                                    <i class="ti ti-code me-1"></i> Format Code
+                                                                                </button>
+                                                                            </div>
+                                                                            <textarea class="form-control font-monospace" x-model="selectedProject.homePage.content" 
+                                                                                      rows="20" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="tab-pane" id="home-footer">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">
+                                                                                Footer Scripts
+                                                                                <span class="form-help" data-bs-toggle="popover" data-bs-html="true"
+                                                                                      data-bs-content="Scripts to be included before the closing body tag.<br><strong>Example:</strong><br><pre>&lt;script&gt;// Custom scripts...&lt;/script&gt;</pre>">?</span>
+                                                                            </label>
+                                                                            <textarea class="form-control font-monospace" x-model="selectedProject.homePage.footerTags" 
+                                                                                      rows="10" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="tab-pane" id="home-preview">
+                                                                        <div class="mb-3">
+                                                                            <button type="button" class="btn btn-outline-primary" @click="refreshPreview()">
+                                                                                <i class="ti ti-refresh me-1"></i> Refresh Preview
+                                                                            </button>
+                                                                        </div>
+                                                                        <div class="border rounded" style="height: 600px;">
+                                                                            <iframe id="previewFrame" style="width: 100%; height: 100%; border: none;" 
+                                                                                    sandbox="allow-same-origin allow-scripts"></iframe>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Pages tab content -->
+                                            <div id="pages" class="tab-pane" role="tabpanel">
+                                                <div class="mt-3">
+                                                    <div class="alert alert-info" role="alert">
+                                                        <i class="ti ti-info-circle me-2"></i>
+                                                        Additional pages are served at <code>https://<span x-text="selectedProject.domainName"></span>/page-name</code> 
+                                                        and <code>/app/<span x-text="selectedProject.slug"></span>/page-name</code>
+                                                    </div>
+                                                    
+                                                    <div class="d-flex mb-3">
+                                                        <h3>Project Pages</h3>
+                                                        <div class="ms-auto">
+                                                            <button class="btn btn-primary" @click="addNewPage()">
+                                                                <i class="ti ti-plus me-1"></i> New Page
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <div class="row align-items-center" x-show="!selectedPage">
+                                                                <div class="col">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-vcenter card-table">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>Page Name</th>
+                                                                                    <th>Slug</th>
+                                                                                    <th>Last Updated</th>
+                                                                                    <th class="w-1"></th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                <template x-for="(page, index) in selectedProject.pages" :key="index">
+                                                                                    <tr>
+                                                                                        <td x-text="page.name"></td>
+                                                                                        <td>
+                                                                                            <code x-text="page.slug"></code>
+                                                                                        </td>
+                                                                                        <td x-text="formatDate(page.updatedAt)"></td>
+                                                                                        <td class="text-end">
+                                                                                            <div class="btn-group">
+                                                                                                <button class="btn btn-sm btn-primary" @click="editPage(index)">
+                                                                                                    <i class="ti ti-edit"></i>
+                                                                                                </button>
+                                                                                                <button class="btn btn-sm btn-danger" @click="deletePage(index)">
+                                                                                                    <i class="ti ti-trash"></i>
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </template>
+                                                                                <tr x-show="!selectedProject.pages || selectedProject.pages.length === 0">
+                                                                                    <td colspan="4" class="text-center">No pages created yet</td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <!-- Page editor (shown when a page is selected) -->
+                                                            <div x-show="selectedPage !== null">
+                                                                <div class="d-flex align-items-center mb-3">
+                                                                    <h3 x-text="getPageEditorTitle()"></h3>
+                                                                    <div class="ms-auto">
+                                                                        <button class="btn btn-outline-primary" @click="backToPagesList()">
+                                                                            <i class="ti ti-arrow-left me-1"></i> Back to Pages
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="row g-3 mb-3">
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">Page Name</label>
+                                                                            <input type="text" class="form-control" x-model="pageForm.name" 
+                                                                                   @input="updatePageSlug" placeholder="About Us">
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">Page Slug</label>
+                                                                            <input type="text" class="form-control" x-model="pageForm.slug" 
+                                                                                   placeholder="about-us" readonly>
+                                                                            <small class="form-hint">URL-friendly name (auto-generated)</small>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <ul class="nav nav-tabs nav-fill mb-3" data-bs-toggle="tabs">
+                                                                    <li class="nav-item">
+                                                                        <a href="#page-header" class="nav-link active" data-bs-toggle="tab">
+                                                                            <i class="ti ti-code me-1"></i> Header Tags
+                                                                        </a>
+                                                                    </li>
+                                                                    <li class="nav-item">
+                                                                        <a href="#page-content" class="nav-link" data-bs-toggle="tab">
+                                                                            <i class="ti ti-layout-board-split me-1"></i> Content
+                                                                        </a>
+                                                                    </li>
+                                                                    <li class="nav-item">
+                                                                        <a href="#page-footer" class="nav-link" data-bs-toggle="tab">
+                                                                            <i class="ti ti-code me-1"></i> Footer Scripts
+                                                                        </a>
+                                                                    </li>
+                                                                </ul>
+                                                                
+                                                                <div class="tab-content">
+                                                                    <div class="tab-pane active show" id="page-header">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">Meta Tags & Header Content</label>
+                                                                            <textarea class="form-control font-monospace" x-model="pageForm.headerTags" 
+                                                                                      rows="10" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="tab-pane" id="page-content">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">Page Content</label>
+                                                                            <div class="btn-group mb-2">
+                                                                                <button type="button" class="btn btn-sm btn-outline-primary" @click="editPageWithAgent()">
+                                                                                    <i class="ti ti-robot me-1"></i> Edit with Agent
+                                                                                </button>
+                                                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="formatPageCode()">
+                                                                                    <i class="ti ti-code me-1"></i> Format Code
+                                                                                </button>
+                                                                            </div>
+                                                                            <textarea class="form-control font-monospace" x-model="pageForm.content" 
+                                                                                      rows="20" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="tab-pane" id="page-footer">
+                                                                        <div class="form-group">
+                                                                            <label class="form-label">Footer Scripts</label>
+                                                                            <textarea class="form-control font-monospace" x-model="pageForm.footerTags" 
+                                                                                      rows="10" style="tab-size: 2;"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="mt-3">
+                                                                    <button type="button" class="btn btn-primary" @click="savePage()">
+                                                                        <i class="ti ti-device-floppy me-1"></i> Save Page
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Database Connections tab content -->
+                                            <div id="connections" class="tab-pane" role="tabpanel">
+                                                <div class="mt-3">
+                                                    <div class="d-flex mb-3">
+                                                        <h3>Database Connections</h3>
+                                                        <div class="ms-auto">
+                                                            <button class="btn btn-primary" @click="addNewConnection()">
+                                                                <i class="ti ti-plus me-1"></i> New Connection
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <div class="table-responsive">
+                                                                <table class="table table-vcenter card-table">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>Name</th>
+                                                                            <th>Type</th>
+                                                                            <th>Host</th>
+                                                                            <th>Database</th>
+                                                                            <th>Status</th>
+                                                                            <th class="w-1"></th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        <template x-for="(conn, index) in selectedProject.connections" :key="index">
+                                                                            <tr>
+                                                                                <td x-text="conn.name"></td>
+                                                                                <td x-text="conn.type"></td>
+                                                                                <td x-text="conn.host"></td>
+                                                                                <td x-text="conn.database"></td>
+                                                                                <td>
+                                                                                    <span class="badge" 
+                                                                                        :class="conn.isActive ? 'bg-green' : 'bg-gray'"
+                                                                                        x-text="conn.isActive ? 'Active' : 'Inactive'"></span>
+                                                                                </td>
+                                                                                <td class="text-end">
+                                                                                    <div class="btn-group">
+                                                                                        <button class="btn btn-sm btn-primary" @click="editConnection(index)">
+                                                                                            <i class="ti ti-edit"></i>
+                                                                                        </button>
+                                                                                        <button class="btn btn-sm btn-info" @click="testConnection(index)">
+                                                                                            <i class="ti ti-test-pipe"></i>
+                                                                                        </button>
+                                                                                        <button class="btn btn-sm btn-danger" @click="deleteConnection(index)">
+                                                                                            <i class="ti ti-trash"></i>
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        </template>
+                                                                        <tr x-show="!selectedProject.connections || selectedProject.connections.length === 0">
+                                                                            <td colspan="6" class="text-center">No database connections configured</td>
+                                                                        </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Logo Generation tab content -->
+                                            <div id="logo" class="tab-pane" role="tabpanel">
+                                                <div class="mt-3">
+                                                    <div class="alert alert-info" role="alert">
+                                                        <i class="ti ti-info-circle me-2"></i>
+                                                        The logo will be available at <code>https://<span x-text="selectedProject.domainName"></span>/logo.svg</code> and <code>/app/<span x-text="selectedProject.slug"></span>/logo.svg</code>
+                                                    </div>
+
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h3 class="card-title">Logo Generator</h3>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">AI Prompt for Logo</label>
+                                                                        <textarea class="form-control" x-model="selectedProject.logoPrompt" rows="3" 
+                                                                                placeholder="Describe the logo you want to generate... e.g., 'A modern, minimalist logo for a tech company with blue and green colors'"></textarea>
+                                                                    </div>
+                                                                    
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Logo Type</label>
+                                                                        <div class="form-selectgroup">
+                                                                            <label class="form-selectgroup-item">
+                                                                                <input type="radio" name="logoType" value="text" class="form-selectgroup-input" x-model="selectedProject.logoType" checked>
+                                                                                <span class="form-selectgroup-label">Text + Icon</span>
+                                                                            </label>
+                                                                            <label class="form-selectgroup-item">
+                                                                                <input type="radio" name="logoType" value="icon" class="form-selectgroup-input" x-model="selectedProject.logoType">
+                                                                                <span class="form-selectgroup-label">Icon Only</span>
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Primary Color</label>
+                                                                        <input type="color" class="form-control form-control-color" x-model="selectedProject.logoColor" value="#206BC4">
+                                                                    </div>
+                                                                    
+                                                                    <div class="mb-3" x-show="selectedProject.logoType === 'text'">
+                                                                        <label class="form-label">Logo Text</label>
+                                                                        <input type="text" class="form-control" x-model="selectedProject.logoText" placeholder="Company or product name">
+                                                                        <small class="form-hint">Leave empty to use project name</small>
+                                                                    </div>
+                                                                    
+                                                                    <div class="d-flex mt-4">
+                                                                        <button type="button" class="btn btn-primary" @click="generateLogo()">
+                                                                            <i class="ti ti-robot me-1"></i> Generate Logo
+                                                                        </button>
+                                                                        <div class="ms-auto">
+                                                                            <button type="button" class="btn btn-success" @click="saveLogo()" x-bind:disabled="!selectedProject.logoSvg">
+                                                                                <i class="ti ti-device-floppy me-1"></i> Save Logo
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="col-md-6">
+                                                            <div class="card">
+                                                                <div class="card-header">
+                                                                    <h3 class="card-title">Logo Preview</h3>
+                                                                </div>
+                                                                <div class="card-body">
+                                                                    <div class="empty" x-show="!selectedProject.logoSvg">
+                                                                        <div class="empty-img">
+                                                                            <i class="ti ti-photo-off" style="font-size: 4rem;"></i>
+                                                                        </div>
+                                                                        <p class="empty-title">No logo generated yet</p>
+                                                                        <p class="empty-subtitle text-muted">
+                                                                            Use the form on the left to generate a logo for your project.
+                                                                        </p>
+                                                                    </div>
+                                                                    
+                                                                    <div x-show="selectedProject.logoSvg" class="text-center">
+                                                                        <div class="my-3 p-3 bg-light rounded">
+                                                                            <div x-html="selectedProject.logoSvg" class="d-inline-block"></div>
+                                                                        </div>
+                                                                        
+                                                                        <div class="mt-3">
+                                                                            <button type="button" class="btn btn-outline-primary btn-sm" @click="downloadSvg()">
+                                                                                <i class="ti ti-download me-1"></i> Download SVG
+                                                                            </button>
+                                                                        </div>
+                                                                        
+                                                                        <div class="mt-4">
+                                                                            <div class="text-muted mb-2">Favicon Preview:</div>
+                                                                            <div class="d-flex justify-content-center gap-3">
+                                                                                <div class="p-2 border rounded" style="background-color: white;">
+                                                                                    <div x-html="getFaviconHtml(32)" style="width: 32px; height: 32px;"></div>
+                                                                                </div>
+                                                                                <div class="p-2 border rounded" style="background-color: white;">
+                                                                                    <div x-html="getFaviconHtml(16)" style="width: 16px; height: 16px;"></div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- New Project Modal -->
+    <div class="modal modal-blur fade" id="newProjectModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Project</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input type="text" class="form-control" x-model="newProject.name" @input="updateNewProjectSlug" placeholder="My New Project">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Domain Name</label>
+                        <input type="text" class="form-control" x-model="newProject.domainName" placeholder="example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Slug (auto-generated)</label>
+                        <input type="text" class="form-control" x-model="newProject.slug" readonly>
+                        <small class="form-hint">URL-friendly version of the name</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" x-model="newProject.description" rows="4" placeholder="Project description..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="createProject()">Create Project</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Connection Modal -->
+    <div class="modal modal-blur fade" id="connectionModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" x-text="connectionModalTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Connection Name</label>
+                        <input type="text" class="form-control" x-model="connectionForm.name" placeholder="Production Database">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Database Type</label>
+                        <select class="form-select" x-model="connectionForm.type">
+                            <option value="mysql">MySQL</option>
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="sqlite">SQLite</option>
+                            <option value="mongodb">MongoDB</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Host</label>
+                            <input type="text" class="form-control" x-model="connectionForm.host" placeholder="localhost">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" x-model="connectionForm.port" placeholder="3306">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Database Name</label>
+                        <input type="text" class="form-control" x-model="connectionForm.database" placeholder="my_database">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" x-model="connectionForm.username" placeholder="db_user">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" x-model="connectionForm.password" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" x-model="connectionForm.isActive">
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="saveConnection()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal modal-blur fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Are you sure?</div>
+                    <div x-text="deleteConfirmMessage"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @click="confirmDelete()">Yes, delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Editor Modal -->
+    <div class="modal modal-blur fade" id="agentEditorModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-full-width" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Content with AI Agent</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Prompt for the Agent</label>
+                            <textarea class="form-control" x-model="agentPrompt" rows="3" 
+                                      placeholder="Describe what you want the agent to do with the content..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex mb-3">
+                        <button type="button" class="btn btn-primary" @click="sendToAgent()">
+                            <i class="ti ti-robot me-1"></i> Send to Agent
+                        </button>
+                        <div class="ms-auto">
+                            <button type="button" class="btn btn-success" @click="applyAgentChanges()">
+                                <i class="ti ti-check me-1"></i> Apply Changes
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Original Content</h3>
+                                </div>
+                                <div class="card-body">
+                                    <pre class="overflow-auto" style="max-height: 500px;"><code x-text="agentOriginalContent"></code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Modified Content</h3>
+                                </div>
+                                <div class="card-body">
+                                    <textarea class="form-control font-monospace" x-model="agentModifiedContent" 
+                                              rows="20" style="max-height: 500px; overflow: auto;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="applyAgentChanges()">Apply Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alpine.js -->
+    <script src="/static/js/alpine.min.js" defer></script>
+    <!-- Tabler Core -->
+    <script src="/static/js/tabler.min.js"></script>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('projectsManager', () => ({
+                selectedProject: null,
+                selectedPage: null,
+                pageForm: { name: '', slug: '', headerTags: '', content: '', footerTags: '' },
+                newProject: { name: '', domainName: '', slug: '', description: '' },
+                connectionForm: { name: '', type: 'mysql', host: '', port: 3306, database: '', username: '', password: '', isActive: true },
+                connectionModalTitle: 'New Database Connection',
+                connectionEditIndex: -1,
+                deleteConfirmMessage: '',
+                deleteType: '', // project, page, connection
+                deleteIndex: -1,
+                agentPrompt: '',
+                agentOriginalContent: '',
+                agentModifiedContent: '',
+                agentFieldTarget: '',
+                
+                init() {
+                    // Initialize with existing projects
+                    this.loadProjects();
+                },
+                
+                loadProjects() {
+                    // Initial loading of project data from server
+                    // In a real implementation, this would fetch from the server
+                    fetch('/api/projects')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Projects loaded:', data);
+                            // If a project ID is provided in URL, load that project
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const projectId = urlParams.get('id');
+                            if (projectId) {
+                                this.editProject(projectId);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading projects:', error);
+                            // Example: this would normally alert the user in a production app
+                        });
+                },
+                
+                // Project management functions
+                openNewProjectModal() {
+                    this.newProject = { name: '', domainName: '', slug: '', description: '' };
+                    const modal = new bootstrap.Modal(document.getElementById('newProjectModal'));
+                    modal.show();
+                },
+                
+                updateNewProjectSlug() {
+                    this.newProject.slug = this.newProject.name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '');
+                },
+                
+                createProject() {
+                    // Validate project data
+                    if (!this.newProject.name || !this.newProject.domainName) {
+                        alert('Project name and domain name are required');
+                        return;
+                    }
+                    
+                    // Send data to server
+                    fetch('/api/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.newProject)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Project created:', data);
+                        // Hide the modal and refresh the project list
+                        bootstrap.Modal.getInstance(document.getElementById('newProjectModal')).hide();
+                        this.loadProjects();
+                        
+                        // Optionally open the new project for editing
+                        if (data.id) {
+                            this.editProject(data.id);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error creating project:', error);
+                        alert('Failed to create project: ' + error.message);
+                    });
+                },
+                
+                editProject(projectId) {
+                    // Fetch project details from server
+                    fetch(`/api/projects/${projectId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Project loaded:', data);
+                            this.selectedProject = data;
+                            
+                            // Ensure project has the necessary structure
+                            if (!this.selectedProject.homePage) {
+                                this.selectedProject.homePage = { headerTags: '', content: '', footerTags: '' };
+                            }
+                            if (!this.selectedProject.pages) {
+                                this.selectedProject.pages = [];
+                            }
+                            if (!this.selectedProject.connections) {
+                                this.selectedProject.connections = [];
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading project:', error);
+                            alert('Failed to load project: ' + error.message);
+                        });
+                },
+                
+                closeProjectEditor() {
+                    this.selectedProject = null;
+                    this.selectedPage = null;
+                },
+                
+                updateSlug() {
+                    if (this.selectedProject) {
+                        this.selectedProject.slug = this.selectedProject.name
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '');
+                    }
+                },
+                
+                saveProjectChanges() {
+                    if (!this.selectedProject) return;
+                    
+                    fetch(`/api/projects/${this.selectedProject.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.selectedProject)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Project saved:', data);
+                        alert('Project changes saved successfully');
+                    })
+                    .catch(error => {
+                        console.error('Error saving project:', error);
+                        alert('Failed to save project changes: ' + error.message);
+                    });
+                },
+                
+                confirmDeleteProject(projectId) {
+                    this.deleteType = 'project';
+                    this.deleteIndex = projectId;
+                    this.deleteConfirmMessage = 'This will permanently delete the project and all its pages and connections.';
+                    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    modal.show();
+                },
+                
+                // Page management functions
+                addNewPage() {
+                    this.selectedPage = -1; // -1 indicates new page
+                    this.pageForm = {
+                        name: '',
+                        slug: '',
+                        headerTags: '',
+                        content: '<div class="container py-5">\n  <h1>New Page</h1>\n  <p>Your content here...</p>\n</div>',
+                        footerTags: ''
+                    };
+                },
+                
+                editPage(index) {
+                    this.selectedPage = index;
+                    const page = this.selectedProject.pages[index];
+                    this.pageForm = { ...page };
+                },
+                
+                updatePageSlug() {
+                    this.pageForm.slug = this.pageForm.name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '');
+                },
+                
+                getPageEditorTitle() {
+                    return this.selectedPage === -1 ? 'New Page' : 'Edit Page: ' + this.pageForm.name;
+                },
+                
+                savePage() {
+                    if (!this.pageForm.name) {
+                        alert('Page name is required');
+                        return;
+                    }
+                    
+                    if (this.selectedPage === -1) {
+                        // Add new page
+                        this.selectedProject.pages.push({ ...this.pageForm });
+                    } else {
+                        // Update existing page
+                        this.selectedProject.pages[this.selectedPage] = { ...this.pageForm };
+                    }
+                    
+                    // Reset page editor
+                    this.selectedPage = null;
+                    
+                    // Save project changes to server
+                    this.saveProjectChanges();
+                },
+                
+                backToPagesList() {
+                    this.selectedPage = null;
+                },
+                
+                deletePage(index) {
+                    this.deleteType = 'page';
+                    this.deleteIndex = index;
+                    this.deleteConfirmMessage = 'This will permanently delete the page from this project.';
+                    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    modal.show();
+                },
+                
+                // Database connection functions
+                addNewConnection() {
+                    this.connectionForm = {
+                        name: '',
+                        type: 'mysql',
+                        host: 'localhost',
+                        port: 3306,
+                        database: '',
+                        username: '',
+                        password: '',
+                        isActive: true
+                    };
+                    this.connectionModalTitle = 'New Database Connection';
+                    this.connectionEditIndex = -1;
+                    const modal = new bootstrap.Modal(document.getElementById('connectionModal'));
+                    modal.show();
+                },
+                
+                editConnection(index) {
+                    this.connectionEditIndex = index;
+                    this.connectionForm = { ...this.selectedProject.connections[index] };
+                    this.connectionModalTitle = 'Edit Database Connection';
+                    const modal = new bootstrap.Modal(document.getElementById('connectionModal'));
+                    modal.show();
+                },
+                
+                saveConnection() {
+                    if (!this.connectionForm.name || !this.connectionForm.host || !this.connectionForm.database) {
+                        alert('Connection name, host, and database name are required');
+                        return;
+                    }
+                    
+                    if (this.connectionEditIndex === -1) {
+                        // Add new connection
+                        this.selectedProject.connections.push({ ...this.connectionForm });
+                    } else {
+                        // Update existing connection
+                        this.selectedProject.connections[this.connectionEditIndex] = { ...this.connectionForm };
+                    }
+                    
+                    // Hide modal
+                    bootstrap.Modal.getInstance(document.getElementById('connectionModal')).hide();
+                    
+                    // Save project changes to server
+                    this.saveProjectChanges();
+                },
+                
+                testConnection(index) {
+                    const connection = this.selectedProject.connections[index];
+                    alert(`Testing connection to ${connection.host}:${connection.port}/${connection.database} as ${connection.username}...`);
+                    
+                    fetch('/api/test-connection', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(connection)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Connection successful!');
+                        } else {
+                            alert('Connection failed: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error testing connection:', error);
+                        alert('Error testing connection: ' + error.message);
+                    });
+                },
+                
+                deleteConnection(index) {
+                    this.deleteType = 'connection';
+                    this.deleteIndex = index;
+                    this.deleteConfirmMessage = 'This will remove the database connection from this project.';
+                    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    modal.show();
+                },
+                
+                // Confirmation actions
+                confirmDelete() {
+                    if (this.deleteType === 'project') {
+                        // Delete project
+                        fetch(`/api/projects/${this.deleteIndex}`, {
+                            method: 'DELETE'
+                        })
+                        .then(() => {
+                            console.log('Project deleted');
+                            bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                            this.loadProjects();
+                            if (this.selectedProject && this.selectedProject.id === this.deleteIndex) {
+                                this.selectedProject = null;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error deleting project:', error);
+                            alert('Failed to delete project: ' + error.message);
+                        });
+                    } else if (this.deleteType === 'page') {
+                        // Delete page
+                        this.selectedProject.pages.splice(this.deleteIndex, 1);
+                        bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                        this.saveProjectChanges();
+                    } else if (this.deleteType === 'connection') {
+                        // Delete connection
+                        this.selectedProject.connections.splice(this.deleteIndex, 1);
+                        bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                        this.saveProjectChanges();
+                    }
+                },
+                
+                // Preview functions
+                refreshPreview() {
+                    const previewFrame = document.getElementById('previewFrame');
+                    if (previewFrame) {
+                        // Create a document containing the combined project HTML
+                        const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.selectedProject.name}</title>
+    ${this.selectedProject.homePage.headerTags || ''}
+</head>
+<body>
+    ${this.selectedProject.homePage.content || '<div class="container"><h1>No content yet</h1></div>'}
+    ${this.selectedProject.homePage.footerTags || ''}
+</body>
+</html>`;
+                        
+                        previewFrame.srcdoc = doc;
+                    }
+                },
+                
+                previewProject(projectId) {
+                    // Open project preview in a new tab
+                    window.open(`/app/${projectId}`, '_blank');
+                },
+                
+                // Agent integration
+                editWithAgent(field) {
+                    // Split the field path and access the nested object
+                    const fieldParts = field.split('.');
+                    let content = this.selectedProject;
+                    
+                    for (const part of fieldParts) {
+                        if (content[part] !== undefined) {
+                            content = content[part];
+                        } else {
+                            content = '';
+                            break;
+                        }
+                    }
+                    
+                    this.agentFieldTarget = field;
+                    this.agentOriginalContent = content;
+                    this.agentModifiedContent = content;
+                    this.agentPrompt = '';
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('agentEditorModal'));
+                    modal.show();
+                },
+                
+                editPageWithAgent() {
+                    this.agentFieldTarget = 'pageContent';
+                    this.agentOriginalContent = this.pageForm.content;
+                    this.agentModifiedContent = this.pageForm.content;
+                    this.agentPrompt = '';
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('agentEditorModal'));
+                    modal.show();
+                },
+                
+                sendToAgent() {
+                    if (!this.agentPrompt) {
+                        alert('Please enter a prompt for the agent');
+                        return;
+                    }
+                    
+                    // Display loading state
+                    const originalContent = this.agentModifiedContent;
+                    this.agentModifiedContent = 'Generating content with AI...';
+                    
+                    // Send to agent API endpoint
+                    fetch('/api/agent/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: this.agentPrompt,
+                            originalContent: this.agentOriginalContent
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.agentModifiedContent = data.content;
+                        } else {
+                            this.agentModifiedContent = originalContent;
+                            alert('Failed to generate content: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error calling agent:', error);
+                        this.agentModifiedContent = originalContent;
+                        alert('Error generating content: ' + error.message);
+                    });
+                },
+                
+                applyAgentChanges() {
+                    if (this.agentFieldTarget === 'pageContent') {
+                        // Update page content
+                        this.pageForm.content = this.agentModifiedContent;
+                    } else {
+                        // Update project field
+                        const fieldParts = this.agentFieldTarget.split('.');
+                        let target = this.selectedProject;
+                        
+                        for (let i = 0; i < fieldParts.length - 1; i++) {
+                            target = target[fieldParts[i]];
+                        }
+                        
+                        target[fieldParts[fieldParts.length - 1]] = this.agentModifiedContent;
+                    }
+                    
+                    bootstrap.Modal.getInstance(document.getElementById('agentEditorModal')).hide();
+                },
+                
+                // Utilities
+                formatCode(field) {
+                    // Simple HTML prettify (in a production app, use a proper library)
+                    const fieldParts = field.split('.');
+                    let content = this.selectedProject;
+                    
+                    for (const part of fieldParts) {
+                        if (content[part] !== undefined) {
+                            content = content[part];
+                        } else {
+                            return;
+                        }
+                    }
+                    
+                    // Very basic formatting
+                    try {
+                        const formatted = this.prettyHtml(content);
+                        
+                        // Update the field
+                        let target = this.selectedProject;
+                        for (let i = 0; i < fieldParts.length - 1; i++) {
+                            target = target[fieldParts[i]];
+                        }
+                        target[fieldParts[fieldParts.length - 1]] = formatted;
+                    } catch (error) {
+                        console.error('Formatting error:', error);
+                        alert('Failed to format code: ' + error.message);
+                    }
+                },
+                
+                formatPageCode() {
+                    try {
+                        this.pageForm.content = this.prettyHtml(this.pageForm.content);
+                    } catch (error) {
+                        console.error('Formatting error:', error);
+                        alert('Failed to format code: ' + error.message);
+                    }
+                },
+                
+                prettyHtml(html) {
+                    // Very simplified HTML formatting function
+                    // In a real app, use a proper HTML formatter library
+                    let formatted = '';
+                    let indent = 0;
+                    
+                    // Remove existing newlines and excess spaces
+                    html = html.replace(/>\s+</g, '><').trim();
+                    
+                    // Process each character
+                    for (let i = 0; i < html.length; i++) {
+                        const char = html[i];
+                        
+                        if (char === '<') {
+                            // Check if this is a closing tag
+                            if (html[i + 1] === '/') {
+                                indent--;
+                            }
+                            
+                            // Add newline and indentation before the tag
+                            formatted += '\n' + '  '.repeat(Math.max(0, indent));
+                            formatted += char;
+                        } else if (char === '>') {
+                            formatted += char;
+                            
+                            // Check if this was an opening tag that's not self-closing
+                            if (html[i - 1] !== '/' && html[i - 1] !== '!' && !/\s/.test(html[i - 1])) {
+                                // Check if the tag is not a self-closing tag
+                                const tag = html.substring(html.lastIndexOf('<', i) + 1, i);
+                            }
+                        }
+                    }
+                    
+                    return formatted;
+                },
+                
+                generateLogo() {
+                    const project = this.selectedProject;
+                    
+                    if (!project.logoPrompt) {
+                        this.showToast('error', 'Please provide a prompt for the logo');
+                        return;
+                    }
+                    
+                    this.showLoading('Generating logo...');
+                    
+                    const logoText = project.logoText || project.name;
+                    const requestData = {
+                        prompt: project.logoPrompt,
+                        projectId: project.id,
+                        type: project.logoType || 'text',
+                        color: project.logoColor || '#206BC4',
+                        text: logoText
+                    };
+                    
+                    fetch('/api/v1/projects/generate-logo', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': this.csrfToken
+                        },
+                        body: JSON.stringify(requestData)
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to generate logo');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.svg) {
+                            project.logoSvg = data.svg;
+                            this.hideLoading();
+                        } else {
+                            throw new Error('No SVG in response');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error generating logo:', error);
+                        this.hideLoading();
+                        this.showToast('error', 'Failed to generate logo: ' + error.message);
+                    });
+                },
+                
+                saveLogo() {
+                    const project = this.selectedProject;
+                    
+                    if (!project.logoSvg) {
+                        this.showToast('error', 'No logo to save');
+                        return;
+                    }
+                    
+                    this.showLoading('Saving logo...');
+                    
+                    fetch(`/api/v1/projects/${project.id}/logo`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': this.csrfToken
+                        },
+                        body: JSON.stringify({
+                            svg: project.logoSvg,
+                            projectId: project.id
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to save logo');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.hideLoading();
+                        this.showToast('success', 'Logo saved successfully');
+                    })
+                    .catch(error => {
+                        console.error('Error saving logo:', error);
+                        this.hideLoading();
+                        this.showToast('error', 'Failed to save logo: ' + error.message);
+                    });
+                },
+                
+                downloadSvg() {
+                    if (!this.selectedProject.logoSvg) return;
+                    
+                    const svgBlob = new Blob([this.selectedProject.logoSvg], {type: 'image/svg+xml'});
+                    const url = URL.createObjectURL(svgBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${this.selectedProject.slug}-logo.svg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+                
+                getFaviconHtml(size) {
+                    if (!this.selectedProject.logoSvg) return '';
+                    return this.selectedProject.logoSvg.replace(/<svg/, `<svg width="${size}" height="${size}"`);
+                },
+            }));
+        });
+    </script>
+</body>
+</html>

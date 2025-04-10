@@ -20,11 +20,11 @@ import (
 const (
 	defaultOllamaURL = "http://host.docker.internal:11434" // Default for Docker Desktop, override for Linux
 	defaultModel     = "llama3:8b"                         // Change to your preferred downloaded model
-	defaultPort      = ":8080"                             // Port the agent's web server listens on inside the container
+	defaultPort      = ":8800"                             // Port the agent's web server listens on inside the container
 	maxIterations    = 20                                  // Safety limit for agent iterations
 	requestTimeout   = 120 * time.Second                   // Timeout for Ollama requests
 	execTimeout      = 60 * time.Second                    // Timeout for command execution
-	htmlTemplatePath = "/app/index.html"                   // Path inside the container
+	htmlTemplatePath = "/app/tpl/agent.html"               // Path inside the container
 	dataDir          = "/app/data"                         // Agent's working data directory inside the container
 )
 
@@ -468,7 +468,7 @@ func (a *Agent) executeInternal(action string) (string, bool, string) {
 // Global template variable
 var tpl *template.Template
 
-func handleRoot(w http.ResponseWriter, r *http.Request) {
+func handleAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	err := tpl.ExecuteTemplate(w, "index.html", nil) // Execute the named template
 	if err != nil {
@@ -575,7 +575,7 @@ func StartAgent() {
 	// Initialize with a nil agent
 	globalAgent = nil
 
-	http.HandleFunc("/", handleRoot)
+	http.HandleFunc("/", handleAgent)
 	http.HandleFunc("/start", handleStart)
 	http.HandleFunc("/next", handleNextStep)
 	http.HandleFunc("/status", handleStatus)

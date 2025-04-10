@@ -3,19 +3,17 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /build
 
-# Install build dependencies for SQLite
-RUN apk add --no-cache gcc musl-dev
-
 # Copy go.mod and go.sum
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy all source files
 COPY *.go ./
-COPY *.html ./
+COPY models/ ./models/
+COPY auth/ ./auth/
 
-# Build the Go binary with CGO enabled for SQLite support
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /app/server .
+# Build the Go binary without CGO
+RUN go build -ldflags="-s -w" -o /app/server .
 
 # Stage 2: Create the runtime image
 FROM alpine:latest
@@ -26,8 +24,7 @@ WORKDIR /app
 # - ca-certificates: For HTTPS communication
 # - bash: For shell commands
 # - curl: Common utility
-# - sqlite: SQLite database support
-RUN apk update && apk add --no-cache ca-certificates bash curl sqlite
+RUN apk update && apk add --no-cache ca-certificates bash curl
 
 # Create the data directory where the application will store data
 RUN mkdir -p /app/data && chmod 755 /app/data
@@ -36,7 +33,7 @@ RUN mkdir -p /app/data && chmod 755 /app/data
 COPY --from=builder /app/server /app/server
 
 # Copy HTML templates and static assets
-COPY *.html /app/
+COPY tpl/ /app/tpl/
 COPY static/ /app/static/
 
 # Copy .env file if it exists (will be overridden by environment variables)
@@ -46,10 +43,10 @@ COPY .env* /app/
 VOLUME /app/data
 
 # Expose the port the application listens on
-EXPOSE 8080
+EXPOSE 8800
 
 # Set default environment variables
-ENV PORT=8080
+ENV PORT=8800
 ENV DATA_DIR=/app/data
 
 # Command to run when the container starts
