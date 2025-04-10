@@ -1,0 +1,8 @@
+{
+    "name": "Ollama Development Environment",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/prulloac/devcontainer-features/ollama:1": {}
+    },
+    "postCreateCommand": "./setup.sh"
+}
