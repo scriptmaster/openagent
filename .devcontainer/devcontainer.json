@@ -1,8 +1,16 @@
 {
-    "name": "Ollama Development Environment",
+    "name": "Agentic AI Codespace",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2": {},
       "ghcr.io/prulloac/devcontainer-features/ollama:1": {}
     },
-    "postCreateCommand": "./setup.sh"
+    "postCreateCommand": "chmod +x setup.sh && ./setup.sh",
+    "customizations": {
+      "vscode": {
+        "settings": {},
+        "extensions": ["ms-python.python"]
+      }
+    },
+    "remoteUser": "vscode"
 }
