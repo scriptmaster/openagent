@@ -48,14 +48,14 @@ USER nobody:nogroup
 VOLUME /app/data
 
 # Expose the port the Go application listens on
-EXPOSE 8080
+EXPOSE 8800
 
 # Set default environment variables (can be overridden in docker-compose)
 # host.docker.internal is for Docker Desktop (Mac/Win)
 # For Linux, this might need to be changed or network_mode: host used
 ENV OLLAMA_URL=http://host.docker.internal:11434
 ENV OLLAMA_MODEL=llama3:8b
-ENV PORT=8080
+ENV PORT=8800
 
 # Command to run when the container starts
 CMD ["/app/agent"]

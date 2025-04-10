@@ -5,7 +5,7 @@ services:
     build: . # Build the image from the Dockerfile in the current directory
     container_name: go-agent-service
     ports:
-      - "3000:8080" # Map host port 8080 to container port 8080 (defined by ENV PORT in Dockerfile)
+      - "8800:8800" # Map host port 8800 to container port 8800
     volumes:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
                          # Creates ./data on the host if it doesn't exist
@@ -32,8 +32,8 @@ services:
       # OLLAMA_URL: http://host.docker.internal:11434 # Keep this for extra_hosts
 
       # --- Other Settings ---
-      # OLLAMA_MODEL: llama3:8b # Optional: Override model from Dockerfile default
-      # PORT: 8080             # Optional: Override port from Dockerfile default (must match EXPOSE/ports)
+      OLLAMA_MODEL: llama3:8b # Optional: Override model from Dockerfile default
+      PORT: 8800             # Optional: Override port from Dockerfile default (must match EXPOSE/ports)
 
     # --- Network Configuration (Uncomment ONE section if needed for Linux) ---
     # For Linux - Method A: Use host network (Less secure, simpler)
