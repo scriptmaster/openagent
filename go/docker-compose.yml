@@ -8,40 +8,17 @@ services:
       - "8800:8800" # Map host port 8800 to container port 8800
     volumes:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
-                         # Creates ./data on the host if it doesn't exist
     environment:
       # --- Ollama Connection ---
-      # Choose ONE method depending on your OS and where Ollama is running:
-
-      # 1. For Docker Desktop (Windows/Mac) - usually works out-of-the-box:
-      OLLAMA_URL: http://host.docker.internal:11434
-
-      # 2. For Linux, if Ollama is on the HOST machine (Method A: Host Network Mode):
-      #    Simplest for Linux host access, but less network isolation.
-      #    Uncomment the network_mode line below AND set Ollama URL to localhost.
-      # OLLAMA_URL: http://localhost:11434
-
-      # 3. For Linux, if Ollama is on the HOST machine (Method B: Bridge Network + Host IP):
-      #    Requires finding your host's IP on the Docker bridge network (e.g., 172.17.0.1)
-      #    or your main network IP accessible from the container. Replace <host_ip>.
-      # OLLAMA_URL: http://<your_host_ip>:11434
-
-      # 4. For Linux, if Ollama is on the HOST machine (Method C: Bridge Network + extra_hosts):
-      #    Recommended for bridge network on newer Docker versions. Maps host.docker.internal.
-      #    Uncomment the extra_hosts section below. Keep OLLAMA_URL as http://host.docker.internal:11434
-      # OLLAMA_URL: http://host.docker.internal:11434 # Keep this for extra_hosts
-
+      # Connect to Ollama running on the host machine
+      OLLAMA_URL: http://172.17.0.1:11434  # Docker host IP on the bridge network
       # --- Other Settings ---
       OLLAMA_MODEL: llama3:8b # Optional: Override model from Dockerfile default
-      PORT: 8800             # Optional: Override port from Dockerfile default (must match EXPOSE/ports)
+      PORT: 8800             # Optional: Override agent's listening port
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # This maps host.docker.internal to the host IP
+    restart: unless-stopped
 
-    # --- Network Configuration (Uncomment ONE section if needed for Linux) ---
-    # For Linux - Method A: Use host network (Less secure, simpler)
-    # network_mode: host # If using this, comment out the 'ports' section above, as all host ports are accessible. OLLAMA_URL should be http://localhost:11434
-
-    # For Linux - Method C: Map host.docker.internal (Recommended over explicit IP)
-    # extra_hosts:
-    #   host.docker.internal: host-gateway
-
-    restart: unless-stopped # Optional: Policy for restarting the container
-
+networks:
+  agent-net:
+    driver: bridge

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -20,13 +19,13 @@ import (
 // Configuration constants (can be overridden by environment variables)
 const (
 	defaultOllamaURL = "http://host.docker.internal:11434" // Default for Docker Desktop, override for Linux
-	defaultModel     = "llama3:8b"                        // Change to your preferred downloaded model
-	defaultPort      = ":8080"                            // Port the agent's web server listens on inside the container
-	maxIterations    = 20                                 // Safety limit for agent iterations
-	requestTimeout   = 120 * time.Second                  // Timeout for Ollama requests
-	execTimeout      = 60 * time.Second                   // Timeout for command execution
-	htmlTemplatePath = "/app/index.html"                  // Path inside the container
-	dataDir          = "/app/data"                        // Agent's working data directory inside the container
+	defaultModel     = "llama3:8b"                         // Change to your preferred downloaded model
+	defaultPort      = ":8080"                             // Port the agent's web server listens on inside the container
+	maxIterations    = 20                                  // Safety limit for agent iterations
+	requestTimeout   = 120 * time.Second                   // Timeout for Ollama requests
+	execTimeout      = 60 * time.Second                    // Timeout for command execution
+	htmlTemplatePath = "/app/index.html"                   // Path inside the container
+	dataDir          = "/app/data"                         // Agent's working data directory inside the container
 )
 
 // --- Agent State ---
@@ -46,16 +45,16 @@ const (
 type Agent struct {
 	sync.Mutex // To protect concurrent access
 
-	OllamaURL   string
-	ModelName   string
-	Goal        string
-	History     []Message
-	Iteration   int
+	OllamaURL     string
+	ModelName     string
+	Goal          string
+	History       []Message
+	Iteration     int
 	MaxIterations int
-	HttpClient  *http.Client
-	State       AgentState
-	LastOutput  string
-	LastError   string
+	HttpClient    *http.Client
+	State         AgentState
+	LastOutput    string
+	LastError     string
 }
 
 type Message struct {
@@ -105,11 +104,11 @@ func InitializeAgent(goal, ollamaURL, modelName string) {
 	defer agentMutex.Unlock()
 
 	globalAgent = &Agent{
-		OllamaURL:   ollamaURL,
-		ModelName:   modelName,
-		Goal:        goal,
-		History:     make([]Message, 0),
-		Iteration:   0,
+		OllamaURL:     ollamaURL,
+		ModelName:     modelName,
+		Goal:          goal,
+		History:       make([]Message, 0),
+		Iteration:     0,
 		MaxIterations: maxIterations,
 		HttpClient: &http.Client{
 			Timeout: requestTimeout,
@@ -189,21 +188,21 @@ func (a *Agent) addToHistory(role, content string) {
 	}
 	tokenLenContent := len(strings.Fields(content))
 
-	for (currentTokens + tokenLenContent) > maxHistoryTokens && len(a.History) > 1 {
+	for (currentTokens+tokenLenContent) > maxHistoryTokens && len(a.History) > 1 {
 		if a.History[0].Role == "system" && len(a.History) > 2 {
 			removedMsg := a.History[1]
 			a.History = append(a.History[:1], a.History[2:]...)
 			currentTokens -= len(strings.Fields(removedMsg.Content))
 			log.Printf("Truncated history, removed oldest non-system message (%s)", removedMsg.Role)
 		} else if a.History[0].Role != "system" {
-            removedMsg := a.History[0]
+			removedMsg := a.History[0]
 			a.History = a.History[1:]
 			currentTokens -= len(strings.Fields(removedMsg.Content))
-            log.Printf("Truncated history, removed oldest message (%s)", removedMsg.Role)
-        } else {
-            log.Println("Warning: Cannot truncate history further.")
-            break
-        }
+			log.Printf("Truncated history, removed oldest message (%s)", removedMsg.Role)
+		} else {
+			log.Println("Warning: Cannot truncate history further.")
+			break
+		}
 	}
 
 	log.Printf("Adding to History - Role: %s", role)
@@ -231,45 +230,44 @@ func isCommandSafe(commandStr string) (bool, string) {
 		}
 	}
 
-    // Check for file operations outside the allowed directory
-    // This is a basic check looking for redirection '>' or '>>' and common file manipulation commands
-    if strings.Contains(trimmedCmd, ">") || strings.Contains(trimmedCmd, "touch ") || strings.Contains(trimmedCmd, "mkdir ") || strings.Contains(trimmedCmd, "cp ") || strings.Contains(trimmedCmd, "mv ") {
-        // Extract potential file paths (very simplistic parsing)
-        fields := strings.Fields(trimmedCmd)
-        for _, field := range fields {
-            // Check if a field looks like an absolute path or relative path starting with '/' or './' or '../'
-            // And it's NOT within the allowed data directory
-             if strings.Contains(field, "/") && !strings.HasPrefix(field, allowedWritePrefix) && field != ">" && field != ">>" && field != "|" && field != "&" {
-                 // Allow paths relative to current dir IF current dir is /app/data (or /app, needs check)
-                 // For simplicity, let's just block absolute paths outside /app/data for now
-                 if strings.HasPrefix(field, "/") {
-                     isPipeTarget := false
-                     pipeParts := strings.Split(trimmedCmd, "|")
-                     if len(pipeParts) > 1 && strings.Contains(pipeParts[len(pipeParts)-1], field) {
-                         isPipeTarget = true // Allow piping to tools like `grep /etc/passwd` (read-only) - risky!
-                     }
+	// Check for file operations outside the allowed directory
+	// This is a basic check looking for redirection '>' or '>>' and common file manipulation commands
+	if strings.Contains(trimmedCmd, ">") || strings.Contains(trimmedCmd, "touch ") || strings.Contains(trimmedCmd, "mkdir ") || strings.Contains(trimmedCmd, "cp ") || strings.Contains(trimmedCmd, "mv ") {
+		// Extract potential file paths (very simplistic parsing)
+		fields := strings.Fields(trimmedCmd)
+		for _, field := range fields {
+			// Check if a field looks like an absolute path or relative path starting with '/' or './' or '../'
+			// And it's NOT within the allowed data directory
+			if strings.Contains(field, "/") && !strings.HasPrefix(field, allowedWritePrefix) && field != ">" && field != ">>" && field != "|" && field != "&" {
+				// Allow paths relative to current dir IF current dir is /app/data (or /app, needs check)
+				// For simplicity, let's just block absolute paths outside /app/data for now
+				if strings.HasPrefix(field, "/") {
+					isPipeTarget := false
+					pipeParts := strings.Split(trimmedCmd, "|")
+					if len(pipeParts) > 1 && strings.Contains(pipeParts[len(pipeParts)-1], field) {
+						isPipeTarget = true // Allow piping to tools like `grep /etc/passwd` (read-only) - risky!
+					}
 
-                     // More refinement needed here. Let's block direct writes outside allowed prefix.
-                     if (strings.Contains(trimmedCmd, " > "+field) || strings.Contains(trimmedCmd, " >> "+field) || strings.HasPrefix(trimmedCmd, "touch "+field) || strings.HasPrefix(trimmedCmd, "mkdir "+field)) && !isPipeTarget {
-                        return false, fmt.Sprintf("Command blocked: Attempting file operation on '%s' which is outside the allowed '%s' directory.", field, dataDir)
-                     }
-                 }
-            }
-        }
-    }
+					// More refinement needed here. Let's block direct writes outside allowed prefix.
+					if (strings.Contains(trimmedCmd, " > "+field) || strings.Contains(trimmedCmd, " >> "+field) || strings.HasPrefix(trimmedCmd, "touch "+field) || strings.HasPrefix(trimmedCmd, "mkdir "+field)) && !isPipeTarget {
+						return false, fmt.Sprintf("Command blocked: Attempting file operation on '%s' which is outside the allowed '%s' directory.", field, dataDir)
+					}
+				}
+			}
+		}
+	}
 
-    // Allow 'cd /app/data' but not 'cd /' or 'cd /etc' etc.
-    if strings.HasPrefix(lowerCmd, "cd ") {
-        targetDir := strings.TrimSpace(strings.TrimPrefix(lowerCmd, "cd "))
-        if targetDir != dataDir && !strings.HasPrefix(targetDir, dataDir+"/") && targetDir != "." && targetDir != ".." {
-             // Allow relative cd inside dataDir - complex to check robustly here.
-             // Safest bet is to perhaps ONLY allow `cd /app/data`.
-             if targetDir != "/app/data" {
-                return false, fmt.Sprintf("Command blocked: 'cd' is only allowed to '%s'. Attempted: '%s'", dataDir, targetDir)
-             }
-        }
-    }
-
+	// Allow 'cd /app/data' but not 'cd /' or 'cd /etc' etc.
+	if strings.HasPrefix(lowerCmd, "cd ") {
+		targetDir := strings.TrimSpace(strings.TrimPrefix(lowerCmd, "cd "))
+		if targetDir != dataDir && !strings.HasPrefix(targetDir, dataDir+"/") && targetDir != "." && targetDir != ".." {
+			// Allow relative cd inside dataDir - complex to check robustly here.
+			// Safest bet is to perhaps ONLY allow `cd /app/data`.
+			if targetDir != "/app/data" {
+				return false, fmt.Sprintf("Command blocked: 'cd' is only allowed to '%s'. Attempted: '%s'", dataDir, targetDir)
+			}
+		}
+	}
 
 	return true, ""
 }
@@ -357,9 +355,9 @@ func (a *Agent) thinkInternal() (string, error) {
 
 	fullPromptString := a.buildPrompt()
 	requestPayload := OllamaRequest{
-		Model:  a.ModelName,
-		Prompt: fullPromptString,
-		Stream: false,
+		Model:   a.ModelName,
+		Prompt:  fullPromptString,
+		Stream:  false,
 		Options: map[string]interface{}{"temperature": 0.5},
 	}
 	jsonData, err := json.Marshal(requestPayload)
@@ -413,16 +411,16 @@ func (a *Agent) executeInternal(action string) (string, bool, string) {
 	if strings.HasPrefix(action, "COMMAND:") {
 		commandStr := strings.TrimSpace(strings.TrimPrefix(action, "COMMAND:"))
 		if commandStr == "" {
-             errorMsg := "Error: Empty command received."
-             a.addToHistory("user", fmt.Sprintf("Result of action: %s", errorMsg))
+			errorMsg := "Error: Empty command received."
+			a.addToHistory("user", fmt.Sprintf("Result of action: %s", errorMsg))
 			return errorMsg, false, ""
 		}
 
 		safe, reason := isCommandSafe(commandStr)
 		if !safe {
 			log.Printf("Safety Check Failed: %s (Command: %s)", reason, commandStr)
-            // Add info about blocking to history for the LLM to see
-            a.addToHistory("user", fmt.Sprintf("Command '%s' was blocked by safety filter: %s. Propose a different, safe command within '/app/data'.", commandStr, reason))
+			// Add info about blocking to history for the LLM to see
+			a.addToHistory("user", fmt.Sprintf("Command '%s' was blocked by safety filter: %s. Propose a different, safe command within '/app/data'.", commandStr, reason))
 			return fmt.Sprintf("Command blocked by safety filter: %s", reason), false, reason
 		}
 
@@ -453,15 +451,15 @@ func (a *Agent) executeInternal(action string) (string, bool, string) {
 			result = fmt.Sprintf("Command executed successfully (Duration: %s).\nSTDOUT:\n%s\nSTDERR:\n%s", duration, output, errMsg)
 			log.Println("Command execution succeeded.")
 		}
-        // Add execution result to history
-        a.addToHistory("user", fmt.Sprintf("Result of action '%s':\n%s", commandStr, result))
+		// Add execution result to history
+		a.addToHistory("user", fmt.Sprintf("Result of action '%s':\n%s", commandStr, result))
 		return result, false, ""
 	}
 
 	// Incorrect format
 	log.Printf("⚠️ Assistant response did not match expected format: %s", action)
 	errorMsg := fmt.Sprintf("Error: Invalid action format received from assistant: '%s'. Please respond ONLY with 'COMMAND: <command>' or 'FINAL_ANSWER: <answer>'.", action)
-    a.addToHistory("user", fmt.Sprintf("Result of action: %s", errorMsg))
+	a.addToHistory("user", fmt.Sprintf("Result of action: %s", errorMsg))
 	return errorMsg, false, ""
 }
 
@@ -548,10 +546,9 @@ func main() {
 	ollamaURL := getEnv("OLLAMA_URL", defaultOllamaURL)
 	modelName := getEnv("OLLAMA_MODEL", defaultModel)
 	port := getEnv("PORT", defaultPort)
-    if !strings.HasPrefix(port, ":") {
-        port = ":" + port // Ensure port starts with ':'
-    }
-
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port // Ensure port starts with ':'
+	}
 
 	log.Printf("Ollama URL: %s", ollamaURL)
 	log.Printf("Using Model: %s", modelName)
@@ -564,17 +561,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create data directory '%s': %v", dataDir, err)
 	} else {
-        log.Printf("Ensured data directory exists: %s", dataDir)
-    }
-
+		log.Printf("Ensured data directory exists: %s", dataDir)
+	}
 
 	// Parse the HTML template file
 	tpl, err = template.ParseFiles(htmlTemplatePath)
 	if err != nil {
 		log.Fatalf("FATAL: Failed to parse template file '%s': %v", htmlTemplatePath, err)
 	} else {
-         log.Printf("Successfully parsed template: %s", htmlTemplatePath)
-    }
+		log.Printf("Successfully parsed template: %s", htmlTemplatePath)
+	}
 
 	// Initialize with a nil agent
 	globalAgent = nil
@@ -586,4 +582,3 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(port, nil))
 }
-
