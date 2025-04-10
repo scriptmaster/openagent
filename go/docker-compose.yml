@@ -10,11 +10,29 @@ services:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
     environment:
       # --- Ollama Connection ---
-      # Connect to Ollama running on the host machine
-      OLLAMA_URL: http://172.17.0.1:11434  # Docker host IP on the bridge network
+      # Connect to the ollama service on the same Docker network
+      OLLAMA_URL: http://ollama:11434
       # --- Other Settings ---
-      OLLAMA_MODEL: llama3:8b # Optional: Override model from Dockerfile default
+      OLLAMA_MODEL: mistral:7b # Smaller model than llama3:8b
       PORT: 8800             # Optional: Override agent's listening port
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # This maps host.docker.internal to the host IP
+    depends_on:
+      - ollama
+    networks:
+      - agent-net
     restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+networks:
+  agent-net:
+    driver: bridge
+
+volumes:
+  ollama_data: # Persist Ollama models and data
