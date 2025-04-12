@@ -11,6 +11,8 @@ RUN go mod download
 COPY *.go ./
 COPY models/ ./models/
 COPY auth/ ./auth/
+COPY admin/ ./admin/
+COPY projects/ ./projects/
 
 # Build the Go binary without CGO
 RUN go build -ldflags="-s -w" -o /app/server .
