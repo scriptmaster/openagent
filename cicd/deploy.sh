@@ -33,18 +33,18 @@ echo "Master environment file copied."
 echo 'Managing containers gracefully...'
 
 # Check if PostgreSQL container is running
-POSTGRES_CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}")
+POSTGRES_CONTAINER=$(docker ps --filter "name=postgres-service" --format "{{.Names}}")
 if [ -n "$POSTGRES_CONTAINER" ]; then
     echo "PostgreSQL container is running, preserving it..."
     # Build first to minimize downtime
-    echo "Building new openagent image..."
-    docker compose build openagent
+    echo "Building new openagent-app image..."
+    docker compose build openagent-app
     
     # Stop and start immediately
-    echo "Stopping and starting openagent service..."
-    docker compose stop openagent
-    docker compose rm -f openagent
-    docker compose up -d openagent
+    echo "Stopping and starting openagent-service..."
+    docker compose stop openagent-service
+    docker compose rm -f openagent-service
+    docker compose up -d openagent-service
 else
     echo "PostgreSQL container not found, will start fresh..."
     # Stop all services if PostgreSQL isn't running
@@ -56,9 +56,9 @@ fi
 echo 'Verifying deployment...'
 sleep 3 # Give services time to start
 
-# Check if openagent is running
-OPENAGENT_CONTAINER=$(docker ps --filter "name=openagent" --format "{{.Names}}")
-if [ -z "$OPENAGENT_CONTAINER" ]; then
+# Check if app is running
+APP_CONTAINER=$(docker ps --filter "name=openagent-service" --format "{{.Names}}")
+if [ -z "$APP_CONTAINER" ]; then
     echo "Error: OpenAgent container failed to start" >&2
     exit 1
 fi
