@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -473,7 +473,9 @@ func InitAgentTemplates(mainTemplates *template.Template) {
 	tpl = mainTemplates
 }
 
-func handleAgent(w http.ResponseWriter, r *http.Request) {
+// HandleAgent renders the main agent interface page.
+// It now uses the global templates variable initialized in routes.go.
+func HandleAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Get the current app version
@@ -498,7 +500,8 @@ func handleAgent(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleStart(w http.ResponseWriter, r *http.Request) {
+// HandleStart initializes the agent with a new goal.
+func HandleStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -528,7 +531,8 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(GetAgentState())
 }
 
-func handleNextStep(w http.ResponseWriter, r *http.Request) {
+// HandleNextStep triggers the agent to perform its next thinking/execution cycle.
+func HandleNextStep(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -550,7 +554,8 @@ func handleNextStep(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(GetAgentState())
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request) {
+// HandleStatus returns the current state of the agent.
+func HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -560,8 +565,10 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- Main Function ---
+// StartAgent is intended to be called if the agent runs as a standalone service.
+// In the integrated setup, the handlers are registered by the main server's routes.
 func StartAgent() {
-	log.Println("--- Go Web Agent Starting ---")
+	log.Println("--- Go Web Agent Starting (Standalone Mode) ---")
 
 	// Load configuration from environment variables
 	ollamaURL := getEnv("OLLAMA_URL", defaultOllamaURL)
@@ -596,10 +603,12 @@ func StartAgent() {
 	// Initialize with a nil agent
 	globalAgent = nil
 
-	http.HandleFunc("/", handleAgent)
-	http.HandleFunc("/start", handleStart)
-	http.HandleFunc("/next", handleNextStep)
-	http.HandleFunc("/status", handleStatus)
+	// In standalone mode, register handlers directly.
+	// In integrated mode, these are registered via server/routes.go.
+	http.HandleFunc("/", HandleAgent)
+	http.HandleFunc("/start", HandleStart)
+	http.HandleFunc("/next", HandleNextStep)
+	http.HandleFunc("/status", HandleStatus)
 
 	log.Fatal(http.ListenAndServe(port, nil))
 }

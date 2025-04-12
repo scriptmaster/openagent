@@ -2,14 +2,79 @@ package auth
 
 import (
 	"encoding/json"
+	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/scriptmaster/openagent/common" // Updated import path
 )
 
-// JSONResponse moved to types.go
-// OTPRequest moved to types.go
-// OTPVerifyRequest moved to types.go
+// Global template variable for auth handlers
+var authTemplates *template.Template
+
+// InitAuthTemplates initializes the template variable for this package
+func InitAuthTemplates(t *template.Template) {
+	authTemplates = t
+}
+
+// HandleLogin displays the login page
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
+	// Ensure templates are initialized
+	if authTemplates == nil {
+		http.Error(w, "Auth templates not initialized", http.StatusInternalServerError)
+		log.Println("Error: HandleLogin called before InitAuthTemplates")
+		return
+	}
+	data := struct {
+		AppName    string
+		PageTitle  string
+		AdminEmail string
+		AppVersion string
+		Error      string
+	}{
+		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
+		PageTitle:  "Login - " + common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
+		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
+		AppVersion: os.Getenv("APP_VERSION"),
+		Error:      r.URL.Query().Get("error"),
+	}
+	if err := authTemplates.ExecuteTemplate(w, "login.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleLogout clears session cookies and redirects to login
+func HandleLogout(w http.ResponseWriter, r *http.Request) {
+	// Get versioned cookie name
+	cookieName := GetSessionCookieName()
+
+	// Clear the versioned session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Now().Add(-24 * time.Hour),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear the regular session cookie for backward compatibility
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Now().Add(-24 * time.Hour),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Redirect to login page
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
 
 // HandleRequestOTP handles OTP request
 func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserService) {

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/scriptmaster/openagent/auth"
+
 	// PostgreSQL driver
 	_ "github.com/lib/pq"
 )
@@ -23,28 +25,7 @@ var (
 	dbOnce sync.Once
 )
 
-// Project represents a project
-type Project struct {
-	ID          int
-	Name        string
-	Description string
-	DomainName  string
-	CreatedBy   int
-	CreatedAt   time.Time
-}
-
-// ProjectDB represents a database connection for a project
-type ProjectDB struct {
-	ID               int
-	ProjectID        int
-	Name             string
-	Description      string
-	DBType           string
-	ConnectionString string
-	SchemaName       string
-	IsDefault        bool
-	CreatedAt        time.Time
-}
+type User = auth.User
 
 // applySchema runs the SQL in migrations directory to initialize the database
 func applySchema(db *sql.DB) error {
@@ -221,6 +202,16 @@ func UpdateMigrationStart(migrationNum int) error {
 	return updateMigrationStart(migrationNum)
 }
 
+// RunMigrations runs the database migrations
+func RunMigrations() error {
+	return applySchema(db)
+}
+
+// GetDB returns the database connection pool
+func GetDB() *sql.DB {
+	return db
+}
+
 // InitDB initializes the database connection
 func InitDB() (*sql.DB, error) {
 	var err error
@@ -344,7 +335,7 @@ func InitDB() (*sql.DB, error) {
 		}
 
 		if dbErr != nil {
-			err = fmt.Errorf("failed to connect to PostgreSQL: %v", dbErr)
+			err = fmt.Errorf("failed to connect to PostgreSQL after retries: %v", dbErr)
 			return
 		}
 
@@ -354,9 +345,9 @@ func InitDB() (*sql.DB, error) {
 		db.SetConnMaxLifetime(5 * time.Minute)
 
 		// Initialize database schema
-		if err := applySchema(db); err != nil {
-			log.Printf("SCHEMA INITIALIZATION ERROR: %v", err)
-			err = fmt.Errorf("failed to initialize PostgreSQL schema: %v", err)
+		if schemaErr := applySchema(db); schemaErr != nil {
+			log.Printf("SCHEMA INITIALIZATION ERROR: %v", schemaErr)
+			err = fmt.Errorf("failed to initialize PostgreSQL schema: %v", schemaErr)
 			return
 		}
 
@@ -486,32 +477,32 @@ func NewUserService(db *sql.DB) *UserService {
 }
 
 // GetUserByEmail retrieves a user by email
-func (s *UserService) GetUserByEmail(email string) (User, error) {
-	var user User
+func (s *UserService) GetUserByEmail(email string) (auth.User, error) {
+	var user auth.User
 	query := `SELECT id, email, is_admin, created_at, last_logged_in FROM ai.users WHERE email = $1`
 	err := s.db.QueryRow(query, email).Scan(
 		&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return User{}, fmt.Errorf("user not found")
+			return auth.User{}, fmt.Errorf("user not found")
 		}
-		return User{}, err
+		return auth.User{}, err
 	}
 	return user, nil
 }
 
 // CreateUser creates a new user
-func (s *UserService) CreateUser(email string) (User, error) {
+func (s *UserService) CreateUser(email string) (auth.User, error) {
 	// Check if any users exist (first user is admin)
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM ai.users").Scan(&count)
 	if err != nil {
-		return User{}, err
+		return auth.User{}, err
 	}
 
 	isAdmin := count == 0 // First user is admin
 
-	var user User
+	var user auth.User
 	query := `
 		INSERT INTO ai.users (email, is_admin) 
 		VALUES ($1, $2) 
@@ -519,24 +510,24 @@ func (s *UserService) CreateUser(email string) (User, error) {
 	`
 	err = s.db.QueryRow(query, email, isAdmin).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt)
 	if err != nil {
-		return User{}, err
+		return auth.User{}, err
 	}
 
 	return user, nil
 }
 
 // GetOrCreateUser retrieves a user by email or creates a new one
-func (s *UserService) GetOrCreateUser(email string) (User, bool, error) {
+func (s *UserService) GetOrCreateUser(email string) (auth.User, bool, error) {
 	user, err := s.GetUserByEmail(email)
 	if err != nil {
 		if err.Error() == "user not found" {
 			newUser, err := s.CreateUser(email)
 			if err != nil {
-				return User{}, false, err
+				return auth.User{}, false, err
 			}
 			return newUser, true, nil // true = created new user
 		}
-		return User{}, false, err
+		return auth.User{}, false, err
 	}
 	return user, false, nil // false = existing user
 }
@@ -551,25 +542,21 @@ func (s *UserService) UpdateUserLastLogin(userID int) error {
 	return err
 }
 
-// ProjectService provides methods to work with projects
-type ProjectService struct {
-	db *sql.DB
-}
-
 // NewProjectService creates a new ProjectService
 func NewProjectService(db *sql.DB) *ProjectService {
 	return &ProjectService{db: db}
 }
 
 // CreateProject creates a new project
-func (s *ProjectService) CreateProject(name, description, domainName string, createdBy int) (Project, error) {
+func (s *ProjectService) CreateProject(ctx context.Context, name, description, domainName string, createdBy *auth.User) (Project, error) {
 	var project Project
 	query := `
-		INSERT INTO ai.projects (name, description, domain_name, created_by) 
-		VALUES ($1, $2, $3, $4) 
+		INSERT INTO ai.projects (name, description, domain_name, created_by, created_at) 
+		VALUES ($1, $2, $3, $4, $5) 
 		RETURNING id, name, description, domain_name, created_by, created_at
 	`
-	err := s.db.QueryRow(query, name, description, domainName, createdBy).Scan(
+	now := time.Now()
+	err := s.db.QueryRowContext(ctx, query, name, description, domainName, createdBy.ID, now).Scan(
 		&project.ID, &project.Name, &project.Description, &project.DomainName,
 		&project.CreatedBy, &project.CreatedAt)
 	if err != nil {
@@ -602,34 +589,42 @@ func (s *ProjectService) GetProjects() ([]Project, error) {
 	return projects, nil
 }
 
-// TableService provides methods to work with tables
-type TableService struct {
-	db *sql.DB
+// GetProjectMembers retrieves members of a project
+func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID int) ([]auth.User, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT u.id, u.email, u.is_admin, u.created_at, u.last_logged_in 
+		FROM ai.users u
+		JOIN ai.project_members pm ON u.id = pm.user_id
+		WHERE pm.project_id = $1
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []auth.User
+	for rows.Next() {
+		var user auth.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn); err != nil {
+			return nil, err
+		}
+		members = append(members, user)
+	}
+	return members, nil
 }
 
-// ManagedTable represents a table's metadata
-type ManagedTable struct {
-	ID          int
-	ProjectID   int
-	ProjectDBID int
-	Name        string
-	SchemaName  string
-	Description string
-	Initialized bool
-	ReadOnly    bool
-	CreatedAt   time.Time
+// AddProjectMember adds a user to a project
+func (s *ProjectService) AddProjectMember(ctx context.Context, projectID int, user *auth.User) error {
+	query := `INSERT INTO ai.project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
+	return err
 }
 
-// ManagedColumn represents a column's metadata for UI display
-type ManagedColumn struct {
-	ID          int
-	TableID     int
-	Name        string
-	DisplayName string
-	Type        string
-	Ordinal     int
-	Visible     bool
-	CreatedAt   time.Time
+// RemoveProjectMember removes a user from a project
+func (s *ProjectService) RemoveProjectMember(ctx context.Context, projectID int, user *auth.User) error {
+	query := `DELETE FROM ai.project_members WHERE project_id = $1 AND user_id = $2`
+	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
+	return err
 }
 
 // NewTableService creates a new TableService
@@ -690,9 +685,9 @@ func (s *TableService) GetManagedTablesByProjectDB(projectDBID int) ([]ManagedTa
 // GetManagedColumns retrieves all managed columns for a table
 func (s *TableService) GetManagedColumns(tableID int) ([]ManagedColumn, error) {
 	rows, err := s.db.Query(`
-		SELECT id, table_id, name, display_name, type, ordinal, visible, created_at 
+		SELECT id, managed_table_id, name, display_name, data_type, ordinal, visible, created_at 
 		FROM ai.managed_columns 
-		WHERE table_id = $1
+		WHERE managed_table_id = $1
 		ORDER BY ordinal
 	`, tableID)
 	if err != nil {
@@ -704,24 +699,17 @@ func (s *TableService) GetManagedColumns(tableID int) ([]ManagedColumn, error) {
 	for rows.Next() {
 		var c ManagedColumn
 		var displayName sql.NullString
-		if err := rows.Scan(&c.ID, &c.TableID, &c.Name, &displayName, &c.Type, &c.Ordinal, &c.Visible, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.ManagedTableID, &c.Name, &displayName, &c.DataType, &c.Ordinal, &c.Visible, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
 			c.DisplayName = displayName.String
 		} else {
-			c.DisplayName = c.Name // Default to column name if display name is not set
+			c.DisplayName = c.Name
 		}
 		columns = append(columns, c)
 	}
 	return columns, nil
-}
-
-// DirectDataService provides methods to work directly with database tables
-type DirectDataService struct {
-	db            *sql.DB
-	dbConnections map[int]*sql.DB // Cache of database connections by project_db_id
-	mu            sync.RWMutex    // Mutex to protect the connections map
 }
 
 // NewDirectDataService creates a new DirectDataService
@@ -961,22 +949,6 @@ func (s *DirectDataService) CloseConnections() {
 	}
 }
 
-// SettingsService provides methods to work with settings
-type SettingsService struct {
-	db *sql.DB
-}
-
-// Setting represents a system setting
-type Setting struct {
-	ID          int
-	Key         string
-	Value       string
-	Description string
-	Scope       string // "system", "project", or "user"
-	ScopeID     int    // ID of the project or user (0 for system)
-	UpdatedAt   time.Time
-}
-
 // NewSettingsService creates a new SettingsService
 func NewSettingsService(db *sql.DB) *SettingsService {
 	return &SettingsService{db: db}
@@ -1069,12 +1041,6 @@ func (s *SettingsService) GetAllSettings() ([]Setting, error) {
 		settings = append(settings, setting)
 	}
 	return settings, nil
-}
-
-// DatabaseMetadataService provides methods to work with database metadata
-type DatabaseMetadataService struct {
-	db          *sql.DB
-	dataService *DirectDataService
 }
 
 // NewDatabaseMetadataService creates a new DatabaseMetadataService
@@ -1188,14 +1154,14 @@ func (s *DatabaseMetadataService) ListDatabaseTables(ctx context.Context, projec
 			managedTable, isManaged := managedTables[key]
 
 			metadata := TableMetadata{
-				Name:       tableName,
+				TableName:  tableName,
 				SchemaName: schema,
 				IsManaged:  isManaged,
 			}
 
 			if isManaged {
 				metadata.Description = managedTable.Description
-				metadata.ManagedID = managedTable.ID
+				metadata.ManagedTableID = managedTable.ID
 				metadata.ReadOnly = managedTable.ReadOnly
 				metadata.Initialized = managedTable.Initialized
 			}
@@ -1208,39 +1174,14 @@ func (s *DatabaseMetadataService) ListDatabaseTables(ctx context.Context, projec
 	return tables, nil
 }
 
-// TableMetadata contains information about a database table
-type TableMetadata struct {
-	Name        string
-	SchemaName  string
-	Description string
-	IsManaged   bool
-	ManagedID   int
-	ReadOnly    bool
-	Initialized bool
-}
-
-// ColumnMetadata contains information about a database column
-type ColumnMetadata struct {
-	Name        string
-	Type        string
-	IsNullable  bool
-	OrdinalPos  int
-	DisplayName string
-	Visible     bool
-	ManagedID   int
-	IsManaged   bool
-}
-
 // GetTableColumns returns all columns for a database table with management status
 func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDBID int, tableID int, schema, tableName string) ([]ColumnMetadata, error) {
-	// First get managed columns if this is a managed table
 	managedColumns := make(map[string]ManagedColumn)
-
 	if tableID > 0 {
 		rows, err := s.db.QueryContext(ctx, `
-			SELECT id, name, display_name, type, ordinal, visible
-			FROM ai.managed_columns
-			WHERE table_id = $1
+			SELECT id, name, display_name, data_type, ordinal, visible 
+			FROM ai.managed_columns 
+			WHERE managed_table_id = $1
 			ORDER BY ordinal
 		`, tableID)
 		if err != nil {
@@ -1251,7 +1192,7 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 		for rows.Next() {
 			var c ManagedColumn
 			var displayName sql.NullString
-			if err := rows.Scan(&c.ID, &c.Name, &displayName, &c.Type, &c.Ordinal, &c.Visible); err != nil {
+			if err := rows.Scan(&c.ID, &c.Name, &displayName, &c.DataType, &c.Ordinal, &c.Visible); err != nil {
 				return nil, err
 			}
 			if displayName.Valid {
@@ -1276,7 +1217,8 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 			column_name, 
 			data_type,
 			is_nullable = 'YES' as is_nullable,
-			ordinal_position
+			ordinal_position,
+			column_default
 		FROM 
 			information_schema.columns
 		WHERE 
@@ -1295,21 +1237,33 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 	var columns []ColumnMetadata
 	for rows.Next() {
 		var col ColumnMetadata
-		if err := rows.Scan(&col.Name, &col.Type, &col.IsNullable, &col.OrdinalPos); err != nil {
+		var defaultValue sql.NullString
+		var isNullableBool bool
+		if err := rows.Scan(&col.ColumnName, &col.DataType, &isNullableBool, &col.OrdinalPos, &defaultValue); err != nil {
 			return nil, err
+		}
+		if isNullableBool {
+			col.IsNullable = "YES"
+		} else {
+			col.IsNullable = "NO"
+		}
+		if defaultValue.Valid {
+			col.DefaultValue = defaultValue.String
 		}
 
 		// Check if column is managed
-		managedColumn, isManaged := managedColumns[col.Name]
+		managedColumn, isManaged := managedColumns[col.ColumnName]
 		col.IsManaged = isManaged
 
 		if isManaged {
 			col.DisplayName = managedColumn.DisplayName
 			col.Visible = managedColumn.Visible
-			col.ManagedID = managedColumn.ID
+			col.ManagedColumnID = managedColumn.ID
+			col.SystemType = managedColumn.ColumnType
 		} else {
-			col.DisplayName = col.Name
+			col.DisplayName = col.ColumnName
 			col.Visible = true
+			col.SystemType = mapDbTypeToColumnType(col.DataType)
 		}
 
 		columns = append(columns, col)
@@ -1429,11 +1383,6 @@ func mapDbTypeToColumnType(dbType string) string {
 	default:
 		return "text" // Default for varchar, char, text, etc.
 	}
-}
-
-// ProjectDBService provides methods to work with project database connections
-type ProjectDBService struct {
-	db *sql.DB
 }
 
 // NewProjectDBService creates a new ProjectDBService

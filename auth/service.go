@@ -24,7 +24,7 @@ func (s *UserService) GetUserByEmail(email string) (*User, error) {
 		SELECT id, email, is_admin, created_at, last_logged_in 
 		FROM ai.users 
 		WHERE email = $1
-	`, email).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLogin)
+	`, email).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn)
 
 	if err != nil {
 		return nil, err
@@ -47,17 +47,17 @@ func (s *UserService) CreateUser(email string) (*User, error) {
 
 	// Create the user
 	user := &User{
-		Email:     email,
-		IsAdmin:   isFirstUser, // First user is admin
-		CreatedAt: time.Now(),
-		LastLogin: time.Now(),
+		Email:        email,
+		IsAdmin:      isFirstUser, // First user is admin
+		CreatedAt:    time.Now(),
+		LastLoggedIn: time.Now(),
 	}
 
 	err = s.db.QueryRow(`
 		INSERT INTO ai.users (email, is_admin, created_at, last_logged_in)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, user.Email, user.IsAdmin, user.CreatedAt, user.LastLogin).Scan(&user.ID)
+	`, user.Email, user.IsAdmin, user.CreatedAt, user.LastLoggedIn).Scan(&user.ID)
 
 	if err != nil {
 		return nil, err

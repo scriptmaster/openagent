@@ -15,11 +15,11 @@ type UserServicer interface {
 
 // User represents a user in the system
 type User struct {
-	ID        int
-	Email     string
-	IsAdmin   bool
-	CreatedAt time.Time
-	LastLogin time.Time // Consider using sql.NullTime if nullable
+	ID           int
+	Email        string
+	IsAdmin      bool
+	CreatedAt    time.Time
+	LastLoggedIn time.Time // Consider using sql.NullTime if nullable
 }
 
 // OTPData stores information about an OTP

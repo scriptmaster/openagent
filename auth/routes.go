@@ -3,71 +3,25 @@ package auth
 import (
 	"html/template"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 )
 
-// RegisterAuthRoutes registers all authentication-related routes
+// RegisterAuthRoutes registers all authentication-related routes using named handlers
 func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userService *UserService) {
-	// Auth endpoints
+	// Initialize templates for auth handlers
+	InitAuthTemplates(templates)
+
+	// Auth API endpoints
 	mux.HandleFunc("/auth/request-otp", func(w http.ResponseWriter, r *http.Request) {
 		HandleRequestOTP(w, r, userService)
 	})
-
 	mux.HandleFunc("/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
 		HandleVerifyOTP(w, r, userService)
 	})
 
-	// Login/Logout pages
-	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		data := struct {
-			AppName    string
-			PageTitle  string
-			AdminEmail string
-			AppVersion string
-			Error      string
-		}{
-			AppName:    "OpenAgent",
-			PageTitle:  "Login - OpenAgent",
-			AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-			AppVersion: os.Getenv("APP_VERSION"),
-			Error:      r.URL.Query().Get("error"),
-		}
-		if err := templates.ExecuteTemplate(w, "login.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-
-	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
-		// Get versioned cookie name
-		cookieName := GetSessionCookieName()
-
-		// Clear the versioned session cookie
-		http.SetCookie(w, &http.Cookie{
-			Name:     cookieName,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			MaxAge:   -1,
-			Expires:  time.Now().Add(-24 * time.Hour),
-			SameSite: http.SameSiteLaxMode,
-		})
-
-		// Clear the regular session cookie for backward compatibility
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session",
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			MaxAge:   -1,
-			Expires:  time.Now().Add(-24 * time.Hour),
-			SameSite: http.SameSiteLaxMode,
-		})
-
-		// Redirect to login page
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-	})
+	// Login/Logout page handlers
+	mux.HandleFunc("/login", HandleLogin)
+	mux.HandleFunc("/logout", HandleLogout)
 }
 
 // AuthMiddleware checks if a user is authenticated and sets user context
@@ -130,39 +84,4 @@ func AdminMiddleware(next http.Handler) http.Handler {
 		// User is admin, proceed
 		next.ServeHTTP(w, r)
 	})
-}
-
-// isPublicPath returns true for paths that don't require authentication
-func isPublicPath(path string) bool {
-	publicPaths := []string{
-		"/login",
-		"/api/request-otp",
-		"/api/verify-otp",
-		"/static/",
-		"/favicon.ico",
-	}
-
-	for _, pp := range publicPaths {
-		if strings.HasPrefix(path, pp) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// isAdminPath returns true for paths that require admin access
-func isAdminPath(path string) bool {
-	adminPaths := []string{
-		"/admin",
-		"/api/admin/",
-	}
-
-	for _, ap := range adminPaths {
-		if strings.HasPrefix(path, ap) {
-			return true
-		}
-	}
-
-	return false
 }

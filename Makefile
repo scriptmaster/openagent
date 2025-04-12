@@ -4,29 +4,8 @@
 REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
-REMOTE_CMD := cd $(REMOTE_DIR) && \
-	echo 'Updating repository...' && \
-	git fetch origin && \
-	git reset --hard origin/main && \
-	echo 'Checking for old go-go-agent container...' && \
-	docker stop go-go-agent || true && \
-	docker rm go-go-agent || true && \
-	echo 'Finding and stopping container using host port 8800...' && \
-	CONTAINER_ID=$$(docker ps --filter "publish=8800" --format "{{.ID}}") && \
-	if [ -n "$$CONTAINER_ID" ]; then \
-		echo "Stopping and removing container $$CONTAINER_ID using port 8800..." && \
-		docker stop $$CONTAINER_ID || true && \
-		docker rm $$CONTAINER_ID || true; \
-	else \
-		echo 'No container found using host port 8800.'; \
-	fi && \
-	docker compose down --remove-orphans && \
-	echo 'Checking port 8800 after down with fuser...' && \
-	fuser -k -n tcp 8800 || echo 'Port 8800 appears free or fuser failed.' && \
-	sleep 3 && \
-	echo 'Building and starting services...' && \
-	docker compose build --no-cache && \
-	docker compose up -d
+DEPLOY_PATH := $(REMOTE_DIR)/cicd
+REMOTE_CMD := "cd $(DEPLOY_PATH) && chmod +x deploy.sh && ./deploy.sh $(VERSION) $(LATEST_COMMIT)" # Command to run deploy.sh in DEPLOY_PATH
 GIT_REMOTE := origin
 GIT_BRANCH := main
 BACKUP_DIR := /root/github.com/openagent_backup
@@ -77,7 +56,7 @@ migrations:
 # Build the application
 build: test-psql
 	@echo "Building $(BINARY_NAME)..."
-	go build -o $(BINARY_NAME)
+	go build -o $(BINARY_NAME) .
 
 # Run tests
 test:
@@ -101,46 +80,47 @@ clean:
 # Deploy using Git (push and pull)
 deploy: deploy-git
 
-# Deploy using Git (push and pull)
-deploy-git:
-	@echo "Deploying using Git to $(REMOTE_HOST)..."
-	@echo "1. Pushing changes to $(GIT_REMOTE)/$(GIT_BRANCH)..."
-	git push $(GIT_REMOTE) $(GIT_BRANCH)
-	
-	@echo "2. Pulling changes and restarting containers on remote server..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && git pull $(GIT_REMOTE) $(GIT_BRANCH) && $(REMOTE_CMD)"
-	
-	@echo "Deployment complete!"
+# Deploy to server using git commit hash for versioning
+deploy-git: build
+	@echo "Deploying to server using Git..."
+	@LATEST_COMMIT=$$(git rev-parse HEAD);
+	@echo "Latest commit: $${LATEST_COMMIT}"
+	@VERSION=$$(git describe --tags --always --dirty)
+	@echo "Deploying version: $${VERSION}"
+	# NO NEED TO DEPLOY SCRIPT IT IS ALREADY PUSHED
+	# Execute the remote command
+	# IMPORTANT: Ensure .env file is securely managed on the remote server in $(DEPLOY_PATH)
+	# IMPORTANT: Assumes deploy.sh knows docker-compose.yml is in $(DEPLOY_PATH)
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) $(REMOTE_CMD)
+	@echo "Deployment complete."
 
 # Deploy using SCP (legacy method)
 deploy-scp:
-	@echo "Deploying to $(REMOTE_HOST) using SCP..."
-	@echo "1. Copying files to remote server..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p $(REMOTE_DIR)/tpl $(REMOTE_DIR)/static $(REMOTE_DIR)/data"
-	scp -r *.go *.mod *.sum .env Dockerfile docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
-	scp -r tpl/* $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/tpl/
-	scp -r static/* $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/static/
-	
-	@echo "2. Restarting containers on remote server..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) $(REMOTE_CMD)
-	
-	@echo "Deployment complete!"
+	@echo "Deploying using SCP to $(REMOTE_HOST)..."
+	# Copy Dockerfile from root, docker-compose.yml from cicd/
+	scp Dockerfile $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
+	scp cicd/docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/cicd/ # Copy to cicd subdir on remote
+	# Use rsync for other files, excluding .git, .env, etc.
+	rsync -avz --exclude '.git' --exclude '.env' --exclude '.idea' --exclude '.vscode' --exclude 'node_modules' --exclude '*.log' ./ $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
+	@echo "Executing remote build and run..."
+	# IMPORTANT: Ensure .env file is securely managed on the remote server in $(REMOTE_DIR)
+	# Run docker compose using the compose file in cicd/
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && docker compose -f cicd/docker-compose.yml up -d --build"
+	@echo "SCP Deployment complete!"
 
-# Build for production with Docker
+# Docker commands
+# Use -f to specify the compose file location in cicd/
 docker-build:
-	@echo "Building Docker image..."
-	docker compose build
+	@echo "Building Docker images using cicd/docker-compose.yml..."
+	docker compose -f cicd/docker-compose.yml build
 
-# Run with Docker
-docker-run:
-	@echo "Starting with Docker..."
-	docker compose up -d
-	@echo "Services started! Check logs with: docker compose logs -f"
+docker-run: docker-build
+	@echo "Starting Docker containers using cicd/docker-compose.yml..."
+	docker compose -f cicd/docker-compose.yml up -d
 
-# Stop Docker containers
 docker-stop:
-	@echo "Stopping Docker containers..."
-	docker compose down
+	@echo "Stopping Docker containers using cicd/docker-compose.yml..."
+	docker compose -f cicd/docker-compose.yml down
 
 # Create data directory for SQLite
 init:
@@ -154,34 +134,32 @@ fix-remote:
 	@echo "1. Creating backup directory..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p $(BACKUP_DIR)"
 	
-	@echo "2. Backing up untracked files..."
+	@echo "2. Backing up potentially modified files (excluding .env)..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && \
-		mv .env $(BACKUP_DIR)/ && \
-		mv Dockerfile $(BACKUP_DIR)/ && \
-		mv docker-compose.yml $(BACKUP_DIR)/ && \
+		mv Dockerfile $(BACKUP_DIR)/ 2>/dev/null || true && \
+		mv cicd/docker-compose.yml $(BACKUP_DIR)/cicd/ 2>/dev/null || true && \
 		mv *.go $(BACKUP_DIR)/ 2>/dev/null || true && \
 		mv go.* $(BACKUP_DIR)/ 2>/dev/null || true && \
 		mv -f static/* $(BACKUP_DIR)/static/ 2>/dev/null || true && \
-		mv -f tpl/* $(BACKUP_DIR)/tpl/ 2>/dev/null || true"
+		mv -f tpl/* $(BACKUP_DIR)/tpl/ 2>/dev/null || true" 
 	
 	@echo "3. Performing clean pull..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && \
 		git fetch $(GIT_REMOTE) && \
 		git reset --hard $(GIT_REMOTE)/$(GIT_BRANCH) && \
-		git clean -fd"
+		git clean -fdx" # Use -x to remove ignored files too (like local .env, deploy.sh)
 	
-	# @echo "4. Restoring backup files..."
-	# ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(BACKUP_DIR) && \
-	# 	cp -f .env $(REMOTE_DIR)/ && \
-	# 	cp -f Dockerfile $(REMOTE_DIR)/ && \
-	# 	cp -f docker-compose.yml $(REMOTE_DIR)/ && \
-	# 	cp -f *.go $(REMOTE_DIR)/ 2>/dev/null || true && \
-	# 	cp -f go.* $(REMOTE_DIR)/ 2>/dev/null || true && \
-	# 	cp -rf static/* $(REMOTE_DIR)/static/ 2>/dev/null || true && \
-	# 	cp -rf tpl/* $(REMOTE_DIR)/tpl/ 2>/dev/null || true"
+	@echo "4. Restoring required files from backup (excluding .env)..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(BACKUP_DIR) && \
+		cp -f Dockerfile $(REMOTE_DIR)/ 2>/dev/null || true && \
+		mkdir -p $(REMOTE_DIR)/cicd && cp -f cicd/docker-compose.yml $(REMOTE_DIR)/cicd/ 2>/dev/null || true && \
+		cp -f *.go $(REMOTE_DIR)/ 2>/dev/null || true && \
+		cp -f go.* $(REMOTE_DIR)/ 2>/dev/null || true && \
+		cp -rf static/* $(REMOTE_DIR)/static/ 2>/dev/null || true && \
+		cp -rf tpl/* $(REMOTE_DIR)/tpl/ 2>/dev/null || true"
 	
-	@echo "5. Restarting containers..."
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) $(REMOTE_CMD)
+	@echo "5. Running standard deployment steps..."
+	make deploy # Rerun the normal deploy which copies deploy.sh and runs it
 	
 	@echo "Fix complete! Backup files are stored in $(BACKUP_DIR) on the remote server."
 
@@ -190,10 +168,10 @@ help:
 	@echo "  make build      - Build the application"
 	@echo "  make test       - Run tests"
 	@echo "  make clean      - Clean build artifacts"
-	@echo "  make deploy     - Deploy using Git (default)"
+	@echo "  make deploy     - Deploy using Git (uses deploy.sh on remote)"
 	@echo "  make deploy-git - Deploy using Git"
-	@echo "  make deploy-scp - Deploy using SCP (legacy)"
-	@echo "  make fix-remote - Fix remote repository issues"
+	@echo "  make deploy-scp - Deploy using SCP (legacy, uses deploy.sh on remote)"
+	@echo "  make fix-remote - Fix remote repository issues (excluding .env)"
 	@echo "  make docker-build - Build with Docker"
 	@echo "  make docker-run - Run with Docker"
 	@echo "  make docker-stop - Stop Docker containers"

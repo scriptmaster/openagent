@@ -1,18 +1,22 @@
-package main
+package server
 
 import (
-	"crypto/sha256"
-	"fmt"
 	"html/template"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// GetTemplateFuncs returns the template function map
+// GetTemplateFuncs returns the template functions map (Exported)
 func GetTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"CurrentYear": func() int {
+			return time.Now().Year()
+		},
+		"AssetPath": func(path string) string {
+			// Basic implementation, may need adjustment based on actual asset handling
+			return "/static/" + strings.TrimPrefix(path, "/")
+		},
 		"formatTime": func(t interface{}) string {
 			if t == nil {
 				return "Never"
@@ -51,21 +55,10 @@ func GetTemplateFuncs() template.FuncMap {
 	}
 }
 
-// getEnvOrDefault returns the value of environment variable or default value if not set
-func getEnvOrDefault(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-// generateSessionSalt creates a unique salt based on the app version
-func generateSessionSalt(version string) string {
-	h := sha256.New()
-	h.Write([]byte(version))
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
+// generateSessionSalt needs to be exported if called directly from outside the server package
+// func generateSessionSalt() (string, error) {
+// 	// ... implementation ...
+// }
 
 // parseVersion splits a version string into components with defaults
 func parseVersion(version string) (major, minor, patch, build int) {

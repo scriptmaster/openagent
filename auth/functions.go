@@ -265,3 +265,38 @@ func GetSessionCookieName() string {
 	}
 	return "session_v" + version
 }
+
+// isPublicPath returns true for paths that don't require authentication
+func isPublicPath(path string) bool {
+	publicPaths := []string{
+		"/login",
+		"/auth/request-otp", // Changed from /api/request-otp
+		"/auth/verify-otp",  // Changed from /api/verify-otp
+		"/static/",
+		"/favicon.ico",
+	}
+
+	for _, pp := range publicPaths {
+		if strings.HasPrefix(path, pp) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isAdminPath returns true for paths that require admin access
+func isAdminPath(path string) bool {
+	adminPaths := []string{
+		"/admin",
+		"/api/admin/", // Keep this if admin API exists
+	}
+
+	for _, ap := range adminPaths {
+		if strings.HasPrefix(path, ap) {
+			return true
+		}
+	}
+
+	return false
+}
