@@ -77,7 +77,8 @@
                     <button @click="nextStep()" :disabled="!canProceed() || isLoading">
                          Next Step
                     </button>
-                    <button @click="retryLastAction()" x-show="agentState.status === 'Error' && agentState.lastError.includes('model')" 
+                    <button @click="retryLastAction()" 
+                            x-show="agentState.status === 'Error' && (agentState.lastError.includes('model') || agentState.lastError.includes('timeout'))" 
                             class="retry-button" :disabled="isLoading">
                         Retry
                     </button>
@@ -275,6 +276,9 @@
                     if (this.isLoading) return;
                     this.isLoading = true;
                     try {
+                        // Add a delay before retrying to give the service time to recover
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
                         if (this.agentState.goal) {
                             // If we have a goal, retry starting the agent
                             await this.startAgent();
