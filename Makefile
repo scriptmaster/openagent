@@ -4,7 +4,10 @@
 REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
-REMOTE_CMD := "cd $(REMOTE_DIR) && docker-compose down && docker-compose build && docker-compose up -d"
+REMOTE_CMD := cd $(REMOTE_DIR) && docker compose down && docker compose build && docker compose up -d
+GIT_REMOTE := origin
+GIT_BRANCH := main
+BACKUP_DIR := /root/github.com/openagent_backup
 
 # Binary name
 BINARY_NAME := openagent
@@ -13,7 +16,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy test-psql migrations
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql migrations fix-remote
 
 all: test build
 
@@ -73,9 +76,23 @@ clean:
 	rm -f $(BINARY_NAME)
 	go clean
 
-# Deploy to remote server
-deploy:
-	@echo "Deploying to $(REMOTE_HOST)..."
+# Deploy using Git (push and pull)
+deploy: deploy-git
+
+# Deploy using Git (push and pull)
+deploy-git:
+	@echo "Deploying using Git to $(REMOTE_HOST)..."
+	@echo "1. Pushing changes to $(GIT_REMOTE)/$(GIT_BRANCH)..."
+	git push $(GIT_REMOTE) $(GIT_BRANCH)
+	
+	@echo "2. Pulling changes and restarting containers on remote server..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && git pull $(GIT_REMOTE) $(GIT_BRANCH) && $(REMOTE_CMD)"
+	
+	@echo "Deployment complete!"
+
+# Deploy using SCP (legacy method)
+deploy-scp:
+	@echo "Deploying to $(REMOTE_HOST) using SCP..."
 	@echo "1. Copying files to remote server..."
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p $(REMOTE_DIR)/tpl $(REMOTE_DIR)/static $(REMOTE_DIR)/data"
 	scp -r *.go *.mod *.sum .env Dockerfile docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
@@ -90,18 +107,18 @@ deploy:
 # Build for production with Docker
 docker-build:
 	@echo "Building Docker image..."
-	docker-compose build
+	docker compose build
 
 # Run with Docker
 docker-run:
 	@echo "Starting with Docker..."
-	docker-compose up -d
-	@echo "Services started! Check logs with: docker-compose logs -f"
+	docker compose up -d
+	@echo "Services started! Check logs with: docker compose logs -f"
 
 # Stop Docker containers
 docker-stop:
 	@echo "Stopping Docker containers..."
-	docker-compose down
+	docker compose down
 
 # Create data directory for SQLite
 init:
@@ -109,12 +126,52 @@ init:
 	mkdir -p data tpl static models auth
 	@echo "Initialization complete!"
 
+# Fix remote repository by backing up untracked files and performing clean pull
+fix-remote:
+	@echo "Fixing remote repository at $(REMOTE_HOST)..."
+	@echo "1. Creating backup directory..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p $(BACKUP_DIR)"
+	
+	@echo "2. Backing up untracked files..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && \
+		mv .env $(BACKUP_DIR)/ && \
+		mv Dockerfile $(BACKUP_DIR)/ && \
+		mv docker-compose.yml $(BACKUP_DIR)/ && \
+		mv *.go $(BACKUP_DIR)/ 2>/dev/null || true && \
+		mv go.* $(BACKUP_DIR)/ 2>/dev/null || true && \
+		mv -f static/* $(BACKUP_DIR)/static/ 2>/dev/null || true && \
+		mv -f tpl/* $(BACKUP_DIR)/tpl/ 2>/dev/null || true"
+	
+	@echo "3. Performing clean pull..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && \
+		git fetch $(GIT_REMOTE) && \
+		git reset --hard $(GIT_REMOTE)/$(GIT_BRANCH) && \
+		git clean -fd"
+	
+	# @echo "4. Restoring backup files..."
+	# ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(BACKUP_DIR) && \
+	# 	cp -f .env $(REMOTE_DIR)/ && \
+	# 	cp -f Dockerfile $(REMOTE_DIR)/ && \
+	# 	cp -f docker-compose.yml $(REMOTE_DIR)/ && \
+	# 	cp -f *.go $(REMOTE_DIR)/ 2>/dev/null || true && \
+	# 	cp -f go.* $(REMOTE_DIR)/ 2>/dev/null || true && \
+	# 	cp -rf static/* $(REMOTE_DIR)/static/ 2>/dev/null || true && \
+	# 	cp -rf tpl/* $(REMOTE_DIR)/tpl/ 2>/dev/null || true"
+	
+	@echo "5. Restarting containers..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) $(REMOTE_CMD)
+	
+	@echo "Fix complete! Backup files are stored in $(BACKUP_DIR) on the remote server."
+
 help:
 	@echo "Available commands:"
 	@echo "  make build      - Build the application"
 	@echo "  make test       - Run tests"
 	@echo "  make clean      - Clean build artifacts"
-	@echo "  make deploy     - Deploy to remote server (update REMOTE_* variables first)"
+	@echo "  make deploy     - Deploy using Git (default)"
+	@echo "  make deploy-git - Deploy using Git"
+	@echo "  make deploy-scp - Deploy using SCP (legacy)"
+	@echo "  make fix-remote - Fix remote repository issues"
 	@echo "  make docker-build - Build with Docker"
 	@echo "  make docker-run - Run with Docker"
 	@echo "  make docker-stop - Stop Docker containers"
