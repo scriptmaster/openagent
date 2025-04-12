@@ -4,7 +4,7 @@
 REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
-REMOTE_CMD := cd $(REMOTE_DIR) && docker compose down && docker compose build && docker compose up -d
+REMOTE_CMD := cd $(REMOTE_DIR) && docker compose down && docker compose build --no-cache && docker compose up -d
 GIT_REMOTE := origin
 GIT_BRANCH := main
 BACKUP_DIR := /root/github.com/openagent_backup
