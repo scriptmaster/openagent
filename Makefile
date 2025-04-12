@@ -5,6 +5,9 @@ REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
 REMOTE_CMD := cd $(REMOTE_DIR) && \
+	echo 'Updating repository...' && \
+	git fetch origin && \
+	git reset --hard origin/main && \
 	echo 'Checking for old go-go-agent container...' && \
 	docker stop go-go-agent || true && \
 	docker rm go-go-agent || true && \
@@ -21,6 +24,7 @@ REMOTE_CMD := cd $(REMOTE_DIR) && \
 	echo 'Checking port 8800 after down with fuser...' && \
 	fuser -k -n tcp 8800 || echo 'Port 8800 appears free or fuser failed.' && \
 	sleep 3 && \
+	echo 'Building and starting services...' && \
 	docker compose build --no-cache && \
 	docker compose up -d
 GIT_REMOTE := origin

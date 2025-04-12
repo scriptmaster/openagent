@@ -10,14 +10,14 @@ services:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
       - ./static:/app/static # Map static assets
       - ./tpl:/app/tpl # Map template files
-    # env_file:
-    #  - .env # Temporarily disable env_file loading
+    env_file:
+      - .env # Load environment variables from .env file
     environment:
       # --- Application Settings --- Ensure PORT and DATA_DIR are still defined if not in .env
       PORT: ${PORT:-8800} # Use PORT from .env or default to 8800
       DATA_DIR: ${DATA_DIR:-/app/data} # Use DATA_DIR from .env or default to /app/data
-      # --- TEST VARIABLE ---
-      SMTP_HOST: "HARDCODED_TEST_VALUE"
+      # --- TEST VARIABLE --- REMOVED
+      # SMTP_HOST: "HARDCODED_TEST_VALUE"
       # --- PostgreSQL Connection --- These will be loaded from .env via env_file
       # DB_HOST: postgres
       # DB_PORT: 5432
