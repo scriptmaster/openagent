@@ -12,7 +12,7 @@ services:
       - ./tpl:/app/tpl # Map template files
       - ./migrations:/app/migrations # Map migrations directory
     env_file:
-      - .env # Path relative to compose file (now in same directory)
+      - .env
     environment:
       - PORT=${PORT:-8800}
       - DATA_DIR=/app/data

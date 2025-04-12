@@ -3,6 +3,7 @@ package projects
 import (
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 
@@ -124,7 +125,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
@@ -149,7 +150,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 
 	// Execute the template
 	if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"                 // Keep godotenv for loading .env
 	"github.com/scriptmaster/openagent/auth"   // Keep auth for UserService
@@ -57,7 +58,11 @@ func StartServer() error {
 	mux := http.NewServeMux()
 
 	// Generate session salt using the function within the server package
-	salt := GetSessionSalt() // Use the exported function
+	version := os.Getenv("APP_VERSION")
+	if version == "" {
+		version = "1.0.0.0"
+	}
+	salt := generateSessionSalt(version)
 
 	// Register all routes (uses RegisterRoutes from the server package)
 	// Pass potentially nil userService if in maintenance mode
