@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Go Agent UI</title>
+    <title>Go Agent</title>
     <script src="//unpkg.com/alpinejs" defer></script>
     <style>
         body { font-family: sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
@@ -39,13 +39,23 @@
 </head>
 <body x-data="agentApp()" x-init="init()">
     <div class="container">
-        <h1>Go Agent Control Panel (Dockerized)</h1>
-
-        <div class="goal-input">
-            <input type="text" x-model="goalInput" placeholder="Enter agent's goal..." :disabled="agentStarted">
-            <button @click="startAgent()" :disabled="agentStarted || goalInput.trim() === '' || isLoading">Start Agent</button>
-             <div x-show="isLoading && !agentStarted" class="loading"><div class="loader"></div></div>
-        </div>
+        <header>
+            <h1>Go Agent</h1>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/logout">Logout</a>
+            </nav>
+        </header>
+        
+        <main>
+            <section class="agent-controls">
+                <h2>Agent Controls</h2>
+                <div class="control-buttons">
+                    <button id="startAgent" class="btn primary">Start Agent</button>
+                    <button id="stopAgent" class="btn danger" disabled>Stop Agent</button>
+                    <button id="nextStep" class="btn secondary" disabled>Next Step</button>
+                </div>
+            </section>
 
         <template x-if="agentStarted">
             <div class="status-bar">
