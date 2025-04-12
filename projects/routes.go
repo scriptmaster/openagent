@@ -20,8 +20,4 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 	mux.HandleFunc("/projects", func(w http.ResponseWriter, r *http.Request) {
 		HandleProjectsRoute(w, r, templates, projectService, userService)
 	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		HandleIndexRoute(w, r, templates, projectService, userService)
-	})
 }

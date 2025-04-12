@@ -3,6 +3,8 @@ package projects
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"sync"
 	"time"
 
 	"github.com/scriptmaster/openagent/common"
@@ -11,6 +13,14 @@ import (
 // ProjectService handles project-related database operations
 type ProjectService struct {
 	db *sql.DB
+	// Cache for projects by domain
+	projectsByDomain map[string]*cachedProject
+	mu               sync.RWMutex
+}
+
+type cachedProject struct {
+	project       *Project
+	lastRefreshed time.Time
 }
 
 // NewProjectService creates a new project service
@@ -24,14 +34,28 @@ func NewProjectService(db *sql.DB) (*ProjectService, error) {
 		return nil, fmt.Errorf("failed to load SQL queries: %w", err)
 	}
 
-	return &ProjectService{db: db}, nil
+	return &ProjectService{
+		db:               db,
+		projectsByDomain: make(map[string]*cachedProject),
+	}, nil
 }
 
 // GetProjectByDomain retrieves a project by its domain
 func (s *ProjectService) GetProjectByDomain(domain string) (*Project, error) {
+	// Check cache first
+	s.mu.RLock()
+	cached, exists := s.projectsByDomain[domain]
+	s.mu.RUnlock()
+
+	refreshInterval := 1 * time.Hour
+	if exists && !cached.lastRefreshed.Before(time.Now().Add(-refreshInterval)) {
+		return cached.project, nil
+	}
+
+	// Cache miss, fetch from database
 	query, err := common.GetQuery(s.db, "GetProjectByDomain")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get query: %w", err)
 	}
 
 	var project Project
@@ -40,10 +64,20 @@ func (s *ProjectService) GetProjectByDomain(domain string) (*Project, error) {
 		&project.CreatedAt, &project.UpdatedAt, &project.Status, &project.Owner)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, fmt.Errorf("project not found for domain: %s", domain)
 		}
-		return nil, fmt.Errorf("failed to get project: %w", err)
+		return nil, fmt.Errorf("failed to scan project: %w", err)
 	}
+
+	// Update cache
+	log.Printf("Caching project for domain: %s", domain)
+	s.mu.Lock()
+	s.projectsByDomain[domain] = &cachedProject{
+		project:       &project,
+		lastRefreshed: time.Now(),
+	}
+	s.mu.Unlock()
+
 	return &project, nil
 }
 

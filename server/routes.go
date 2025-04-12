@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"html/template"
 	"log"
 	"net/http"
@@ -11,20 +12,10 @@ import (
 	"github.com/scriptmaster/openagent/projects"
 )
 
-// Handle404 handles requests for unconfigured domains or non-existent routes
-func Handle404(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	if err := templates.ExecuteTemplate(w, "404.html", nil); err != nil {
-		http.Error(w, "404 Not Found", http.StatusNotFound)
-	}
-}
-
 // RegisterRoutes registers all application routes for the server package
 func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt string) {
 	// Load app version into the global appVersion variable
 	appVersion = common.GetEnvOrDefault("APP_VERSION", "1.0.0.0")
-	// Assign the passed-in salt to the global sessionSalt variable
-	sessionSalt = salt
 
 	// Initialize the global templates variable
 	templates = template.Must(template.New("").Funcs(GetTemplateFuncs()).ParseGlob("tpl/*.html"))
@@ -49,14 +40,38 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 
 	// Only register project routes if database is available
 	if db != nil {
+		RegisterRootRoutes(mux, templates, userService, db)
 		projects.RegisterProjectRoutes(mux, templates, userService, db)
 	}
 
 	// Register agent routes (internal to server package)
 	registerAgentRoutes(mux)
 
-	// Register catch-all handler for 404 errors
-	mux.HandleFunc("/", Handle404)
+	// Register catch-all handler for 404 errors - must be last
+	mux.HandleFunc("/{path:.*}", func(w http.ResponseWriter, r *http.Request) {
+		common.Handle404(w, r, templates)
+	})
+}
+
+func RegisterRootRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB) {
+	projectService, err := projects.NewProjectService(db)
+	if err != nil {
+		log.Printf("Failed to create project service: %v", err)
+		SetMaintenanceMode(true)
+		return
+	}
+
+	// Root and project page routes handler
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			// Handle root path
+			projects.HandleIndexRoute(w, r, templates, projectService, userService)
+			return
+		}
+
+		// Check if current domain has a project and the path matches a project page
+		projects.HandleProjectPageRoute(w, r, templates, projectService, userService)
+	})
 }
 
 // registerAgentRoutes registers all agent-related routes

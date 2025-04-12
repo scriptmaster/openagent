@@ -186,3 +186,37 @@ func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *templat
 	ctx := auth.SetUserContext(r.Context(), user)
 	HandleIndex(w, r.WithContext(ctx), templates, projectService)
 }
+
+// HandleProjectPageRoute handles project-specific pages based on domain and path
+func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+	// Get project by current domain
+	project, err := projectService.GetProjectByDomain(r.Host)
+	if err != nil || project == nil {
+		// No project found for this domain, serve 404 page
+		common.Handle404(w, r, templates)
+		return
+	}
+
+	// Get user from session if available
+	user, _ := userService.GetUserFromSession(r)
+	if user != nil {
+		// Add user to request context
+		ctx := auth.SetUserContext(r.Context(), user)
+		r = r.WithContext(ctx)
+	}
+
+	// Prepare page data
+	data := models.PageData{
+		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
+		PageTitle:  project.Name,
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		Project:    project,
+		User:       user,
+	}
+
+	// Execute the template
+	if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}

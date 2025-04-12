@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"html/template"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -82,22 +81,17 @@ func parseVersion(version string) (major, minor, patch, build int) {
 	return major, minor, patch, build
 }
 
-// GetSessionSalt returns the session salt generated during route registration.
-// It must be called after RegisterRoutes has been executed.
+// GetSessionSalt returns the session salt.
+// It ensures the salt is initialized before returning it.
 func GetSessionSalt() string {
 	// Return the globally stored salt
 	// Ensure sessionSalt is initialized before this is called (e.g., in RegisterRoutes)
 	if sessionSalt == "" {
-		// This shouldn't happen in the normal flow where RegisterRoutes is called first.
-		// Maybe generate a temporary one or log a warning?
-		log.Println("Warning: GetSessionSalt called before sessionSalt was initialized in RegisterRoutes.")
-		// Fallback or panic might be appropriate depending on strictness needed.
-		// For now, let's recalculate based on current env var as a fallback.
 		version := os.Getenv("APP_VERSION")
 		if version == "" {
 			version = "1.0.0.0"
 		}
-		return generateSessionSalt(version) // Use the helper if available
+		sessionSalt = generateSessionSalt(version) // Use the helper if available
 	}
 	return sessionSalt
 }
