@@ -4,7 +4,13 @@
 REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
-REMOTE_CMD := cd $(REMOTE_DIR) && docker compose down && docker compose build --no-cache && docker compose up -d
+REMOTE_CMD := cd $(REMOTE_DIR) && \
+	docker compose down --remove-orphans && \
+	echo 'Checking port 8800 after down...' && \
+	lsof -i :8800 || echo 'Port 8800 appears free.' && \
+	sleep 2 && \
+	docker compose build --no-cache && \
+	docker compose up -d
 GIT_REMOTE := origin
 GIT_BRANCH := main
 BACKUP_DIR := /root/github.com/openagent_backup
