@@ -37,12 +37,8 @@ func HandleMaintenance(w http.ResponseWriter, r *http.Request, templates *templa
 		return
 	}
 
-	// Show login page
-	data := struct {
-		Error      string
-		AdminEmail string
-		AppVersion string
-	}{
+	// Show login page using the new struct from types.go
+	data := MaintenanceLoginData{
 		Error:      r.URL.Query().Get("error"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
 		AppVersion: os.Getenv("APP_VERSION"),
@@ -98,8 +94,9 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 		return
 	}
 
-	// Get error from query parameters if present
+	// Get error/success from query parameters if present
 	errorMsg := r.URL.Query().Get("error")
+	successMsg := r.URL.Query().Get("success")
 
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
@@ -122,33 +119,16 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 		migrationStart = "000" // Ensure consistent formatting with leading zeros
 	}
 
-	data := struct {
-		DBHost         string
-		DBPort         string
-		DBUser         string
-		DBPassword     string
-		DBName         string
-		Error          string
-		Success        string
-		AdminEmail     string
-		VersionMajor   int
-		VersionMinor   int
-		VersionPatch   int
-		VersionBuild   int
-		MigrationStart string
-		SMTPHost       string
-		SMTPPort       string
-		SMTPUser       string
-		SMTPPassword   string
-		SMTPFrom       string
-	}{
+	// Use the new struct from types.go
+	data := MaintenanceConfigData{
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
 		DBUser:         os.Getenv("DB_USER"),
-		DBPassword:     os.Getenv("DB_PASSWORD"),
+		DBPassword:     os.Getenv("DB_PASSWORD"), // Populate even if not always shown
 		DBName:         os.Getenv("DB_NAME"),
 		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
 		Error:          errorMsg,
+		Success:        successMsg,
 		VersionMajor:   major,
 		VersionMinor:   minor,
 		VersionPatch:   patch,
@@ -157,7 +137,7 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 		SMTPHost:       os.Getenv("SMTP_HOST"),
 		SMTPPort:       os.Getenv("SMTP_PORT"),
 		SMTPUser:       os.Getenv("SMTP_USER"),
-		SMTPPassword:   os.Getenv("SMTP_PASSWORD"),
+		SMTPPassword:   os.Getenv("SMTP_PASSWORD"), // Populate even if not always shown
 		SMTPFrom:       os.Getenv("SMTP_FROM"),
 	}
 
@@ -247,215 +227,49 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 			handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Invalid migration number: "+err.Error())
 			return
 		}
-
-		// Update migration tracking to the specified number
-		log.Printf("Setting migration tracking to %d", migNum)
+		log.Printf("Updating migration start number to %d", migNum)
 		if err := updateMigrationStart(migNum); err != nil {
-			log.Printf("Warning: Failed to update migration tracking: %v", err)
+			handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update migration start number: "+err.Error())
+			return
 		}
 	}
 
-	// Update database configuration
-	if err := updateDatabaseConfig(host, port, user, password, dbname); err != nil {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update database configuration: "+err.Error())
+	// Construct the updated configuration
+	configUpdates := map[string]string{
+		"DB_HOST":       host,
+		"DB_PORT":       port,
+		"DB_USER":       user,
+		"DB_PASSWORD":   password,
+		"DB_NAME":       dbname,
+		"SMTP_HOST":     smtpHost,
+		"SMTP_PORT":     smtpPort,
+		"SMTP_USER":     smtpUser,
+		"SMTP_PASSWORD": smtpPassword,
+		"SMTP_FROM":     smtpFrom,
+		// Update version in environment
+		"APP_VERSION": fmt.Sprintf("%d.%d.%d.%d", major, minor, patch, GetBuildNumber()+1), // Increment build number on update
+	}
+
+	// Update environment variables and .env file
+	if err := UpdateEnvFile(configUpdates); err != nil {
+		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update configuration file: "+err.Error())
 		return
 	}
 
-	// Update environment variables for database
-	os.Setenv("DB_HOST", host)
-	os.Setenv("DB_PORT", port)
-	os.Setenv("DB_USER", user)
-	os.Setenv("DB_PASSWORD", password)
-	os.Setenv("DB_NAME", dbname)
+	// Log the update attempt
+	log.Printf("Configuration updated: DB=%s:%s/%s User=%s SMTP=%s:%s", host, port, dbname, user, smtpHost, smtpPort)
 
-	// Update SMTP environment variables if provided
-	if smtpHost != "" {
-		os.Setenv("SMTP_HOST", smtpHost)
-	}
-	if smtpPort != "" {
-		os.Setenv("SMTP_PORT", smtpPort)
-	}
-	if smtpUser != "" {
-		os.Setenv("SMTP_USER", smtpUser)
-	}
-	if smtpPassword != "" {
-		os.Setenv("SMTP_PASSWORD", smtpPassword)
-	}
-	if smtpFrom != "" {
-		os.Setenv("SMTP_FROM", smtpFrom)
-	}
+	// Trigger restart logic here (e.g., send signal, use supervisor, etc.)
+	// For simplicity, we'll just log and expect manual/external restart for now
+	log.Println("Configuration saved. Server restart required to apply changes.")
 
-	// Update .env file with SMTP settings
-	updateEnvFile := func(lines []string) []string {
-		smtpVars := map[string]string{
-			"SMTP_HOST":     smtpHost,
-			"SMTP_PORT":     smtpPort,
-			"SMTP_USER":     smtpUser,
-			"SMTP_PASSWORD": smtpPassword,
-			"SMTP_FROM":     smtpFrom,
-		}
-
-		// Track which SMTP variables we've updated
-		updatedVars := map[string]bool{}
-
-		// Update existing lines
-		for i, line := range lines {
-			if line == "" {
-				continue
-			}
-
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) != 2 {
-				continue
-			}
-
-			key := strings.TrimSpace(parts[0])
-			if val, exists := smtpVars[key]; exists && val != "" {
-				lines[i] = key + "=" + val
-				updatedVars[key] = true
-			}
-		}
-
-		// Add missing SMTP vars that have values
-		for key, val := range smtpVars {
-			if !updatedVars[key] && val != "" {
-				lines = append(lines, key+"="+val)
-			}
-		}
-
-		return lines
-	}
-
-	// Handle version update
-	// Parse current version to get build number
-	buildNumber := 0
-	appVersion := os.Getenv("APP_VERSION")
-	if appVersion != "" {
-		parts := strings.Split(appVersion, ".")
-		if len(parts) == 4 {
-			buildNumber, _ = strconv.Atoi(parts[3])
-		}
-	}
-
-	// Construct new version
-	newVersion := fmt.Sprintf("%d.%d.%d.%d", major, minor, patch, buildNumber)
-
-	// Update .env file with version
-	envPath := ".env"
-	content, err := os.ReadFile(envPath)
-	if err != nil && !os.IsNotExist(err) {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to read .env file: "+err.Error())
-		return
-	}
-
-	// Parse .env content line by line
-	lines := strings.Split(string(content), "\n")
-	versionLineFound := false
-	for i, line := range lines {
-		if strings.HasPrefix(line, "APP_VERSION=") {
-			lines[i] = "APP_VERSION=" + newVersion
-			versionLineFound = true
-			break
-		}
-	}
-
-	// If APP_VERSION line not found, add it
-	if !versionLineFound {
-		lines = append(lines, "APP_VERSION="+newVersion)
-	}
-
-	// Update SMTP settings
-	lines = updateEnvFile(lines)
-
-	// Write back to .env
-	err = os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0644)
-	if err != nil {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update .env file: "+err.Error())
-		return
-	}
-
-	// Update global variables
-	os.Setenv("APP_VERSION", newVersion)
-
-	// Build success message
-	successMsg := "Configuration updated successfully!"
-	if resetMigrations {
-		successMsg += " Migration tracking reset to apply all migrations."
-	} else if migrationStart != "" {
-		successMsg += fmt.Sprintf(" Migration tracking set to %s.", migrationStart)
-	}
-	successMsg += " Server will restart in 5 seconds..."
-
-	log.Printf("Application configuration updated. Version: %s, Database: %s@%s:%s/%s",
-		newVersion, user, host, port, dbname)
-
-	// Parse current version for template
-	versionParts := strings.Split(newVersion, ".")
-	vMajor, _ := strconv.Atoi(versionParts[0])
-	vMinor, _ := strconv.Atoi(versionParts[1])
-	vPatch, _ := strconv.Atoi(versionParts[2])
-	vBuild, _ := strconv.Atoi(versionParts[3])
-
-	// Get updated migration start - always retrieve the latest from environment
-	updatedMigrationStart := os.Getenv("MIGRATION_START")
-	if updatedMigrationStart == "" {
-		updatedMigrationStart = "000" // Ensure consistent formatting with leading zeros
-	}
-
-	// Show success message and redirect to home after a delay
-	data := struct {
-		DBHost         string
-		DBPort         string
-		DBUser         string
-		DBPassword     string
-		DBName         string
-		Error          string
-		Success        string
-		AdminEmail     string
-		VersionMajor   int
-		VersionMinor   int
-		VersionPatch   int
-		VersionBuild   int
-		MigrationStart string
-		SMTPHost       string
-		SMTPPort       string
-		SMTPUser       string
-		SMTPPassword   string
-		SMTPFrom       string
-	}{
-		DBHost:         host,
-		DBPort:         port,
-		DBUser:         user,
-		DBPassword:     password,
-		DBName:         dbname,
-		Success:        successMsg,
-		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
-		VersionMajor:   vMajor,
-		VersionMinor:   vMinor,
-		VersionPatch:   vPatch,
-		VersionBuild:   vBuild,
-		MigrationStart: updatedMigrationStart,
-		SMTPHost:       smtpHost,
-		SMTPPort:       smtpPort,
-		SMTPUser:       smtpUser,
-		SMTPPassword:   smtpPassword,
-		SMTPFrom:       smtpFrom,
-	}
-
-	w.Header().Set("Refresh", "5;url=/")
-	if err := templates.ExecuteTemplate(w, "maintenance.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	// Redirect back to config page with success message
+	http.Redirect(w, r, "/maintenance/config?success="+url.QueryEscape("Configuration saved. Restart server to apply changes."), http.StatusSeeOther)
 }
 
-// handleMaintenanceError displays error message on maintenance page
+// handleMaintenanceError redirects back to the config page with an error message
 func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, errorMsg string) {
-	// Verify authentication (should be caught by middleware, but double-check)
-	if !isMaintenanceAuthenticated(r) {
-		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
-		return
-	}
-
+	log.Printf("Maintenance configuration error: %s", errorMsg)
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
 	appVersion := os.Getenv("APP_VERSION")
@@ -471,48 +285,27 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 	patch, _ := strconv.Atoi(versionParts[2])
 	build, _ := strconv.Atoi(versionParts[3])
 
-	// Get current migration start or use form value if present
-	migrationStart := r.FormValue("migration_start")
+	// Get current migration start number
+	migrationStart := os.Getenv("MIGRATION_START")
 	if migrationStart == "" {
-		migrationStart = os.Getenv("MIGRATION_START")
-		if migrationStart == "" {
-			migrationStart = "000" // Ensure consistent formatting with leading zeros
-		}
+		migrationStart = "000"
 	}
 
-	data := struct {
-		DBHost         string
-		DBPort         string
-		DBUser         string
-		DBPassword     string
-		DBName         string
-		Error          string
-		Success        string
-		AdminEmail     string
-		VersionMajor   int
-		VersionMinor   int
-		VersionPatch   int
-		VersionBuild   int
-		MigrationStart string
-		SMTPHost       string
-		SMTPPort       string
-		SMTPUser       string
-		SMTPPassword   string
-		SMTPFrom       string
-	}{
-		DBHost:         r.FormValue("db_host"),
+	// Populate data with current/submitted values to redisplay the form
+	data := MaintenanceConfigData{
+		DBHost:         r.FormValue("db_host"), // Use submitted value
 		DBPort:         r.FormValue("db_port"),
 		DBUser:         r.FormValue("db_user"),
 		DBPassword:     r.FormValue("db_password"),
 		DBName:         r.FormValue("db_name"),
-		Error:          errorMsg,
 		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		Error:          errorMsg,
 		VersionMajor:   major,
 		VersionMinor:   minor,
 		VersionPatch:   patch,
 		VersionBuild:   build,
 		MigrationStart: migrationStart,
-		SMTPHost:       r.FormValue("smtp_host"),
+		SMTPHost:       r.FormValue("smtp_host"), // Use submitted value
 		SMTPPort:       r.FormValue("smtp_port"),
 		SMTPUser:       r.FormValue("smtp_user"),
 		SMTPPassword:   r.FormValue("smtp_password"),
@@ -524,29 +317,28 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 	}
 }
 
-// HandleInitializeSchema manually executes the database schema initialization
+// HandleInitializeSchema attempts to initialize the database schema.
 func HandleInitializeSchema(w http.ResponseWriter, r *http.Request, isMaintenanceAuthenticated func(r *http.Request) bool, updateMigrationStart func(migrationNum int) error, initDB func() (*sql.DB, error)) {
-	// Verify authentication
 	if !isMaintenanceAuthenticated(r) {
-		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Reset migration tracking to apply all migrations
-	if err := updateMigrationStart(0); err != nil {
-		http.Redirect(w, r, "/maintenance/config?error="+url.QueryEscape("Failed to reset migration tracking: "+err.Error()), http.StatusSeeOther)
-		return
-	}
-
-	// Get database connection
+	log.Println("Attempting to initialize database schema...")
 	db, err := initDB()
 	if err != nil {
-		// Return to maintenance config with error
-		http.Redirect(w, r, "/maintenance/config?error="+url.QueryEscape("Failed to connect to database: "+err.Error()), http.StatusSeeOther)
+		msg := fmt.Sprintf("Failed to initialize database schema: %v", err)
+		log.Println(msg)
+		http.Redirect(w, r, "/maintenance/config?error="+url.QueryEscape(msg), http.StatusSeeOther)
 		return
 	}
-	defer db.Close()
+	db.Close()
 
-	// Return to maintenance config with success message
-	http.Redirect(w, r, "/maintenance/config?success=Database+schema+initialized+successfully", http.StatusSeeOther)
+	// After successful initialization, reset migration start number to 0
+	if err := updateMigrationStart(0); err != nil {
+		log.Printf("Warning: Failed to reset migration tracking after schema init: %v", err)
+	}
+
+	log.Println("Database schema initialized successfully.")
+	http.Redirect(w, r, "/maintenance/config?success="+url.QueryEscape("Database schema initialized successfully."), http.StatusSeeOther)
 }

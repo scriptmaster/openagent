@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/scriptmaster/openagent/admin"
 	"github.com/scriptmaster/openagent/auth"
@@ -16,18 +15,6 @@ var (
 	appVersion  string
 	sessionSalt string
 )
-
-// PageData represents the data passed to templates
-type PageData struct {
-	AppName    string
-	PageTitle  string
-	User       auth.User
-	Error      string
-	Projects   []interface{}
-	Project    interface{}
-	AdminEmail string
-	AppVersion string
-}
 
 // RegisterRoutes registers all application routes
 func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService) {
@@ -53,6 +40,10 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService) {
 
 	// Register agent routes
 	registerAgentRoutes(mux)
+
+	// Register main package routes
+	mux.HandleFunc("/login", handleLogin)   // Use handleLogin from handlers.go
+	mux.HandleFunc("/logout", handleLogout) // Use handleLogout from handlers.go
 }
 
 // registerAgentRoutes registers all agent-related routes
@@ -63,33 +54,6 @@ func registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/status", handleStatus)
 }
 
-// handleLogin displays the login page
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	data := PageData{
-		AppName:    "OpenAgent",
-		PageTitle:  "Login - OpenAgent",
-		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: appVersion,
-	}
+// handleLogin moved to handlers.go
 
-	if err := templates.ExecuteTemplate(w, "login.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-// handleLogout clears the session cookie and redirects to login
-func handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Clear the session cookie by setting an expired cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,                              // Delete cookie immediately
-		Expires:  time.Now().Add(-24 * time.Hour), // Expired
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	// Redirect to login page
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
+// handleLogout moved to handlers.go

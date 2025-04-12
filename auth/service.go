@@ -3,9 +3,7 @@ package auth
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -77,15 +75,6 @@ func (s *UserService) UpdateUserLastLogin(userID int) error {
 	`, time.Now(), userID)
 
 	return err
-}
-
-// GetSessionCookieName returns the cookie name for session, versioned by app version
-func GetSessionCookieName() string {
-	version := os.Getenv("APP_VERSION")
-	if version == "" {
-		version = "1.0.0.0" // Default version
-	}
-	return fmt.Sprintf("session_v%s", version)
 }
 
 // GetUserFromSession retrieves the user from the session cookie

@@ -103,19 +103,13 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 	// Get all projects
 	projects := store.ListProjects()
 
-	// Prepare template data
-	data := struct {
-		AppName    string
-		PageTitle  string
-		User       auth.User
-		Projects   []*Project
-		AppVersion string
-	}{
+	// Prepare template data using ProjectsPageData struct
+	data := ProjectsPageData{
 		AppName:    "OpenAgent",
 		PageTitle:  "Projects",
 		User:       *user,
 		Projects:   projects,
-		AppVersion: "1.0.0",
+		AppVersion: "1.0.0", // TODO: Get actual version
 	}
 
 	// Execute the template
@@ -144,19 +138,13 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 	// Get all projects
 	projects := store.ListProjects()
 
-	// Prepare template data
-	data := struct {
-		AppName    string
-		PageTitle  string
-		User       auth.User
-		Projects   []*Project
-		AppVersion string
-	}{
+	// Prepare template data using ProjectsPageData struct
+	data := ProjectsPageData{
 		AppName:    "OpenAgent",
 		PageTitle:  "Dashboard",
 		User:       *user,
 		Projects:   projects,
-		AppVersion: "1.0.0",
+		AppVersion: "1.0.0", // TODO: Get actual version
 	}
 
 	// Execute the template

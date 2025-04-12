@@ -19,74 +19,96 @@ func IsMaintenanceAuthenticated(r *http.Request) bool {
 	}
 
 	// Expected value with current version salt
-	expected := "authenticated_" + os.Getenv("APP_VERSION")[:8]
+	// Compare against first 8 chars of version for basic check
+	currentVersion := os.Getenv("APP_VERSION")
+	if len(currentVersion) < 8 {
+		currentVersion = "1.0.0.0_" // Default to avoid panic
+	}
+	expected := "authenticated_" + currentVersion[:8]
 
-	// Validate cookie value matches current version
+	// Validate cookie value matches current version prefix
 	return cookie.Value == expected
 }
 
-// IncrementBuildVersion increases the build number in APP_VERSION and updates the .env file
-func IncrementBuildVersion() error {
-	// Read current version from environment
+// GetBuildNumber extracts the build number from the APP_VERSION env var.
+func GetBuildNumber() int {
 	currentVersion := os.Getenv("APP_VERSION")
 	if currentVersion == "" {
-		currentVersion = "1.0.0.0" // Default if not set
+		return 0
 	}
-
-	// Parse version
 	parts := strings.Split(currentVersion, ".")
 	if len(parts) != 4 {
-		// Invalid format, initialize to default
-		parts = []string{"1", "0", "0", "0"}
+		return 0
 	}
-
-	// Increment build number (last part)
 	buildNumber, err := strconv.Atoi(parts[3])
 	if err != nil {
-		buildNumber = 0 // Reset if parsing failed
+		return 0
 	}
-	buildNumber++
-	parts[3] = strconv.Itoa(buildNumber)
+	return buildNumber
+}
 
-	// Reassemble version string
-	newVersion := strings.Join(parts, ".")
-
-	// Load current .env content
+// UpdateEnvFile reads the .env file, updates or adds the provided key-value pairs,
+// and writes the changes back to the file.
+func UpdateEnvFile(updates map[string]string) error {
 	envPath := ".env"
 	content, err := os.ReadFile(envPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read .env file: %v", err)
-		}
-		// File doesn't exist, create it with just the version
-		content = []byte("")
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read .env file: %v", err)
 	}
 
-	// Parse .env content line by line
 	lines := strings.Split(string(content), "\n")
-	versionLineFound := false
-	for i, line := range lines {
-		if strings.HasPrefix(line, "APP_VERSION=") {
-			lines[i] = "APP_VERSION=" + newVersion
-			versionLineFound = true
-			break
+	newLines := make([]string, 0, len(lines))
+	updatedKeys := make(map[string]bool)
+
+	// Process existing lines and update values
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+			newLines = append(newLines, line) // Keep comments and empty lines
+			continue
+		}
+
+		parts := strings.SplitN(trimmedLine, "=", 2)
+		if len(parts) != 2 {
+			newLines = append(newLines, line) // Keep malformed lines
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		if newValue, shouldUpdate := updates[key]; shouldUpdate {
+			newLines = append(newLines, key+"="+newValue)
+			updatedKeys[key] = true
+		} else {
+			newLines = append(newLines, line) // Keep existing line
 		}
 	}
 
-	// If APP_VERSION line not found, add it
-	if !versionLineFound {
-		lines = append(lines, "APP_VERSION="+newVersion)
+	// Add any keys from updates that were not found in the original file
+	for key, value := range updates {
+		if !updatedKeys[key] {
+			newLines = append(newLines, key+"="+value)
+		}
 	}
 
-	// Write back to .env
-	err = os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0644)
+	// Filter out potential trailing empty line if the original file didn't end with one
+	outputContent := strings.Join(newLines, "\n")
+	if len(content) > 0 && !strings.HasSuffix(string(content), "\n") && strings.HasSuffix(outputContent, "\n") {
+		// Remove trailing newline if original didn't have one
+		// (More robust handling might be needed depending on desired behavior)
+		// outputContent = strings.TrimSuffix(outputContent, "\n")
+	}
+
+	err = os.WriteFile(envPath, []byte(outputContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to update .env file: %v", err)
 	}
 
-	// Update environment variable
-	os.Setenv("APP_VERSION", newVersion)
-	log.Printf("Application version updated to %s", newVersion)
+	// Update environment variables in the current process
+	for key, value := range updates {
+		os.Setenv(key, value)
+	}
+
+	log.Printf("Updated %d keys in .env file", len(updates))
 	return nil
 }
 

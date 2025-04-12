@@ -6,28 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
 )
-
-// Project represents a project in the system
-type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Status      string    `json:"status"`
-	Owner       string    `json:"owner"`
-	Members     []string  `json:"members"`
-}
-
-// ProjectStore manages project data persistence
-type ProjectStore struct {
-	mu       sync.RWMutex
-	projects map[string]*Project
-	filePath string
-}
 
 // NewProjectStore creates a new project store
 func NewProjectStore(dataDir string) (*ProjectStore, error) {
@@ -51,6 +30,8 @@ func (s *ProjectStore) load() error {
 	file, err := os.Open(s.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			// If the file doesn't exist, initialize with empty map
+			s.projects = make(map[string]*Project)
 			return nil
 		}
 		return err
@@ -61,6 +42,11 @@ func (s *ProjectStore) load() error {
 	if err != nil {
 		return err
 	}
+	// If file is empty, initialize with empty map
+	if len(data) == 0 {
+		s.projects = make(map[string]*Project)
+		return nil
+	}
 
 	return json.Unmarshal(data, &s.projects)
 }
@@ -69,6 +55,11 @@ func (s *ProjectStore) load() error {
 func (s *ProjectStore) save() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	// Ensure the data directory exists
+	if err := os.MkdirAll(filepath.Dir(s.filePath), 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
 
 	data, err := json.MarshalIndent(s.projects, "", "  ")
 	if err != nil {

@@ -11,51 +11,23 @@ import (
 	"net/smtp"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
 )
 
-// UserServicer defines the interface for user service operations
-type UserServicer interface {
-	GetUserByEmail(email string) (*User, error)
-	CreateUser(email string) (*User, error)
-	UpdateUserLastLogin(userID int) error
-}
-
-// User represents a user in the system
-type User struct {
-	ID        int
-	Email     string
-	IsAdmin   bool
-	CreatedAt time.Time
-	LastLogin time.Time
-}
-
-// OTPData stores information about an OTP
-type OTPData struct {
-	Email     string
-	OTP       string
-	ExpiresAt time.Time
-	Attempts  int
-}
-
-// Session represents a user session
-type Session struct {
-	Token     string
-	User      *User
-	CreatedAt time.Time
-	ExpiresAt time.Time
-}
-
-// userCtxKey is the key used for storing user in request context
-type userCtxKey struct{}
+// UserServicer moved to types.go
+// User moved to types.go
+// OTPData moved to types.go
+// Session moved to types.go
+// userCtxKey moved to types.go
 
 var (
-	otpStore     = make(map[string]OTPData)
+	otpStore     = make(map[string]OTPData) // Uses OTPData from types.go
 	otpMutex     = &sync.Mutex{}
-	sessions     = make(map[string]Session)
+	sessions     = make(map[string]Session) // Uses Session from types.go
 	sessionMutex = &sync.RWMutex{}
 )
 
@@ -69,7 +41,7 @@ func SendOTP(email string) error {
 
 	// Store OTP with expiration time
 	otpMutex.Lock()
-	otpStore[email] = OTPData{
+	otpStore[email] = OTPData{ // Uses OTPData from types.go
 		Email:     email,
 		OTP:       otp,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
@@ -146,13 +118,13 @@ func GenerateSessionToken() (string, error) {
 }
 
 // CreateSession creates a new session for the given user
-func CreateSession(user *User) (Session, error) {
+func CreateSession(user *User) (Session, error) { // Uses User and Session from types.go
 	token, err := GenerateSessionToken()
 	if err != nil {
 		return Session{}, err
 	}
 
-	session := Session{
+	session := Session{ // Uses Session from types.go
 		Token:     token,
 		User:      user,
 		CreatedAt: time.Now(),
@@ -168,7 +140,7 @@ func CreateSession(user *User) (Session, error) {
 }
 
 // GetSession retrieves a session by token
-func GetSession(token string) (Session, bool) {
+func GetSession(token string) (Session, bool) { // Uses Session from types.go
 	sessionMutex.RLock()
 	defer sessionMutex.RUnlock()
 
@@ -194,17 +166,20 @@ func ClearSession(token string) {
 }
 
 // SetUserContext adds the user to the request context
-func SetUserContext(ctx context.Context, user *User) context.Context {
+func SetUserContext(ctx context.Context, user *User) context.Context { // Uses User from types.go
 	return context.WithValue(ctx, userCtxKey{}, user)
 }
 
 // GetUserFromContext retrieves the user from the request context
-func GetUserFromContext(ctx context.Context) *User {
-	user, ok := ctx.Value(userCtxKey{}).(User)
+func GetUserFromContext(ctx context.Context) *User { // Uses User from types.go
+	userVal := ctx.Value(userCtxKey{})
+	user, ok := userVal.(*User) // Type assertion to *User
 	if !ok {
+		// Handle case where value is not *User or nil
+		log.Printf("Warning: User context value is not of type *User or is nil: %T", userVal)
 		return nil
 	}
-	return &user
+	return user
 }
 
 // CleanupSessions removes expired sessions
@@ -277,7 +252,16 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return value
 }
 
-// IsExpired checks if the session has expired
-func (s *Session) IsExpired() bool {
-	return time.Now().After(s.ExpiresAt)
+// GetSessionCookieName returns the versioned session cookie name
+func GetSessionCookieName() string {
+	version := os.Getenv("APP_VERSION")
+	if version == "" {
+		version = "1.0.0.0" // Default version
+	}
+	// Use only major.minor for cookie name to reduce frequency of cookie invalidation on patch/build
+	parts := strings.Split(version, ".")
+	if len(parts) >= 2 {
+		version = parts[0] + "_" + parts[1]
+	}
+	return "session_v" + version
 }

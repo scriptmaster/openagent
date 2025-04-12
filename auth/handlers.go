@@ -7,24 +7,9 @@ import (
 	"time"
 )
 
-// JSONResponse object for API responses
-type JSONResponse struct {
-	Success  bool        `json:"success"`
-	Message  string      `json:"message,omitempty"`
-	Data     interface{} `json:"data,omitempty"`
-	Redirect string      `json:"redirect,omitempty"`
-}
-
-// OTPRequest represents the request body for requesting an OTP
-type OTPRequest struct {
-	Email string `json:"email"`
-}
-
-// OTPVerifyRequest represents the request body for verifying an OTP
-type OTPVerifyRequest struct {
-	Email string `json:"email"`
-	OTP   string `json:"otp"`
-}
+// JSONResponse moved to types.go
+// OTPRequest moved to types.go
+// OTPVerifyRequest moved to types.go
 
 // HandleRequestOTP handles OTP request
 func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserService) {
@@ -33,11 +18,8 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 		return
 	}
 
-	// Parse JSON request
-	var req struct {
-		Email string `json:"email"`
-	}
-
+	// Parse JSON request using OTPRequest struct
+	var req OTPRequest // Uses OTPRequest from types.go
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
 		SendJSONResponse(w, false, "Invalid request", nil, "")
@@ -101,7 +83,7 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 	}
 
 	// Parse JSON request
-	var req OTPVerifyRequest
+	var req OTPVerifyRequest // Uses OTPVerifyRequest from types.go
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
 		SendJSONResponse(w, false, "Invalid request", nil, "")
@@ -178,7 +160,7 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 // SendJSONResponse sends a JSON response
 func SendJSONResponse(w http.ResponseWriter, success bool, message string, data interface{}, redirect string) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(JSONResponse{
+	json.NewEncoder(w).Encode(JSONResponse{ // Uses JSONResponse from types.go
 		Success:  success,
 		Message:  message,
 		Data:     data,
