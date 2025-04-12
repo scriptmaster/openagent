@@ -5,10 +5,12 @@ REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
 REMOTE_CMD := cd $(REMOTE_DIR) && \
+	docker stop openagent-service || true && \
+	docker rm openagent-service || true && \
 	docker compose down --remove-orphans && \
 	echo 'Checking port 8800 after down...' && \
 	fuser -k -n tcp 8800 || echo 'Port 8800 appears free or fuser failed.' && \
-	sleep 2 && \
+	sleep 3 && \
 	docker compose build --no-cache && \
 	docker compose up -d
 GIT_REMOTE := origin
