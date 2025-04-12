@@ -8,10 +8,17 @@ REMOTE_CMD := cd $(REMOTE_DIR) && \
 	echo 'Checking for old go-go-agent container...' && \
 	docker stop go-go-agent || true && \
 	docker rm go-go-agent || true && \
-	docker stop openagent-service || true && \
-	docker rm openagent-service || true && \
+	echo 'Finding and stopping container using host port 8800...' && \
+	CONTAINER_ID=$$(docker ps --filter "publish=8800" --format "{{.ID}}") && \
+	if [ -n "$$CONTAINER_ID" ]; then \
+		echo "Stopping and removing container $$CONTAINER_ID using port 8800..." && \
+		docker stop $$CONTAINER_ID || true && \
+		docker rm $$CONTAINER_ID || true; \
+	else \
+		echo 'No container found using host port 8800.'; \
+	fi && \
 	docker compose down --remove-orphans && \
-	echo 'Checking port 8800 after down...' && \
+	echo 'Checking port 8800 after down with fuser...' && \
 	fuser -k -n tcp 8800 || echo 'Port 8800 appears free or fuser failed.' && \
 	sleep 3 && \
 	docker compose build --no-cache && \
