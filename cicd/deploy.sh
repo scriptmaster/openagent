@@ -29,30 +29,38 @@ if [ $? -ne 0 ]; then
 fi
 echo "Master environment file copied."
 
-# --- Cleanup Old/Conflicting Containers --- 
-echo 'Checking for old go-go-agent container...'
-docker stop go-go-agent > /dev/null 2>&1 || true
-docker rm go-go-agent > /dev/null 2>&1 || true
+# --- Graceful Container Management --- 
+echo 'Managing containers gracefully...'
 
-echo 'Finding and stopping container using host port 8800...'
-CONTAINER_ID=$(docker ps --filter "publish=8800" --format "{{.ID}}")
-if [ -n "$CONTAINER_ID" ]; then
-    echo "Stopping and removing container $CONTAINER_ID using port 8800..."
-    docker stop "$CONTAINER_ID" > /dev/null 2>&1 || true
-    docker rm "$CONTAINER_ID" > /dev/null 2>&1 || true
+# Check if PostgreSQL container is running
+POSTGRES_CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}")
+if [ -n "$POSTGRES_CONTAINER" ]; then
+    echo "PostgreSQL container is running, preserving it..."
+    # Build first to minimize downtime
+    echo "Building new openagent image..."
+    docker compose build openagent
+    
+    # Stop and start immediately
+    echo "Stopping and starting openagent service..."
+    docker compose stop openagent
+    docker compose rm -f openagent
+    docker compose up -d openagent
 else
-    echo 'No container found using host port 8800.'
+    echo "PostgreSQL container not found, will start fresh..."
+    # Stop all services if PostgreSQL isn't running
+    docker compose down
+    docker compose up -d --build
 fi
 
-# --- Docker Compose Operations --- 
-docker compose down --remove-orphans
+# --- Verify Deployment --- 
+echo 'Verifying deployment...'
+sleep 3 # Give services time to start
 
-echo 'Checking port 8800 after down with fuser...'
-fuser -k -n tcp 8800 || echo 'Port 8800 appears free.'
-sleep 3
+# Check if openagent is running
+OPENAGENT_CONTAINER=$(docker ps --filter "name=openagent" --format "{{.Names}}")
+if [ -z "$OPENAGENT_CONTAINER" ]; then
+    echo "Error: OpenAgent container failed to start" >&2
+    exit 1
+fi
 
-echo 'Building and starting services...'
-docker compose build --no-cache
-docker compose up -d
-
-echo "Remote deployment steps completed successfully." 
+echo "Deployment completed successfully!" 
