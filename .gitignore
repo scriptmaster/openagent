@@ -3,3 +3,4 @@ Auto-GPT
 temp*
 tmp*
 *.log*
+.env

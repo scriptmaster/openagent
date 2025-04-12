@@ -5,27 +5,29 @@ services:
     build: . # Build the image from the Dockerfile in the current directory
     container_name: openagent-service
     ports:
-      - "8801:8800" # Map host port 8801 to container port 8800
+      - "8800:8800" # Map host port 8800 to container port 8800
     volumes:
       - ./data:/app/data # Map host's ./data directory to container's /app/data
       - ./static:/app/static # Map static assets
       - ./tpl:/app/tpl # Map template files
+    env_file:
+      - .env # Load environment variables from .env file
     environment:
-      # --- Application Settings ---
-      PORT: 8800
-      DATA_DIR: /app/data
-      # --- PostgreSQL Connection (Optional) ---
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: agentdb
-      # --- Email Settings ---
-      SMTP_HOST: smtp.example.com
-      SMTP_PORT: 587
-      SMTP_USER: your-email@example.com
-      SMTP_PASSWORD: your-email-password
-      SMTP_FROM: noreply@example.com
+      # --- Application Settings --- Ensure PORT and DATA_DIR are still defined if not in .env
+      PORT: ${PORT:-8800} # Use PORT from .env or default to 8800
+      DATA_DIR: ${DATA_DIR:-/app/data} # Use DATA_DIR from .env or default to /app/data
+      # --- PostgreSQL Connection --- These will be loaded from .env via env_file
+      # DB_HOST: postgres
+      # DB_PORT: 5432
+      # DB_USER: postgres
+      # DB_PASSWORD: postgres
+      # DB_NAME: agentdb
+      # --- Email Settings --- These will be loaded from .env via env_file
+      # SMTP_HOST: smtp.example.com
+      # SMTP_PORT: 587
+      # SMTP_USER: your-email@example.com
+      # SMTP_PASSWORD: your-email-password
+      # SMTP_FROM: noreply@example.com
     depends_on:
       - postgres
     networks:
