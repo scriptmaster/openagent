@@ -40,15 +40,14 @@ func StartServer() error {
 		// to potentially serve maintenance pages. db will be nil.
 		log.Println("Continuing server start in maintenance mode...")
 	}
-	// Defer close only if db is not nil
-	if db != nil {
-		defer db.Close()
-	}
 
 	// Create user service (Requires *sql.DB, handle nil case if in maintenance)
 	var userService *auth.UserService
 	if db != nil {
 		userService = auth.NewUserService(db)
+		if userService == nil {
+			return fmt.Errorf("failed to create user service")
+		}
 	} else {
 		log.Println("Warning: Database connection is nil, running without user service features.")
 		// userService remains nil, routes needing it should handle this

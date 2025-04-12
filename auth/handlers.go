@@ -76,10 +76,17 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-// HandleRequestOTP handles OTP request
+// HandleRequestOTP handles OTP requests
 func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserService) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if userService is nil
+	if userService == nil {
+		log.Printf("Error: UserService is nil in HandleRequestOTP")
+		SendJSONResponse(w, false, "System error: User service not available", nil, "")
 		return
 	}
 
