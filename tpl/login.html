@@ -11,8 +11,7 @@
     <style>
         body {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
             min-height: 100vh;
             background: #f5f7fb;
         }
@@ -20,6 +19,7 @@
             max-width: 450px;
             width: 100%;
             padding: 2rem;
+            margin: auto;
         }
         .card-title {
             font-size: 1.5rem;
@@ -34,16 +34,12 @@
     </style>
 </head>
 <body class="border-top-wide border-primary d-flex flex-column">
+    {{template "header.html" .}}
+
     <div class="page">
         <div class="container container-tight py-4">
             <div class="text-center mb-4">
-                <a href="/" class="navbar-brand navbar-brand-autodark">
-                    <img src="/static/img/logo.svg" height="36" alt="{{.AppName}}">
-                </a>
-                <h2 class="h3 text-muted">{{.AppName}}</h2>
-                <div class="col-12 text-center">
-                  <p class="text-muted">System Maintenance</p>
-                </div>
+                <p></p>
             </div>
 
             <div class="card card-md" x-data="loginApp()">
@@ -55,7 +51,7 @@
                     {{end}}
 
                     <div class="step" :class="{ 'active': currentStep === 1 }">
-                        <h2 class="card-title text-center mb-4">Login to your account</h2>
+                        <h2 class="card-title text-center mb-4">Login</h2>
                         <form @submit.prevent="requestOtp">
                             <div class="mb-3">
                                 <label class="form-label">Email address</label>

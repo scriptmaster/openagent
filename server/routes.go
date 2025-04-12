@@ -19,6 +19,7 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 
 	// Initialize the global templates variable
 	templates = template.Must(template.New("").Funcs(GetTemplateFuncs()).ParseGlob("tpl/*.html"))
+	templates = template.Must(templates.ParseGlob("tpl/_partials/*.html"))
 	// Initialize agent templates
 	InitAgentTemplates(templates)
 
