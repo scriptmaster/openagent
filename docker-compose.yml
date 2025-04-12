@@ -3,8 +3,8 @@ version: '3.8'
 services:
   app:
     build:
-      context: ..       # Set context to project root (parent directory)
-      dockerfile: Dockerfile # Path relative to context (now project root)
+      context: .       # Set context to current directory (project root)
+      dockerfile: Dockerfile
     container_name: openagent-service
     ports:
       - "${PORT:-8800}:${PORT:-8800}"
@@ -13,7 +13,7 @@ services:
       - ./static:/app/static # Map static assets
       - ./tpl:/app/tpl # Map template files
     env_file:
-      - ../.env # Path relative to compose file
+      - .env # Path relative to compose file (now in same directory)
     environment:
       - PORT=${PORT:-8800}
       - DATA_DIR=/app/data
