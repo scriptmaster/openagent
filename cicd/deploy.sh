@@ -37,14 +37,14 @@ POSTGRES_CONTAINER=$(docker ps --filter "name=postgres-service" --format "{{.Nam
 if [ -n "$POSTGRES_CONTAINER" ]; then
     echo "PostgreSQL container is running, preserving it..."
     # Build first to minimize downtime
-    echo "Building new openagent-app image..."
-    docker compose build openagent-app
+    echo "Building new app image..."
+    docker compose build app
     
     # Stop and start immediately
-    echo "Stopping and starting openagent-service..."
-    docker compose stop openagent-service
-    docker compose rm -f openagent-service
-    docker compose up -d openagent-service
+    echo "Stopping and starting app service..."
+    docker compose stop app
+    docker compose rm -f app
+    docker compose up -d app
 else
     echo "PostgreSQL container not found, will start fresh..."
     # Stop all services if PostgreSQL isn't running
