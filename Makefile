@@ -5,6 +5,9 @@ REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
 REMOTE_DIR := /root/github.com/openagent
 REMOTE_CMD := cd $(REMOTE_DIR) && \
+	echo 'Checking for old go-go-agent container...' && \
+	docker stop go-go-agent || true && \
+	docker rm go-go-agent || true && \
 	docker stop openagent-service || true && \
 	docker rm openagent-service || true && \
 	docker compose down --remove-orphans && \
