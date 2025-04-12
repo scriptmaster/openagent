@@ -11,6 +11,14 @@ import (
 	"github.com/scriptmaster/openagent/projects"
 )
 
+// Handle404 handles requests for unconfigured domains or non-existent routes
+func Handle404(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	if err := templates.ExecuteTemplate(w, "404.html", nil); err != nil {
+		http.Error(w, "404 Not Found", http.StatusNotFound)
+	}
+}
+
 // RegisterRoutes registers all application routes for the server package
 func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt string) {
 	// Load app version into the global appVersion variable
@@ -46,6 +54,9 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 
 	// Register agent routes (internal to server package)
 	registerAgentRoutes(mux)
+
+	// Register catch-all handler for 404 errors
+	mux.HandleFunc("/", Handle404)
 }
 
 // registerAgentRoutes registers all agent-related routes
