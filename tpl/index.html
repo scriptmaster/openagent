@@ -57,9 +57,9 @@
         <div class="page">
             <div class="container container-tight py-4">
                 <div class="loading">
+                    <h2>{{.AppName | safeHTML}}</h2>
                     <div class="spinner"></div>
-                    <h2>Loading...</h2>
-                    <p class="text-muted">Please wait while we redirect you to the appropriate page.</p>
+                    <p>This domain is not configured for a project.</p>
                 </div>
             </div>
         </div>
@@ -73,13 +73,10 @@
         <footer>
             {{.Project.FooterTags | safeHTML}}
         </footer>
+    {{else}}
+        <!-- Default footer -->
+        {{template "footer.html" .}}
     {{end}}
- 
-    <div>
-        <div class="text-center text-muted mt-3">
-            <p class="text-muted small">Version {{.AppVersion}}</p>
-        </div>
-    </div>
 </body>
 </html>
 

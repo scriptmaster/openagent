@@ -55,9 +55,6 @@ func GetTemplateFuncs() template.FuncMap {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
-		"noescape": func(s string) template.HTML {
-			return template.HTML(s)
-		},
 	}
 }
 
