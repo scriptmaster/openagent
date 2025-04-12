@@ -32,9 +32,9 @@
     <div class="page">
         <div class="container container-tight py-4">
             <div class="header-container text-center">
-                <h1 class="navbar-brand navbar-brand-autodark">
+                <a href="/" class="navbar-brand navbar-brand-autodark">
                     <img src="/static/img/logo.svg" height="36" alt="OpenAgent">
-                </h1>
+                </a>
                 <h2 class="h3 text-muted">OpenAgent</h2>
                 <p class="text-muted">Database Management System</p>
             </div>
@@ -109,6 +109,60 @@
                                     <i class="ti ti-database"></i>
                                 </span>
                                 <input type="text" class="form-control" name="db_name" value="{{.DBName}}" placeholder="postgres" required>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <!-- SMTP Configuration Section -->
+                        <h4 class="mt-4 mb-3">Email (SMTP) Configuration</h4>
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Host</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-mail"></i>
+                                </span>
+                                <input type="text" class="form-control" name="smtp_host" value="{{.SMTPHost}}" placeholder="smtp.example.com">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Port</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-network"></i>
+                                </span>
+                                <input type="text" class="form-control" name="smtp_port" value="{{.SMTPPort}}" placeholder="587">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Username</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-user"></i>
+                                </span>
+                                <input type="text" class="form-control" name="smtp_user" value="{{.SMTPUser}}" placeholder="username">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">SMTP Password</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-key"></i>
+                                </span>
+                                <input type="password" class="form-control" name="smtp_password" value="{{.SMTPPassword}}" placeholder="password">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">From Email</label>
+                            <div class="input-group input-group-flat">
+                                <span class="input-group-text">
+                                    <i class="ti ti-mail-forward"></i>
+                                </span>
+                                <input type="email" class="form-control" name="smtp_from" value="{{.SMTPFrom}}" placeholder="noreply@example.com">
                             </div>
                         </div>
                         

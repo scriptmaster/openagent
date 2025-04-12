@@ -71,11 +71,11 @@
                         const isAdmin = this.$el.getAttribute('data-is-admin') === 'true';
                         
                         if (!isLoggedIn) {
-                            window.location.href = '/login.html';
+                            window.location.href = '/login';
                         } else if (isAdmin) {
-                            window.location.href = '/admin.html';
+                            window.location.href = '/admin';
                         } else {
-                            window.location.href = '/agent.html';
+                            window.location.href = '/agent';
                         }
                     }
                 }

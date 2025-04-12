@@ -128,9 +128,15 @@ func sendEmail(to, subject, body string) error {
 	password := os.Getenv("SMTP_PASSWORD")
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
 
 	if from == "" || password == "" || smtpHost == "" || smtpPort == "" {
 		return fmt.Errorf("email configuration is incomplete")
+	}
+
+	// If SMTP_USER is empty, use from email as username
+	if smtpUser == "" {
+		smtpUser = from
 	}
 
 	// Message composition
@@ -141,12 +147,13 @@ func sendEmail(to, subject, body string) error {
 		"%s\r\n", from, to, subject, body))
 
 	// Authentication
-	auth := smtp.PlainAuth("", from, password, smtpHost)
+	auth := smtp.PlainAuth("", smtpUser, password, smtpHost)
 
 	// Send email
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, message)
 	if err != nil {
-		return err
+		return fmt.Errorf("SMTP error: %v (Host: %s, Port: %s, User: %s, From: %s)",
+			err, smtpHost, smtpPort, smtpUser, from)
 	}
 
 	return nil

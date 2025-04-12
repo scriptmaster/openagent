@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .PageTitle}}{{.PageTitle}}{{else}}{{.AppName}}{{end}}</title>
+    <!-- Tabler CSS -->
+    <link rel="stylesheet" href="/static/css/tabler.min.css">
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
+    {{block "head" .}}
+    <!-- Additional head content goes here -->
+    {{end}}
+</head>
+<body>
+    <div class="page">
+        {{template "header.html" .}}
+
+        <div class="page-wrapper">
+            <div class="container-xl">
+                <!-- Page title -->
+                {{block "page-title" .}}
+                <div class="page-header d-print-none">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h2 class="page-title">
+                                {{if .PageTitle}}{{.PageTitle}}{{else}}Dashboard{{end}}
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            <div class="page-body">
+                <div class="container-xl">
+                    {{block "content" .}}
+                    <!-- Page content goes here -->
+                    {{end}}
+                </div>
+            </div>
+            <footer class="footer footer-transparent d-print-none">
+                <div class="container-xl">
+                    <div class="row text-center align-items-center flex-row-reverse">
+                        <div class="col-lg-auto ms-lg-auto">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    <a href="mailto:{{.AdminEmail}}" class="link-secondary">
+                                        Contact Admin
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    &copy; 2025 {{.AppName}} - v{{.AppVersion}}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Tabler Core -->
+    <script src="/static/js/tabler.min.js"></script>
+    {{block "scripts" .}}
+    <!-- Additional scripts go here -->
+    {{end}}
+</body>
+</html>
