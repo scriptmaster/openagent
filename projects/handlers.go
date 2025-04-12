@@ -9,12 +9,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/scriptmaster/openagent/auth"
+	"github.com/scriptmaster/openagent/common"
+	"github.com/scriptmaster/openagent/models"
 )
 
 // HandleProjectsAPI handles the /api/projects endpoint
-func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, store *ProjectStore) {
+func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service *ProjectService) {
 	if r.Method == http.MethodGet {
-		projects := store.ListProjects()
+		projects, err := service.ListProjects()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		json.NewEncoder(w).Encode(projects)
 		return
 	}
@@ -30,7 +36,7 @@ func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, store *ProjectSto
 		project.CreatedAt = time.Now()
 		project.UpdatedAt = time.Now()
 
-		if err := store.CreateProject(&project); err != nil {
+		if err := service.CreateProject(&project); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -44,12 +50,12 @@ func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, store *ProjectSto
 }
 
 // HandleProjectAPI handles the /api/projects/{id} endpoint
-func HandleProjectAPI(w http.ResponseWriter, r *http.Request, store *ProjectStore) {
+func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service *ProjectService) {
 	id := r.URL.Path[len("/api/projects/"):]
 
 	switch r.Method {
 	case http.MethodGet:
-		project, err := store.GetProject(id)
+		project, err := service.GetProject(id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -66,7 +72,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, store *ProjectStor
 		project.ID = id
 		project.UpdatedAt = time.Now()
 
-		if err := store.UpdateProject(&project); err != nil {
+		if err := service.UpdateProject(&project); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -74,7 +80,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, store *ProjectStor
 		json.NewEncoder(w).Encode(project)
 
 	case http.MethodDelete:
-		if err := store.DeleteProject(id); err != nil {
+		if err := service.DeleteProject(id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -85,8 +91,8 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, store *ProjectStor
 	}
 }
 
-// HandleProjects handles the /projects route
-func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.Template) {
+// HandleProjects handles the projects page
+func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.Template, service *ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
@@ -94,15 +100,12 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 		return
 	}
 
-	// Create a new project store
-	store, err := NewProjectStore("data")
+	// Get all projects
+	projects, err := service.ListProjects()
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-
-	// Get all projects
-	projects := store.ListProjects()
 
 	// Prepare template data using ProjectsPageData struct
 	data := ProjectsPageData{
@@ -110,42 +113,42 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 		PageTitle:  "Projects",
 		User:       *user,
 		Projects:   projects,
-		AppVersion: "1.0.0", // TODO: Get actual version
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 	}
 
 	// Execute the template
 	if err := templates.ExecuteTemplate(w, "projects.html", data); err != nil {
+		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
 	}
 }
 
 // HandleIndex handles the root route
-func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Template) {
+func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Template, service *ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+
+	// If user is logged in, redirect to dashboard
+	if user != nil {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 
-	// Create a new project store
-	store, err := NewProjectStore("data")
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+	// Prepare page data with defaults
+	data := models.PageData{
+		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
+		PageTitle:  "Welcome to OpenAgent",
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 	}
 
-	// Get all projects
-	projects := store.ListProjects()
-
-	// Prepare template data using ProjectsPageData struct
-	data := ProjectsPageData{
-		AppName:    "OpenAgent",
-		PageTitle:  "Dashboard",
-		User:       *user,
-		Projects:   projects,
-		AppVersion: "1.0.0", // TODO: Get actual version
+	// Try to get project based on host
+	host := r.Host
+	if host != "" {
+		project, err := service.GetProjectByDomain(host)
+		if err == nil && project != nil {
+			data.Project = project
+			data.PageTitle = project.Name
+		}
 	}
 
 	// Execute the template
@@ -153,4 +156,33 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
+}
+
+// HandleProjectsRoute handles the /projects route with authentication
+func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+	// Get user from session
+	user, err := userService.GetUserFromSession(r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Add user to request context
+	ctx := auth.SetUserContext(r.Context(), user)
+	HandleProjects(w, r.WithContext(ctx), templates, projectService)
+}
+
+// HandleIndexRoute handles the root route with optional authentication
+func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+	// Get user from session
+	user, err := userService.GetUserFromSession(r)
+	if err != nil {
+		// For index page, we don't redirect to login
+		HandleIndex(w, r, templates, projectService)
+		return
+	}
+
+	// Add user to request context
+	ctx := auth.SetUserContext(r.Context(), user)
+	HandleIndex(w, r.WithContext(ctx), templates, projectService)
 }

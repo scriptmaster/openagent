@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
 )
 
@@ -21,7 +22,7 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request, templates *template.Tem
 		AppName:    "OpenAgent",
 		PageTitle:  "Admin Dashboard - OpenAgent",
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: os.Getenv("APP_VERSION"),
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 	}
 
 	if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
@@ -41,7 +42,7 @@ func HandleMaintenance(w http.ResponseWriter, r *http.Request, templates *templa
 	data := MaintenanceLoginData{
 		Error:      r.URL.Query().Get("error"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: os.Getenv("APP_VERSION"),
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance-login.html", data); err != nil {

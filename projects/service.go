@@ -1,135 +1,142 @@
 package projects
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
+	"time"
+
+	"github.com/scriptmaster/openagent/common"
 )
 
-// NewProjectStore creates a new project store
-func NewProjectStore(dataDir string) (*ProjectStore, error) {
-	store := &ProjectStore{
-		projects: make(map[string]*Project),
-		filePath: filepath.Join(dataDir, "projects.json"),
-	}
-
-	if err := store.load(); err != nil {
-		return nil, fmt.Errorf("failed to load projects: %w", err)
-	}
-
-	return store, nil
+// ProjectService handles project-related database operations
+type ProjectService struct {
+	db *sql.DB
 }
 
-// load reads projects from the JSON file
-func (s *ProjectStore) load() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// NewProjectService creates a new project service
+func NewProjectService(db *sql.DB) (*ProjectService, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database connection is required")
+	}
 
-	file, err := os.Open(s.filePath)
+	// Load SQL queries
+	if err := common.LoadSQLQueries("data/projects.yaml"); err != nil {
+		return nil, fmt.Errorf("failed to load SQL queries: %w", err)
+	}
+
+	return &ProjectService{db: db}, nil
+}
+
+// GetProjectByDomain retrieves a project by its domain
+func (s *ProjectService) GetProjectByDomain(domain string) (*Project, error) {
+	query, err := common.GetQuery(s.db, "GetProjectByDomain")
 	if err != nil {
-		if os.IsNotExist(err) {
-			// If the file doesn't exist, initialize with empty map
-			s.projects = make(map[string]*Project)
-			return nil
+		return nil, err
+	}
+
+	var project Project
+	err = s.db.QueryRow(query, domain).Scan(
+		&project.ID, &project.Name, &project.Description, &project.Domain,
+		&project.CreatedAt, &project.UpdatedAt, &project.Status, &project.Owner)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
 		}
-		return err
+		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
-	defer file.Close()
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-	// If file is empty, initialize with empty map
-	if len(data) == 0 {
-		s.projects = make(map[string]*Project)
-		return nil
-	}
-
-	return json.Unmarshal(data, &s.projects)
-}
-
-// save writes projects to the JSON file
-func (s *ProjectStore) save() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// Ensure the data directory exists
-	if err := os.MkdirAll(filepath.Dir(s.filePath), 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
-	}
-
-	data, err := json.MarshalIndent(s.projects, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(s.filePath, data, 0644)
+	return &project, nil
 }
 
 // CreateProject creates a new project
-func (s *ProjectStore) CreateProject(project *Project) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.projects[project.ID]; exists {
-		return fmt.Errorf("project with ID %s already exists", project.ID)
+func (s *ProjectService) CreateProject(project *Project) error {
+	query, err := common.GetQuery(s.db, "CreateProject")
+	if err != nil {
+		return err
 	}
 
-	s.projects[project.ID] = project
-	return s.save()
+	_, err = s.db.Exec(query,
+		project.ID, project.Name, project.Description, project.Domain,
+		project.CreatedAt, project.UpdatedAt, project.Status, project.Owner)
+	if err != nil {
+		return fmt.Errorf("failed to create project: %w", err)
+	}
+	return nil
 }
 
 // GetProject retrieves a project by ID
-func (s *ProjectStore) GetProject(id string) (*Project, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	project, exists := s.projects[id]
-	if !exists {
-		return nil, fmt.Errorf("project with ID %s not found", id)
+func (s *ProjectService) GetProject(id string) (*Project, error) {
+	query, err := common.GetQuery(s.db, "GetProject")
+	if err != nil {
+		return nil, err
 	}
 
-	return project, nil
+	var project Project
+	err = s.db.QueryRow(query, id).Scan(
+		&project.ID, &project.Name, &project.Description, &project.Domain,
+		&project.CreatedAt, &project.UpdatedAt, &project.Status, &project.Owner)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get project: %w", err)
+	}
+	return &project, nil
 }
 
 // UpdateProject updates an existing project
-func (s *ProjectStore) UpdateProject(project *Project) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.projects[project.ID]; !exists {
-		return fmt.Errorf("project with ID %s not found", project.ID)
+func (s *ProjectService) UpdateProject(project *Project) error {
+	query, err := common.GetQuery(s.db, "UpdateProject")
+	if err != nil {
+		return err
 	}
 
-	s.projects[project.ID] = project
-	return s.save()
+	project.UpdatedAt = time.Now()
+	_, err = s.db.Exec(query,
+		project.Name, project.Description, project.Domain,
+		project.UpdatedAt, project.Status, project.Owner, project.ID)
+	if err != nil {
+		return fmt.Errorf("failed to update project: %w", err)
+	}
+	return nil
 }
 
 // DeleteProject removes a project by ID
-func (s *ProjectStore) DeleteProject(id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.projects[id]; !exists {
-		return fmt.Errorf("project with ID %s not found", id)
+func (s *ProjectService) DeleteProject(id string) error {
+	query, err := common.GetQuery(s.db, "DeleteProject")
+	if err != nil {
+		return err
 	}
 
-	delete(s.projects, id)
-	return s.save()
+	_, err = s.db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete project: %w", err)
+	}
+	return nil
 }
 
 // ListProjects returns all projects
-func (s *ProjectStore) ListProjects() []*Project {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	projects := make([]*Project, 0, len(s.projects))
-	for _, project := range s.projects {
-		projects = append(projects, project)
+func (s *ProjectService) ListProjects() ([]*Project, error) {
+	query, err := common.GetQuery(s.db, "ListProjects")
+	if err != nil {
+		return nil, err
 	}
 
-	return projects
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []*Project
+	for rows.Next() {
+		project := &Project{}
+		err := rows.Scan(
+			&project.ID, &project.Name, &project.Description, &project.Domain,
+			&project.CreatedAt, &project.UpdatedAt, &project.Status, &project.Owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan project: %w", err)
+		}
+		projects = append(projects, project)
+	}
+	return projects, nil
 }

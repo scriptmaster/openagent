@@ -39,10 +39,11 @@
     {{end}}
 </head>
 <body 
-    x-data="appController()"
-    data-has-project="{{if .Project}}true{{else}}false{{end}}"
-    data-is-logged-in="{{if .User}}true{{else}}false{{end}}"
-    data-is-admin="{{if and .User .User.IsAdmin}}true{{else}}false{{end}}"
+    {{if .Project}}
+        {{.Project.BodyAttributes | safeHTML}}
+    {{else}}
+        class="page"
+    {{end}}
 >
     {{if .Project}}
         <!-- Project home page content from database -->
@@ -50,46 +51,26 @@
     {{else}}
         <!-- Default loading/redirect screen -->
         <div class="loading">
-            <h2>{{.AppName}}</h2>
+            <h2>{{.AppName | noescape}}</h2>
             <div class="spinner"></div>
-            <p>Redirecting to appropriate dashboard...</p>
+            <p>This domain is not configured for a project.</p>
         </div>
     {{end}}
 
     <!-- Alpine.js -->
     <script src="/static/js/alpine.min.js" defer></script>
-    
-    <script>
-        function appController() {
-            return {
-                init() {
-                    // Use data attributes to decide about redirections
-                    const hasProject = this.$el.getAttribute('data-has-project') === 'true';
-                    
-                    if (!hasProject) {
-                        const isLoggedIn = this.$el.getAttribute('data-is-logged-in') === 'true';
-                        const isAdmin = this.$el.getAttribute('data-is-admin') === 'true';
-                        
-                        if (!isLoggedIn) {
-                            window.location.href = '/login';
-                        } else if (isAdmin) {
-                            window.location.href = '/admin';
-                        } else {
-                            window.location.href = '/agent';
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    
+
     {{if .Project}}
         <!-- Project-specific footer scripts -->
-        {{.Project.FooterTags | safeHTML}}
+        <footer>
+            {{.Project.FooterTags | safeHTML}}
+        </footer>
     {{end}}
-    
-    <div class="text-center text-muted mt-3">
-        <p class="text-muted small">Version {{.AppVersion}}</p>
+ 
+    <div>
+        <div class="text-center text-muted mt-3">
+            <p class="text-muted small">Version {{.AppVersion}}</p>
+        </div>
     </div>
 </body>
 </html>

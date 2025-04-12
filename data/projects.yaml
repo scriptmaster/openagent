@@ -1,0 +1,103 @@
+postgres:
+  CreateProject: |
+    INSERT INTO ai.projects (name, description, status, owner_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  GetProject: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM ai.projects
+    WHERE id = $1
+
+  UpdateProject: |
+    UPDATE ai.projects
+    SET name = $1, description = $2, status = $3, updated_at = NOW()
+    WHERE id = $4
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  DeleteProject: |
+    DELETE FROM ai.projects
+    WHERE id = $1
+
+  ListProjects: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM ai.projects
+    ORDER BY created_at DESC
+
+sqlite:
+  CreateProject: |
+    INSERT INTO projects (name, description, status, owner_id)
+    VALUES (?, ?, ?, ?)
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  GetProject: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    WHERE id = ?
+
+  UpdateProject: |
+    UPDATE projects
+    SET name = ?, description = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  DeleteProject: |
+    DELETE FROM projects
+    WHERE id = ?
+
+  ListProjects: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    ORDER BY created_at DESC
+
+mysql:
+  CreateProject: |
+    INSERT INTO projects (name, description, status, owner_id)
+    VALUES (?, ?, ?, ?)
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  GetProject: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    WHERE id = ?
+
+  UpdateProject: |
+    UPDATE projects
+    SET name = ?, description = ?, status = ?, updated_at = NOW()
+    WHERE id = ?
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  DeleteProject: |
+    DELETE FROM projects
+    WHERE id = ?
+
+  ListProjects: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    ORDER BY created_at DESC
+
+mssql:
+  CreateProject: |
+    INSERT INTO projects (name, description, status, owner_id)
+    VALUES (@p1, @p2, @p3, @p4)
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  GetProject: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    WHERE id = @p1
+
+  UpdateProject: |
+    UPDATE projects
+    SET name = @p1, description = @p2, status = @p3, updated_at = GETDATE()
+    WHERE id = @p4
+    RETURNING id, name, description, created_at, updated_at, status, owner_id
+
+  DeleteProject: |
+    DELETE FROM projects
+    WHERE id = @p1
+
+  ListProjects: |
+    SELECT id, name, description, created_at, updated_at, status, owner_id
+    FROM projects
+    ORDER BY created_at DESC 

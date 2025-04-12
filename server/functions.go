@@ -1,7 +1,11 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"html/template"
+	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +56,9 @@ func GetTemplateFuncs() template.FuncMap {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
+		"noescape": func(s string) template.HTML {
+			return template.HTML(s)
+		},
 	}
 }
 
@@ -73,4 +80,34 @@ func parseVersion(version string) (major, minor, patch, build int) {
 	build, _ = strconv.Atoi(versionParts[3])
 
 	return major, minor, patch, build
+}
+
+// GetSessionSalt returns the session salt generated during route registration.
+// It must be called after RegisterRoutes has been executed.
+func GetSessionSalt() string {
+	// Return the globally stored salt
+	// Ensure sessionSalt is initialized before this is called (e.g., in RegisterRoutes)
+	if sessionSalt == "" {
+		// This shouldn't happen in the normal flow where RegisterRoutes is called first.
+		// Maybe generate a temporary one or log a warning?
+		log.Println("Warning: GetSessionSalt called before sessionSalt was initialized in RegisterRoutes.")
+		// Fallback or panic might be appropriate depending on strictness needed.
+		// For now, let's recalculate based on current env var as a fallback.
+		version := os.Getenv("APP_VERSION")
+		if version == "" {
+			version = "1.0.0.0"
+		}
+		return generateSessionSalt(version) // Use the helper if available
+	}
+	return sessionSalt
+}
+
+// generateSessionSalt generates a salt based on the app version.
+// This should ideally be defined once, maybe in functions.go or kept private here.
+func generateSessionSalt(version string) string {
+	// Simple salt generation (replace with more robust method if needed)
+	h := sha256.New()
+	h.Write([]byte(version))
+	h.Write([]byte("-openagent-secret-salt-value")) // Add a static secret
+	return hex.EncodeToString(h.Sum(nil))[:16]      // Use first 16 chars
 }

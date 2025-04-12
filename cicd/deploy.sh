@@ -48,7 +48,7 @@ fi
 docker compose down --remove-orphans
 
 echo 'Checking port 8800 after down with fuser...'
-fuser -k -n tcp 8800 || echo 'Port 8800 appears free or fuser failed.'
+fuser -k -n tcp 8800 || echo 'Port 8800 appears free.'
 sleep 3
 
 echo 'Building and starting services...'

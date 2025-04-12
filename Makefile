@@ -60,6 +60,8 @@ build: test-psql
 
 # Run tests
 test:
+	@echo "Running go mod tidy..."
+	go mod tidy
 	@echo "Running tests..."
 	go test -v ./...
 	@echo "Testing local build..."
@@ -131,6 +133,10 @@ init:
 	mkdir -p data tpl static models auth
 	@echo "Initialization complete!"
 
+update-deps:
+	go clean -modcache
+	go mod tidy
+
 # Fix remote repository by backing up untracked files and performing clean pull
 fix-remote:
 	@echo "Fixing remote repository at $(REMOTE_HOST)..."
@@ -180,3 +186,4 @@ help:
 	@echo "  make docker-stop - Stop Docker containers"
 	@echo "  make init       - Initialize directories"
 	@echo "  make help       - Show this help"
+	@echo "  make update-deps - Update dependencies"

@@ -18,6 +18,8 @@ import (
 
 	// PostgreSQL driver
 	_ "github.com/lib/pq"
+	// MySQL driver
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
@@ -214,156 +216,49 @@ func GetDB() *sql.DB {
 
 // InitDB initializes the database connection
 func InitDB() (*sql.DB, error) {
-	var err error
-	dbOnce.Do(func() {
-		// Get connection details from environment variables
-		host := os.Getenv("DB_HOST")
-		port := os.Getenv("DB_PORT")
-		user := os.Getenv("DB_USER")
-		password := os.Getenv("DB_PASSWORD")
-		dbname := os.Getenv("DB_NAME")
-
-		// Check if PostgreSQL configuration is complete
-		if host == "" || port == "" || user == "" || dbname == "" {
-			err = fmt.Errorf("incomplete PostgreSQL configuration, server running in maintenance mode")
-			return
-		}
-
-		// Create connection string with additional parameters
-		connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=10",
-			host, port, user, password, dbname)
-
-		// Connect to the database with retry
-		var dbErr error
-		for attempts := 0; attempts < 3; attempts++ {
-			log.Printf("Connecting to PostgreSQL %s@%s:%s (attempt %d)...", user, host, port, attempts+1)
-			db, dbErr = sql.Open("postgres", connStr)
-			if dbErr == nil {
-				// Test the connection
-				if err := db.Ping(); err == nil {
-					break
-				} else {
-					dbErr = err
-					log.Printf("Connection established but ping failed: %v", err)
-				}
-			}
-			log.Printf("Failed to connect: %v. Retrying in 2 seconds...", dbErr)
-			time.Sleep(2 * time.Second)
-		}
-
-		if dbErr != nil {
-			// Check if the error is "database does not exist"
-			if strings.Contains(dbErr.Error(), "does not exist") {
-				log.Printf("Database %q does not exist, attempting to create it...", dbname)
-
-				// Try to connect to default postgres database (same as username) to create the missing database
-				defaultConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable connect_timeout=10",
-					host, port, user, password, user)
-
-				// Open connection to default database
-				defaultDB, err := sql.Open("postgres", defaultConnStr)
-				pingErr := err
-				if err == nil {
-					pingErr = defaultDB.Ping()
-				}
-
-				// If we couldn't connect to the user's default database, try the 'postgres' database
-				if pingErr != nil {
-					log.Printf("Failed to connect to user's default database: %v, trying 'postgres' database...", pingErr)
-
-					// Try connecting to the standard 'postgres' database
-					defaultConnStr = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=disable connect_timeout=10",
-						host, port, user, password)
-					defaultDB, err = sql.Open("postgres", defaultConnStr)
-					if err == nil {
-						pingErr = defaultDB.Ping()
-						if pingErr != nil {
-							log.Printf("Failed to ping 'postgres' database: %v", pingErr)
-							err = pingErr // Set err for the next check
-							if defaultDB != nil {
-								defaultDB.Close()
-							}
-						}
-					} else {
-						log.Printf("Failed to connect to 'postgres' database: %v", err)
-					}
-				}
-
-				// If we have a valid connection to either database, try to create the target database
-				if err == nil && pingErr == nil {
-					defer defaultDB.Close()
-
-					// Create the database
-					createSQL := fmt.Sprintf("CREATE DATABASE %s", dbname)
-					_, err := defaultDB.Exec(createSQL)
-					if err != nil {
-						// Check if error is because database already exists
-						if strings.Contains(err.Error(), "already exists") {
-							log.Printf("Database %q already exists, continuing with connection", dbname)
-
-							// Try connecting to the existing database
-							db, dbErr = sql.Open("postgres", connStr)
-							if dbErr == nil {
-								if err := db.Ping(); err == nil {
-									log.Printf("Successfully connected to existing database %q", dbname)
-								} else {
-									dbErr = err
-									log.Printf("Failed to connect to existing database: %v", err)
-								}
-							}
-						} else {
-							log.Printf("Failed to create database %q: %v", dbname, err)
-						}
-					} else {
-						log.Printf("Successfully created database %q", dbname)
-
-						// Try connecting to the newly created database
-						db, dbErr = sql.Open("postgres", connStr)
-						if dbErr == nil {
-							if err := db.Ping(); err == nil {
-								log.Printf("Successfully connected to newly created database %q", dbname)
-							} else {
-								dbErr = err
-								log.Printf("Failed to connect to newly created database: %v", err)
-							}
-						}
-					}
-				} else {
-					log.Printf("Could not connect to any database to create %q", dbname)
-				}
-			}
-		}
-
-		if dbErr != nil {
-			err = fmt.Errorf("failed to connect to PostgreSQL after retries: %v", dbErr)
-			return
-		}
-
-		// Configure connection pool
-		db.SetMaxOpenConns(25)
-		db.SetMaxIdleConns(5)
-		db.SetConnMaxLifetime(5 * time.Minute)
-
-		// Initialize database schema
-		if schemaErr := applySchema(db); schemaErr != nil {
-			log.Printf("SCHEMA INITIALIZATION ERROR: %v", schemaErr)
-			err = fmt.Errorf("failed to initialize PostgreSQL schema: %v", schemaErr)
-			return
-		}
-
-		log.Println("Database connection established and schema initialized")
-	})
-
-	if err != nil {
-		// Mark that we're in maintenance mode
-		log.Printf("WARNING: %v", err)
-		SetMaintenanceMode(true)
-		return nil, err
+	// Get individual connection parameters from environment
+	driver := os.Getenv("DB_DRIVER")
+	if driver == "" {
+		driver = "postgres" // Default to postgres if not specified
 	}
 
-	// Not in maintenance mode
-	SetMaintenanceMode(false)
-	return db, nil
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+
+	// Validate required parameters
+	if host == "" || port == "" || user == "" || password == "" || dbname == "" {
+		return nil, fmt.Errorf("database connection parameters are not set (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME required)")
+	}
+
+	var dsn string
+	switch driver {
+	case "postgres":
+		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			host, port, user, password, dbname)
+	case "mysql":
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+			user, password, host, port, dbname)
+	default:
+		return nil, fmt.Errorf("unsupported database driver: %s", driver)
+	}
+
+	// Open a direct connection to the database
+	sqlDB, err := sql.Open(driver, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Test the connection
+	if err := sqlDB.Ping(); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	log.Printf("Successfully connected to database using %s driver", driver)
+	return sqlDB, nil
 }
 
 // Global maintenance mode flag

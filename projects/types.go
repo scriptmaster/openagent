@@ -9,14 +9,16 @@ import (
 
 // Project represents a project in the system
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Status      string    `json:"status"`
-	Owner       string    `json:"owner"`   // Consider using User ID or email
-	Members     []string  `json:"members"` // Consider using User IDs or emails
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Domain      string            `json:"domain"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	Status      string            `json:"status"`
+	Owner       string            `json:"owner"`   // Consider using User ID or email
+	Members     []string          `json:"members"` // Consider using User IDs or emails
+	Scripts     map[string]string `json:"scripts"` // Map of script names to their content
 }
 
 // ProjectStore manages project data persistence

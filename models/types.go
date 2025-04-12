@@ -23,7 +23,7 @@ type JSONResponse struct {
 type PageData struct {
 	AppName    string
 	PageTitle  string
-	User       auth.User // Using auth.User for broader context
+	User       *auth.User // Changed to pointer to handle nil cases
 	Error      string
 	Success    string
 	Projects   []interface{} // Consider a more specific type like []*projects.Project

@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"database/sql"
 	"html/template"
 	"net/http"
 
@@ -8,31 +9,19 @@ import (
 )
 
 // RegisterProjectRoutes registers all project-related routes
-func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService) {
+func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB) {
+	// Initialize project service
+	projectService, err := NewProjectService(db)
+	if err != nil {
+		panic("failed to initialize project service: " + err.Error())
+	}
+
 	// Project routes
 	mux.HandleFunc("/projects", func(w http.ResponseWriter, r *http.Request) {
-		// Get user from session
-		user, err := userService.GetUserFromSession(r)
-		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// Add user to request context
-		ctx := auth.SetUserContext(r.Context(), user)
-		HandleProjects(w, r.WithContext(ctx), templates)
+		HandleProjectsRoute(w, r, templates, projectService, userService)
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Get user from session
-		user, err := userService.GetUserFromSession(r)
-		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// Add user to request context
-		ctx := auth.SetUserContext(r.Context(), user)
-		HandleIndex(w, r.WithContext(ctx), templates)
+		HandleIndexRoute(w, r, templates, projectService, userService)
 	})
 }

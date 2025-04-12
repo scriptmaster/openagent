@@ -1,0 +1,111 @@
+postgres:
+  GetUserByEmail: |
+    SELECT id, email, is_admin, created_at, last_logged_in 
+    FROM ai.users 
+    WHERE email = $1
+
+  CreateUser: |
+    INSERT INTO ai.users (email, is_admin) 
+    VALUES ($1, $2) 
+    RETURNING id, email, is_admin, created_at
+
+  UpdateUserLastLogin: |
+    UPDATE ai.users 
+    SET last_logged_in = NOW() 
+    WHERE id = $1
+
+  GetUserCount: |
+    SELECT COUNT(*) FROM ai.users
+
+  GetSession: |
+    SELECT token, user_id, created_at, expires_at 
+    FROM ai.sessions 
+    WHERE token = $1
+
+  CreateSession: |
+    INSERT INTO ai.sessions (token, user_id, created_at, expires_at)
+    VALUES ($1, $2, $3, $4)
+
+sqlite:
+  GetUserByEmail: |
+    SELECT id, email, is_admin, created_at, last_logged_in 
+    FROM users 
+    WHERE email = ?
+
+  CreateUser: |
+    INSERT INTO users (email, is_admin) 
+    VALUES (?, ?) 
+    RETURNING id, email, is_admin, created_at
+
+  UpdateUserLastLogin: |
+    UPDATE users 
+    SET last_logged_in = CURRENT_TIMESTAMP 
+    WHERE id = ?
+
+  GetUserCount: |
+    SELECT COUNT(*) FROM users
+
+  GetSession: |
+    SELECT token, user_id, created_at, expires_at 
+    FROM sessions 
+    WHERE token = ?
+
+  CreateSession: |
+    INSERT INTO sessions (token, user_id, created_at, expires_at)
+    VALUES (?, ?, ?, ?)
+
+mysql:
+  GetUserByEmail: |
+    SELECT id, email, is_admin, created_at, last_logged_in 
+    FROM users 
+    WHERE email = ?
+
+  CreateUser: |
+    INSERT INTO users (email, is_admin) 
+    VALUES (?, ?) 
+    RETURNING id, email, is_admin, created_at
+
+  UpdateUserLastLogin: |
+    UPDATE users 
+    SET last_logged_in = NOW() 
+    WHERE id = ?
+
+  GetUserCount: |
+    SELECT COUNT(*) FROM users
+
+  GetSession: |
+    SELECT token, user_id, created_at, expires_at 
+    FROM sessions 
+    WHERE token = ?
+
+  CreateSession: |
+    INSERT INTO sessions (token, user_id, created_at, expires_at)
+    VALUES (?, ?, ?, ?)
+
+mssql:
+  GetUserByEmail: |
+    SELECT id, email, is_admin, created_at, last_logged_in 
+    FROM users 
+    WHERE email = @p1
+
+  CreateUser: |
+    INSERT INTO users (email, is_admin) 
+    VALUES (@p1, @p2) 
+    RETURNING id, email, is_admin, created_at
+
+  UpdateUserLastLogin: |
+    UPDATE users 
+    SET last_logged_in = GETDATE() 
+    WHERE id = @p1
+
+  GetUserCount: |
+    SELECT COUNT(*) FROM users
+
+  GetSession: |
+    SELECT token, user_id, created_at, expires_at 
+    FROM sessions 
+    WHERE token = @p1
+
+  CreateSession: |
+    INSERT INTO sessions (token, user_id, created_at, expires_at)
+    VALUES (@p1, @p2, @p3, @p4) 

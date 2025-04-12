@@ -173,10 +173,13 @@ func SetUserContext(ctx context.Context, user *User) context.Context { // Uses U
 // GetUserFromContext retrieves the user from the request context
 func GetUserFromContext(ctx context.Context) *User { // Uses User from types.go
 	userVal := ctx.Value(userCtxKey{})
+	if userVal == nil {
+		return nil
+	}
 	user, ok := userVal.(*User) // Type assertion to *User
 	if !ok {
-		// Handle case where value is not *User or nil
-		log.Printf("Warning: User context value is not of type *User or is nil: %T", userVal)
+		// Handle case where value is not *User
+		log.Printf("Warning: User context value is not of type *User: %T", userVal)
 		return nil
 	}
 	return user

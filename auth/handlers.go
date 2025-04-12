@@ -37,7 +37,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  "Login - " + common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: os.Getenv("APP_VERSION"),
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 		Error:      r.URL.Query().Get("error"),
 	}
 	if err := authTemplates.ExecuteTemplate(w, "login.html", data); err != nil {
