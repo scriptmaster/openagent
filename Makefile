@@ -87,7 +87,10 @@ deploy-git: build
 	@echo "Latest commit: $${LATEST_COMMIT}"
 	@VERSION=$$(git describe --tags --always --dirty)
 	@echo "Deploying version: $${VERSION}"
-	# NO NEED TO DEPLOY SCRIPT IT IS ALREADY PUSHED
+	# Ensure remote directory exists and has proper permissions
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "mkdir -p $(DEPLOY_PATH) && chmod 755 $(DEPLOY_PATH)"
+	# Ensure deploy.sh has execute permissions
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(DEPLOY_PATH) && chmod +x deploy.sh"
 	# Execute the remote command
 	# IMPORTANT: Ensure .env file is securely managed on the remote server in $(DEPLOY_PATH)
 	# IMPORTANT: Assumes deploy.sh knows docker-compose.yml is in $(DEPLOY_PATH)
