@@ -7,7 +7,14 @@ REMOTE_DIR := /root/github.com/openagent
 REMOTE_CMD := cd $(REMOTE_DIR) && \
 	docker compose down --remove-orphans && \
 	echo 'Checking port 8800 after down...' && \
-	lsof -i :8800 || echo 'Port 8800 appears free.' && \
+	PIDS=$$(lsof -t -i :8800) && \
+	if [ -n "$$PIDS" ]; then \
+		echo "Port 8800 still in use by PIDs: $$PIDS. Attempting to kill them..." && \
+		kill -9 $$PIDS || echo "Failed to kill processes, continuing anyway..." && \
+		sleep 2; \
+	else \
+		echo 'Port 8800 appears free.'; \
+	fi && \
 	sleep 2 && \
 	docker compose build --no-cache && \
 	docker compose up -d
