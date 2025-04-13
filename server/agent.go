@@ -515,6 +515,8 @@ func HandleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prompt := r.FormValue("prompt") // Get optional prompt
+
 	ollamaURL := getEnv("OLLAMA_URL", defaultOllamaURL)
 	modelName := getEnv("OLLAMA_MODEL", defaultModel)
 	InitializeAgent(goal, ollamaURL, modelName)
@@ -522,6 +524,9 @@ func HandleStart(w http.ResponseWriter, r *http.Request) {
 	// Add initial user prompt to history
 	globalAgent.Lock()
 	initialUserPrompt := fmt.Sprintf("My goal is: %s. What is the first safe shell command I should execute within the '%s' directory?", goal, dataDir)
+	if prompt != "" {
+		initialUserPrompt = fmt.Sprintf("%s\nAdditional context: %s", initialUserPrompt, prompt)
+	}
 	globalAgent.addToHistory("user", initialUserPrompt)
 	globalAgent.State = StateAwaitingStep
 	globalAgent.Unlock()
@@ -536,6 +541,13 @@ func HandleNextStep(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request: Could not parse form", http.StatusBadRequest)
+		return
+	}
+
+	prompt := r.FormValue("prompt") // Get optional prompt
+
 	agentMutex.Lock() // Lock agent init mutex
 	if globalAgent == nil {
 		agentMutex.Unlock()
@@ -543,6 +555,13 @@ func HandleNextStep(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentMutex.Unlock() // Unlock agent init mutex
+
+	// Add prompt to history if provided
+	if prompt != "" {
+		globalAgent.Lock()
+		globalAgent.addToHistory("user", fmt.Sprintf("Additional context: %s", prompt))
+		globalAgent.Unlock()
+	}
 
 	// globalAgent.Step() now runs the core logic in a goroutine
 	globalAgent.Step()

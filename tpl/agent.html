@@ -48,6 +48,19 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
+        .prompt-input {
+            margin-right: 10px;
+        }
+        .prompt-input input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .prompt-input input:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body x-data="agentApp()" x-init="init()">
@@ -74,6 +87,10 @@
                      (<span x-text="agentState.iteration"></span>/<span x-text="agentState.maxIterations"></span> iterations)
                 </div>
                 <div class="action-button">
+                    <div class="prompt-input">
+                        <input type="text" x-model="promptInput" placeholder="Add a tip or prompt..." 
+                               :disabled="!canProceed() || isLoading">
+                    </div>
                     <button @click="nextStep()" :disabled="!canProceed() || isLoading">
                          Next Step
                     </button>
@@ -117,6 +134,7 @@
         function agentApp() {
             return {
                 goalInput: '',
+                promptInput: '',
                 agentStarted: false,
                 isLoading: false, // Indicates an active request to the backend (/start, /next)
                 agentState: { status: 'Idle', history: [], iteration: 0, maxIterations: 20, goal: '', lastOutput: '', lastError: '' },
@@ -233,28 +251,29 @@
 
                 async nextStep() {
                     if (!this.canProceed() || this.isLoading) return;
-                    this.isLoading = true; // Indicate user action initiated
-                    // Don't clear lastError here, let status update handle it
+                    this.isLoading = true;
                     console.log("Triggering next step...");
                     try {
-                        const response = await fetch('/next', { method: 'POST' });
-                         if (!response.ok) {
-                             const errorText = await response.text();
+                        const response = await fetch('/next', { 
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({ 'prompt': this.promptInput })
+                        });
+                        if (!response.ok) {
+                            const errorText = await response.text();
                             throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
                         }
-                        // Response is immediate, update state based on it (likely Thinking/Executing)
                         const data = await response.json();
                         this.agentState = data;
+                        this.promptInput = ''; // Clear prompt after sending
                         console.log("Next step triggered, agent status:", this.agentState.status);
-                        // Polling will catch the final state of the step.
                     } catch (error) {
                         console.error("Error triggering next step:", error);
                         this.agentState.status = 'Error';
                         this.agentState.lastError = `Failed to trigger next step: ${error.message}`;
-                         this.stopPolling();
+                        this.stopPolling();
                     } finally {
-                         // Set loading false after the *request* finishes, not waiting for the step
-                         this.isLoading = false;
+                        this.isLoading = false;
                     }
                 },
 
@@ -276,14 +295,29 @@
                     if (this.isLoading) return;
                     this.isLoading = true;
                     try {
-                        // Add a delay before retrying to give the service time to recover
                         await new Promise(resolve => setTimeout(resolve, 2000));
                         
                         if (this.agentState.goal) {
-                            // If we have a goal, retry starting the agent
-                            await this.startAgent();
+                            // If we have a goal, retry starting the agent with the prompt
+                            const response = await fetch('/start', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({ 
+                                    'goal': this.agentState.goal,
+                                    'prompt': this.promptInput 
+                                })
+                            });
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                            }
+                            const data = await response.json();
+                            this.agentState = data;
+                            this.promptInput = ''; // Clear prompt after sending
+                            this.agentStarted = true;
+                            this.startPolling();
                         } else {
-                            // Otherwise retry the next step
+                            // Otherwise retry the next step with the prompt
                             await this.nextStep();
                         }
                     } finally {
