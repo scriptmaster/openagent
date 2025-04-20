@@ -21,16 +21,17 @@ type JSONResponse struct {
 
 // PageData represents common data passed to various page templates.
 type PageData struct {
-	AppName    string
-	PageTitle  string
-	User       *auth.User // Changed to pointer to handle nil cases
-	Error      string
-	Success    string
-	Projects   []interface{} // Consider a more specific type like []*projects.Project
-	Project    interface{}   // Consider a more specific type like *projects.Project
-	AdminEmail string
-	AppVersion string
-	Stats      interface{} // Placeholder for stats data
+	AppName     string
+	PageTitle   string
+	User        *auth.User // Changed to pointer to handle nil cases
+	Error       string
+	Success     string
+	Projects    []interface{} // Consider a more specific type like []*projects.Project
+	Project     interface{}   // Consider a more specific type like *projects.Project
+	AdminEmail  string
+	AppVersion  string
+	Stats       interface{} // Placeholder for stats data
+	CurrentHost string      // Add CurrentHost field
 }
 
 // Add other shared model structs here

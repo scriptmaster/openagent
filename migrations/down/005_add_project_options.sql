@@ -1,0 +1,2 @@
+ALTER TABLE ai.projects
+DROP COLUMN IF EXISTS options; 

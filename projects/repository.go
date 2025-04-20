@@ -2,9 +2,11 @@ package projects
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/scriptmaster/openagent/common"
 )
 
 type projectRepository struct {
@@ -16,18 +18,21 @@ func NewProjectRepository(db *sqlx.DB) ProjectRepository {
 }
 
 func (r *projectRepository) Create(project *Project) (int64, error) {
-	query := `
-		INSERT INTO projects (name, description, domain, created_by, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id
-	`
+	if project.Options == nil {
+		project.Options = make(ProjectOptions)
+	}
+
+	query, err := common.GetSQL("projects/create")
+	if err != nil {
+		return 0, err
+	}
 
 	now := time.Now()
 	project.CreatedAt = now
 	project.UpdatedAt = now
 
 	var id int64
-	err := r.db.QueryRow(
+	err = r.db.QueryRow(
 		query,
 		project.Name,
 		project.Description,
@@ -36,6 +41,7 @@ func (r *projectRepository) Create(project *Project) (int64, error) {
 		project.IsActive,
 		project.CreatedAt,
 		project.UpdatedAt,
+		project.Options,
 	).Scan(&id)
 
 	if err != nil {
@@ -48,53 +54,86 @@ func (r *projectRepository) Create(project *Project) (int64, error) {
 
 func (r *projectRepository) GetByID(id int64) (*Project, error) {
 	project := &Project{}
-	query := `SELECT * FROM projects WHERE id = $1`
-	err := r.db.Get(project, query, id)
+	query, err := common.GetSQL("projects/get_by_id")
+	if err != nil {
+		return nil, err
+	}
+	err = r.db.Get(project, query, id)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, ErrProjectNotFound
+	}
+	if project.Options == nil {
+		project.Options = make(ProjectOptions)
 	}
 	return project, err
 }
 
 func (r *projectRepository) GetByDomain(domain string) (*Project, error) {
 	project := &Project{}
-	query := `SELECT * FROM projects WHERE domain = $1`
-	err := r.db.Get(project, query, domain)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	query, err := common.GetSQL("projects/get_by_domain")
+	if err != nil {
+		return nil, err
 	}
-	return project, err
+	row := r.db.QueryRowx(query, domain)
+	err = row.StructScan(project)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrProjectNotFound
+		}
+		log.Printf("Error scanning project struct for domain '%s': %v", domain, err)
+		return nil, err
+	}
+
+	if project.Options == nil {
+		project.Options = make(ProjectOptions)
+	}
+	return project, nil
 }
 
 func (r *projectRepository) List() ([]*Project, error) {
 	var projects []*Project
-	query := `SELECT * FROM projects ORDER BY created_at DESC`
-	err := r.db.Select(&projects, query)
+	query, err := common.GetSQL("projects/list")
+	if err != nil {
+		return nil, err
+	}
+	err = r.db.Select(&projects, query)
+	for _, p := range projects {
+		if p.Options == nil {
+			p.Options = make(ProjectOptions)
+		}
+	}
 	return projects, err
 }
 
 func (r *projectRepository) Update(project *Project) error {
-	query := `
-		UPDATE projects
-		SET name = $1, description = $2, domain = $3, is_active = $4, updated_at = $5
-		WHERE id = $6
-	`
+	if project.Options == nil {
+		project.Options = make(ProjectOptions)
+	}
+
+	query, err := common.GetSQL("projects/update")
+	if err != nil {
+		return err
+	}
 
 	project.UpdatedAt = time.Now()
-	_, err := r.db.Exec(
+	_, err = r.db.Exec(
 		query,
 		project.Name,
 		project.Description,
 		project.Domain,
 		project.IsActive,
 		project.UpdatedAt,
+		project.Options,
 		project.ID,
 	)
 	return err
 }
 
 func (r *projectRepository) Delete(id int64) error {
-	query := `DELETE FROM projects WHERE id = $1`
-	_, err := r.db.Exec(query, id)
+	query, err := common.GetSQL("projects/delete")
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(query, id)
 	return err
 }

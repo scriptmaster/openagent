@@ -17,7 +17,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy deploy-git deploy-scp test-psql migrations fix-remote
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations
 
 all: test build
 
@@ -27,39 +27,27 @@ test-psql:
 	@PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -c "SELECT version();" >/dev/null 2>&1 || (echo "Error: PostgreSQL connection failed!" && exit 1)
 	@echo "PostgreSQL connection successful."
 
-# Apply database migrations
-migrations:
-	@echo "Applying database migrations..."
-	@# Get the current highest migration number
-	@LAST_APPLIED=$$(grep -oP "MIGRATION_START=\K\d+" .env 2>/dev/null || echo "0"); \
-	HIGHEST_APPLIED=$$LAST_APPLIED; \
-	for file in migrations/[0-9][0-9][0-9]_*.sql; do \
-		NUM=$$(echo $${file} | grep -oP "migrations/\K\d+"); \
-		if [ "$$NUM" -gt "$$LAST_APPLIED" ]; then \
-			echo "Applying $${file}..."; \
-			PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f $${file} || exit 1; \
-			if [ "$$NUM" -gt "$$HIGHEST_APPLIED" ]; then \
-				HIGHEST_APPLIED=$$NUM; \
-			fi; \
-		else \
-			echo "Skipping $${file} (already applied)"; \
-		fi; \
-	done; \
-	if [ "$$HIGHEST_APPLIED" -gt "$$LAST_APPLIED" ]; then \
-		echo "Updating MIGRATION_START to $$HIGHEST_APPLIED in .env"; \
-		sed -i.bak "/MIGRATION_START=/d" .env || true; \
-		echo "MIGRATION_START=$$HIGHEST_APPLIED" >> .env; \
-		rm -f .env.bak 2>/dev/null || true; \
-	fi
-	@echo "Migrations complete!"
-
 # Build the application
 build: test-psql
 	@echo "Building $(BINARY_NAME)..."
 	go build -o $(BINARY_NAME) .
 
-# Run tests
-test:
+# Manually apply database migrations (Original Method)
+migrations:
+	@echo "Applying migrations manually..."
+	# Ensure the Go binary exists
+	@[ -f $(BINARY_NAME) ] || go build -o $(BINARY_NAME) .
+	# Execute the migration command within your app (assuming a command or flag exists)
+	# Example: ./$(BINARY_NAME) --migrate 
+	# OR, if migrations are applied on startup based on MIGRATION_START:
+	@echo "Running application to apply migrations based on MIGRATION_START..."
+	./$(BINARY_NAME)
+	@echo "Migrations check/apply completed."
+
+# Run tests (includes running migrations first if needed)
+test: stop
+	# Optionally run migrations before testing if tests depend on schema
+	# make migrations
 	@echo "Running go mod tidy..."
 	go mod tidy
 	@echo "Running tests..."
@@ -172,11 +160,26 @@ fix-remote:
 	
 	@echo "Fix complete! Backup files are stored in $(BACKUP_DIR) on the remote server."
 
+# Stop all running openagent processes
+stop:
+	@echo "Stopping all openagent.exe processes..."
+	@while true; do \
+		PID=$$(tasklist /NH /FI "IMAGENAME eq openagent.exe" 2>nul | awk '{print $$2}' | head -n 1); \
+		if [ -z "$$PID" ] || [ "$$PID" = "No" ]; then \
+			echo "All openagent.exe processes stopped."; \
+			break; \
+		fi; \
+		echo "Stopping PID: $$PID"; \
+		taskkill /PID $$PID /F /T >nul 2>&1 || true; \
+		sleep 1; \
+	done
+
 help:
 	@echo "Available commands:"
 	@echo "  make build      - Build the application"
 	@echo "  make test       - Run tests"
 	@echo "  make clean      - Clean build artifacts"
+	@echo "  make migrations - Apply database migrations manually (runs the app)"
 	@echo "  make deploy     - Deploy using Git (uses deploy.sh on remote)"
 	@echo "  make deploy-git - Deploy using Git"
 	@echo "  make deploy-scp - Deploy using SCP (legacy, uses deploy.sh on remote)"
@@ -187,3 +190,4 @@ help:
 	@echo "  make init       - Initialize directories"
 	@echo "  make help       - Show this help"
 	@echo "  make update-deps - Update dependencies"
+	@echo "  make stop       - Stop all running openagent processes"

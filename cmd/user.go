@@ -18,13 +18,13 @@ var userCmd = &cobra.Command{
 }
 
 var addUserCmd = &cobra.Command{
-	Use:   "add [email]",
+	Use:   "add [email] [password]",
 	Short: "Add a new user",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Load environment variables
+		// Load environment variables from root .env
 		if err := godotenv.Load(); err != nil {
-			fmt.Printf("Warning: Error loading .env file: %v\n", err)
+			fmt.Printf("Warning: Error loading .env file from root: %v\n", err)
 		}
 
 		// Connect to the database
@@ -39,8 +39,9 @@ var addUserCmd = &cobra.Command{
 		userService := auth.NewUserService(db)
 
 		email := args[0]
+		password := args[1]
 
-		user, err := userService.CreateUser(email)
+		user, err := userService.CreateUser(email, password)
 		if err != nil {
 			fmt.Printf("Error creating user: %v\n", err)
 			os.Exit(1)
@@ -54,9 +55,9 @@ var makeAdminCmd = &cobra.Command{
 	Short: "Make a user an admin",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Load environment variables
+		// Load environment variables from root .env
 		if err := godotenv.Load(); err != nil {
-			fmt.Printf("Warning: Error loading .env file: %v\n", err)
+			fmt.Printf("Warning: Error loading .env file from root: %v\n", err)
 		}
 
 		// Connect to the database

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/joho/godotenv"                 // Keep godotenv for loading .env
 	"github.com/scriptmaster/openagent/auth"   // Keep auth for UserService
@@ -20,13 +21,26 @@ var (
 // StartServer initializes and starts the web server.
 // Moved from main.go and Exported.
 func StartServer() error {
-	log.Println("--- Server Starting ---")
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// Load environment variables from .env file
+	// Load .env file from project root
 	err := godotenv.Load()
 	if err != nil {
-		log.Printf("Warning: .env file not found, using environment variables.")
+		// Log warning if .env is not found in root
+		log.Printf("Warning: Error loading .env file from project root: %v", err)
 	}
+
+	// Determine SQL directory based on DB_DRIVER
+	dbDriver := common.GetEnvOrDefault("DB_DRIVER", "postgres")
+	// Default base path is now ./data/sql
+	sqlBaseDir := common.GetEnvOrDefault("SQL_DIR", "./data/sql")
+	sqlDir := filepath.Join(sqlBaseDir, dbDriver) // Construct path like ./data/sql/postgres
+
+	// Load SQL queries from the driver-specific directory
+	if err := common.LoadNamedSQLFiles(sqlDir); err != nil {
+		log.Fatalf("CRITICAL: Failed to load SQL files from %s: %v", sqlDir, err)
+	}
+	log.Printf("Successfully loaded SQL queries from %s", sqlDir)
 
 	// Initialize database (uses InitDB from the server package)
 	db, err := InitDB()
@@ -87,6 +101,3 @@ func StartServer() error {
 	// Return the error from the channel (blocks until server stops or errors)
 	return <-serverErrors
 }
-
-// Placeholder for fmt import if needed by error wrapping
-// import "fmt" // Removed from here

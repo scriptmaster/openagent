@@ -24,8 +24,8 @@ WORKDIR /app
 # - curl: Common utility
 RUN apk update && apk add --no-cache ca-certificates bash curl
 
-# Create the data directory where the application will store data
-RUN mkdir -p /app/data && chmod 755 /app/data
+# Create the data directory (if still needed for other runtime data)
+RUN mkdir -p /app/data/sql && chmod -R 755 /app/data # Ensure data/sql exists
 
 # Copy the built Go binary from the builder stage
 COPY --from=builder /app/server /app/server
@@ -34,10 +34,13 @@ COPY --from=builder /app/server /app/server
 COPY tpl/ /app/tpl/
 COPY static/ /app/static/
 
-# Copy .env file if it exists (will be overridden by environment variables)
-COPY .env* /app/
+# Copy SQL files from data/sql to /app/data/sql/
+COPY data/sql/ /app/data/sql/
 
-# Declare the volume mount point
+# Copy .env file to app root
+COPY .env /app/.env
+
+# Declare the volume mount point (if needed for runtime data, keep it)
 VOLUME /app/data
 
 # Expose the port the application listens on
@@ -46,6 +49,7 @@ EXPOSE 8800
 # Set default environment variables
 ENV PORT=8800
 ENV DATA_DIR=/app/data
+ENV SQL_DIR=/app/data/sql # Point SQL loader to the new image location
 
 # Command to run when the container starts
 CMD ["/app/server"] 

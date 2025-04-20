@@ -15,11 +15,16 @@ import (
 	"time"
 
 	"github.com/scriptmaster/openagent/auth"
+	"github.com/scriptmaster/openagent/common"
 
 	// PostgreSQL driver
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+
 	// MySQL driver
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -27,19 +32,30 @@ var (
 	dbOnce sync.Once
 )
 
+// Global database instance and mutex
+var dbInstance *sql.DB
+var dbMutex sync.Mutex
+
 type User = auth.User
 
 // applySchema runs the SQL in migrations directory to initialize the database
+// based on MIGRATION_START environment variable.
 func applySchema(db *sql.DB) error {
 	// First check if the ai schema exists - if not, reset migration tracking
 	var schemaExists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = 'ai')").Scan(&schemaExists)
+	// Use MustGetSQL or define the query here if common loader isn't used by this function
+	checkSchemaQuery := common.MustGetSQL("CheckSchemaExists")
+	err := db.QueryRow(checkSchemaQuery).Scan(&schemaExists)
 	if err != nil {
-		return fmt.Errorf("failed to check if schema exists: %v", err)
-	}
-
-	if !schemaExists {
-		log.Println("AI schema does not exist - resetting migration tracking to apply all migrations")
+		// If the ai schema doesn't exist, the query might fail depending on permissions
+		// Let's try creating it explicitly.
+		// log.Println("Attempting to create AI schema...")
+		if _, createErr := db.Exec("CREATE SCHEMA IF NOT EXISTS ai"); createErr != nil {
+			return fmt.Errorf("failed to create schema 'ai': %v", createErr) // Return the creation error
+		}
+		log.Println("AI schema created or verified. Resetting migration tracking.") // Consolidated message
+		schemaExists = true                                                         // Assume it exists now
+		// Reset migration tracking since schema was just potentially created
 		if err := UpdateMigrationStart(0); err != nil {
 			log.Printf("Warning: Failed to reset MIGRATION_START in .env: %v", err)
 		}
@@ -57,95 +73,75 @@ func applySchema(db *sql.DB) error {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
 			continue
 		}
-
-		// Include numbered migration files (supports 001_*.sql format)
-		if strings.HasPrefix(file.Name(), "0") || strings.HasPrefix(file.Name(), "1") {
+		// Simple check for numbered migrations
+		if _, err := strconv.Atoi(strings.Split(file.Name(), "_")[0]); err == nil {
 			fileNames = append(fileNames, file.Name())
 		}
 	}
 	sort.Strings(fileNames)
 
 	if len(fileNames) == 0 {
-		return fmt.Errorf("no migration files found in migrations directory")
+		log.Println("No numbered migration files found in migrations directory.")
+		return nil // Not necessarily an error
 	}
 
-	// Check for last applied migration number
+	// Check for last applied migration number from env
 	lastApplied := 0
-	if !schemaExists {
-		// Schema doesn't exist, so start from scratch
-		lastApplied = 0
-	} else if migStart := os.Getenv("MIGRATION_START"); migStart != "" {
-		// Parse the migration start number, handle both "007" and "7" formats
+	if migStart := os.Getenv("MIGRATION_START"); migStart != "" {
 		lastApplied, err = strconv.Atoi(migStart)
 		if err != nil {
-			log.Printf("Warning: Invalid MIGRATION_START value: %s", migStart)
+			log.Printf("Warning: Invalid MIGRATION_START value '%s', applying all migrations.", migStart)
 			lastApplied = 0
 		}
 	}
 
-	// Filter migrations to only include those higher than lastApplied
-	var pendingMigrations []string
-	var highestApplied int
+	highestAppliedThisRun := lastApplied // Track the highest number applied in this execution
 
+	// Execute migrations higher than lastApplied
+	log.Printf("Applying migrations starting after %d...", lastApplied)
+	migrationsApplied := 0
 	for _, fileName := range fileNames {
-		// Extract migration number from filename (e.g., "001" from "001_schema.sql")
 		numStr := strings.SplitN(fileName, "_", 2)[0]
-		num, err := strconv.Atoi(numStr)
-		if err != nil {
-			log.Printf("Warning: Invalid migration filename format: %s", fileName)
-			continue
-		}
+		num, _ := strconv.Atoi(numStr) // Error already checked above
 
-		// Only apply migrations with higher numbers than last applied
 		if num > lastApplied {
-			pendingMigrations = append(pendingMigrations, fileName)
-		}
+			log.Printf("Applying migration: %s", fileName)
+			migrationPath := filepath.Join("migrations", fileName)
+			migrationBytes, readErr := os.ReadFile(migrationPath)
+			if readErr != nil {
+				return fmt.Errorf("failed to read migration %s: %w", fileName, readErr)
+			}
 
-		// Track highest migration number
-		if num > highestApplied {
-			highestApplied = num
-		}
-	}
-
-	// No new migrations to apply
-	if len(pendingMigrations) == 0 {
-		log.Printf("No new migrations to apply (last applied: %d)", lastApplied)
-		return nil
-	}
-
-	log.Printf("Found %d pending migrations to apply", len(pendingMigrations))
-
-	// Execute each pending migration
-	for _, fileName := range pendingMigrations {
-		log.Printf("Applying migration: %s", fileName)
-
-		// Read migration file
-		migrationPath := filepath.Join("migrations", fileName)
-		migration, err := os.ReadFile(migrationPath)
-		if err != nil {
-			return fmt.Errorf("failed to read migration %s: %v", fileName, err)
-		}
-
-		// Execute migration
-		if _, err := db.Exec(string(migration)); err != nil {
-			return fmt.Errorf("failed to apply migration %s: %v", fileName, err)
+			// Execute migration using Exec
+			// Split script into statements if needed, though Exec often handles multiple simple statements
+			if _, execErr := db.Exec(string(migrationBytes)); execErr != nil {
+				return fmt.Errorf("failed to apply migration %s: %w", fileName, execErr)
+			}
+			migrationsApplied++
+			if num > highestAppliedThisRun {
+				highestAppliedThisRun = num
+			}
 		}
 	}
 
-	// Update MIGRATION_START in .env file
-	if highestApplied > lastApplied {
-		if err := UpdateMigrationStart(highestApplied); err != nil {
-			log.Printf("Warning: Failed to update MIGRATION_START in .env: %v", err)
-		} else {
-			log.Printf("Updated MIGRATION_START to %d", highestApplied)
+	if migrationsApplied > 0 {
+		log.Printf("%d migration(s) applied successfully.", migrationsApplied)
+		// Update MIGRATION_START in .env file if new migrations were applied
+		if highestAppliedThisRun > lastApplied {
+			if err := UpdateMigrationStart(highestAppliedThisRun); err != nil {
+				log.Printf("Warning: Failed to update MIGRATION_START in .env: %v", err)
+			} else {
+				log.Printf("Updated MIGRATION_START to %d", highestAppliedThisRun)
+			}
 		}
+	} else {
+		log.Printf("No new migrations needed (last applied: %d).", lastApplied)
 	}
 
-	log.Println("All migrations applied successfully")
 	return nil
 }
 
-// updateMigrationStart updates the MIGRATION_START value in the .env file
+// updateMigrationStart updates the MIGRATION_START value in the .env file (local helper)
 func updateMigrationStart(migrationNum int) error {
 	// Format migration number with leading zeros for consistent display
 	formattedNum := fmt.Sprintf("%03d", migrationNum)
@@ -156,109 +152,169 @@ func updateMigrationStart(migrationNum int) error {
 		return fmt.Errorf("error reading .env file: %v", err)
 	}
 
-	// Parse existing content
 	lines := strings.Split(string(content), "\n")
 	newLines := []string{}
 	migrationStartFound := false
 
-	// Update existing MIGRATION_START line if found
 	for _, line := range lines {
-		if line == "" {
-			newLines = append(newLines, line)
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			// Keep empty lines, but avoid adding multiple consecutive ones if reading/writing
+			if len(newLines) == 0 || newLines[len(newLines)-1] != "" {
+				newLines = append(newLines, "")
+			}
 			continue
 		}
 
 		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			newLines = append(newLines, line)
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		if key == "MIGRATION_START" {
+		if len(parts) == 2 && strings.TrimSpace(parts[0]) == "MIGRATION_START" {
 			newLines = append(newLines, fmt.Sprintf("MIGRATION_START=%s", formattedNum))
 			migrationStartFound = true
 		} else {
-			newLines = append(newLines, line)
+			newLines = append(newLines, line) // Keep the original line
 		}
 	}
 
 	// Add MIGRATION_START if not found
 	if !migrationStartFound {
-		newLines = append(newLines, fmt.Sprintf("MIGRATION_START=%s", formattedNum))
+		// Avoid adding if the last line was empty
+		if len(newLines) > 0 && newLines[len(newLines)-1] == "" {
+			newLines = append(newLines[:len(newLines)-1], fmt.Sprintf("MIGRATION_START=%s", formattedNum), "")
+		} else {
+			newLines = append(newLines, fmt.Sprintf("MIGRATION_START=%s", formattedNum))
+		}
 	}
 
-	// Write back to .env file
-	return os.WriteFile(".env", []byte(strings.Join(newLines, "\n")), 0644)
+	// Ensure there's a newline at the end if the file wasn't empty
+	finalContent := strings.Join(newLines, "\n")
+	if len(finalContent) > 0 && !strings.HasSuffix(finalContent, "\n") {
+		finalContent += "\n"
+	}
+
+	return os.WriteFile(".env", []byte(finalContent), 0644)
 }
 
 // UpdateMigrationStart updates the MIGRATION_START value in the .env file (exported version)
 func UpdateMigrationStart(migrationNum int) error {
-	// Format migration number with leading zeros
-	formattedNum := fmt.Sprintf("%03d", migrationNum)
-
-	// Update the environment variable in the current process
-	os.Setenv("MIGRATION_START", formattedNum)
-
+	// Update the environment variable in the current process for consistency
+	os.Setenv("MIGRATION_START", fmt.Sprintf("%03d", migrationNum))
 	// Update the .env file
 	return updateMigrationStart(migrationNum)
 }
 
-// RunMigrations runs the database migrations
-func RunMigrations() error {
+// RunMigrations runs the database migrations (exported alias for applySchema)
+// This might not be needed if only called from InitDB
+func RunMigrations(db *sql.DB) error {
 	return applySchema(db)
 }
 
-// GetDB returns the database connection pool
+// GetDB returns the initialized database connection pool.
 func GetDB() *sql.DB {
-	return db
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+	return dbInstance
 }
 
-// InitDB initializes the database connection
+// InitDB initializes the database connection, ensuring the DB exists, runs migrations, and sets the global dbInstance.
 func InitDB() (*sql.DB, error) {
-	// Get individual connection parameters from environment
-	driver := os.Getenv("DB_DRIVER")
-	if driver == "" {
-		driver = "postgres" // Default to postgres if not specified
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	// Prevent re-initialization if already done
+	if dbInstance != nil {
+		if err := dbInstance.Ping(); err == nil {
+			return dbInstance, nil
+		}
+		log.Println("WARN: Existing DB connection failed ping, attempting re-initialization.")
+		dbInstance.Close()
+		dbInstance = nil
 	}
 
+	// --- Database Connection Parameters ---
+	driver := common.GetEnvOrDefault("DB_DRIVER", "postgres")
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
+	targetDbName := os.Getenv("DB_NAME") // The DB we actually want to use
+	defaultDbName := "postgres"          // DB to connect to initially for CREATE DATABASE command
 
-	// Validate required parameters
-	if host == "" || port == "" || user == "" || password == "" || dbname == "" {
-		return nil, fmt.Errorf("database connection parameters are not set (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME required)")
+	if driver != "postgres" {
+		// Currently, auto-creation logic is only implemented for postgres
+		return nil, fmt.Errorf("unsupported database driver '%s' for automatic database creation", driver)
 	}
 
-	var dsn string
-	switch driver {
-	case "postgres":
-		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-			host, port, user, password, dbname)
-	case "mysql":
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
-			user, password, host, port, dbname)
-	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", driver)
+	if host == "" || port == "" || user == "" || targetDbName == "" { // Password can be empty
+		return nil, fmt.Errorf("database connection parameters are not fully set (DB_HOST, DB_PORT, DB_USER, DB_NAME required)")
 	}
 
-	// Open a direct connection to the database
-	sqlDB, err := sql.Open(driver, dsn)
+	// --- Step 1: Connect to default DB to check/create target DB ---
+	initialDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, defaultDbName)
+
+	initialDB, err := sql.Open(driver, initialDSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to open initial connection to default database '%s': %w", defaultDbName, err)
+	}
+	defer initialDB.Close()
+
+	if err = initialDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping default database '%s': %w", defaultDbName, err)
 	}
 
-	// Test the connection
+	// --- Step 2: Try to create the target database ---
+	// log.Printf("Ensuring database '%s' exists...", targetDbName)
+	_, err = initialDB.Exec(fmt.Sprintf("CREATE DATABASE \"%s\"", targetDbName)) // Use quoted identifier for safety
+	if err != nil {
+		// Check if the error is "database already exists"
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "42P04" { // 42P04 is the code for duplicate_database
+			log.Printf("Database '%s' exists and is ready to connect to.", targetDbName)
+		} else {
+			// Another error occurred (e.g., permission denied)
+			return nil, fmt.Errorf("failed to create target database '%s': %w", targetDbName, err)
+		}
+	} else {
+		log.Printf("Database '%s' created successfully.", targetDbName)
+	}
+	// Initial connection no longer needed
+	initialDB.Close()
+
+	// --- Step 3: Connect to the target database ---
+	targetDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, targetDbName)
+
+	sqlDB, err := sql.Open(driver, targetDSN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open connection to target database '%s': %w", targetDbName, err)
+	}
+
+	// Test the target connection
 	if err := sqlDB.Ping(); err != nil {
 		sqlDB.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		return nil, fmt.Errorf("failed to ping target database '%s': %w", targetDbName, err)
+	}
+	log.Printf("→    Successfully connected to target database '%s'", targetDbName)
+
+	// --- Run Database Migrations (Old Method) ---
+	log.Println("Applying database schema/migrations...")
+	if err := applySchema(sqlDB); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to apply database schema/migrations: %w", err)
+	}
+	// -------------------------------------------
+
+	// --- Check/Create Admin Token ---
+	_, tokenErr := CheckOrCreateAdminToken(sqlDB)
+	if tokenErr != nil {
+		log.Printf("WARNING: Failed to check/create admin token: %v", tokenErr)
 	}
 
-	log.Printf("Successfully connected to database using %s driver", driver)
-	return sqlDB, nil
+	// Store the initialized instance globally
+	dbInstance = sqlDB
+
+	log.Printf("Database '%s' completely initialized.", targetDbName) // Consolidated message
+
+	return dbInstance, nil
 }
 
 // Global maintenance mode flag
@@ -374,9 +430,8 @@ func NewUserService(db *sql.DB) *UserService {
 // GetUserByEmail retrieves a user by email
 func (s *UserService) GetUserByEmail(email string) (auth.User, error) {
 	var user auth.User
-	query := `SELECT id, email, is_admin, created_at, last_logged_in FROM ai.users WHERE email = $1`
-	err := s.db.QueryRow(query, email).Scan(
-		&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn)
+	query := common.MustGetSQL("auth/get_user_by_email") // Load query
+	err := s.db.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return auth.User{}, fmt.Errorf("user not found")
@@ -510,14 +565,15 @@ func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID int) (
 
 // AddProjectMember adds a user to a project
 func (s *ProjectService) AddProjectMember(ctx context.Context, projectID int, user *auth.User) error {
-	query := `INSERT INTO ai.project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	query := common.MustGetSQL("project_members/add") // Load query
 	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
 	return err
 }
 
 // RemoveProjectMember removes a user from a project
 func (s *ProjectService) RemoveProjectMember(ctx context.Context, projectID int, user *auth.User) error {
-	query := `DELETE FROM ai.project_members WHERE project_id = $1 AND user_id = $2`
+	query := "DELETE FROM ai.project_members WHERE project_id = $1 AND user_id = $2" // Keeping inline due to file creation issue
+	// query := common.MustGetSQL("project_members/remove") // Load query (if file existed)
 	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
 	return err
 }
@@ -852,32 +908,19 @@ func NewSettingsService(db *sql.DB) *SettingsService {
 // GetSetting retrieves a setting by key and scope
 func (s *SettingsService) GetSetting(key string, scope string, scopeID *int) (Setting, error) {
 	var setting Setting
+	var err error
 	var query string
-	var args []interface{}
 
-	if scopeID == nil {
-		query = `SELECT id, key, value, description, scope, scope_id, updated_at 
-				FROM ai.settings 
-				WHERE key = $1 AND scope = $2 AND scope_id IS NULL`
-		args = []interface{}{key, scope}
+	if scopeID != nil {
+		query = common.MustGetSQL("settings/get_scoped") // Load scoped query
+		err = s.db.QueryRow(query, key, scope, *scopeID).Scan(&setting.ID, &setting.Key, &setting.Value, &setting.Description, &setting.Scope, &setting.ScopeID, &setting.UpdatedAt)
 	} else {
-		query = `SELECT id, key, value, description, scope, scope_id, updated_at 
-				FROM ai.settings 
-				WHERE key = $1 AND scope = $2 AND scope_id = $3`
-		args = []interface{}{key, scope, *scopeID}
+		query = common.MustGetSQL("settings/get_global") // Load global query
+		err = s.db.QueryRow(query, key).Scan(&setting.ID, &setting.Key, &setting.Value, &setting.Description, &setting.Scope, &setting.ScopeID, &setting.UpdatedAt)
 	}
-
-	var scopeIDNull sql.NullInt64
-	err := s.db.QueryRow(query, args...).Scan(
-		&setting.ID, &setting.Key, &setting.Value, &setting.Description,
-		&setting.Scope, &scopeIDNull, &setting.UpdatedAt)
 
 	if err != nil {
 		return Setting{}, err
-	}
-
-	if scopeIDNull.Valid {
-		setting.ScopeID = int(scopeIDNull.Int64)
 	}
 
 	return setting, nil
@@ -1476,4 +1519,53 @@ func (s *ProjectDBService) TestConnection(projectDB ProjectDB) error {
 	}
 
 	return nil
+}
+
+// CheckOrCreateAdminToken checks if an admin token exists for today (UTC).
+// If not, it creates one, stores it, and returns it. It also prints the token.
+func CheckOrCreateAdminToken(db *sql.DB) (string, error) {
+	today := time.Now().UTC().Format("2006-01-02")
+	var existingToken string
+	// Check if a token already exists for today
+	query := common.MustGetSQL("admin_tokens/get_by_date")             // Load query
+	err := db.QueryRow(query, today).Scan(&existingToken, new(string)) // Scan date into dummy
+
+	if err == nil {
+		// Token exists for today
+		log.Printf("Admin token for %s already exists. Token: %s", today, existingToken)
+		return existingToken, nil
+	} else if err == sql.ErrNoRows {
+		// No token for today, create one
+		log.Printf("No admin token found for %s, generating a new one.", today)
+
+		// Generate new token using uuid
+		newToken := uuid.New().String()
+		insertQuery := common.MustGetSQL("admin_tokens/insert") // Load query
+		_, err = db.Exec(insertQuery, newToken, today)
+		if err != nil {
+			return "", fmt.Errorf("failed to store new admin token: %w", err)
+		}
+		// IMPORTANT: Print the token to the console for the admin
+		fmt.Printf("\n *** IMPORTANT: New Admin Setup Token for %s: %s ***\n\n", today, newToken)
+		log.Printf("Generated and stored new admin token for %s.", today)
+		return newToken, nil
+	} else {
+		// Other database error
+		return "", fmt.Errorf("error checking admin token for %s: %w", today, err)
+	}
+}
+
+// GetAdminTokenForDate retrieves the admin token for a specific date (UTC).
+// Returns empty string if not found or error occurs.
+func GetAdminTokenForDate(db *sql.DB, dateStr string) (string, error) {
+	var token string
+	query := common.MustGetSQL("admin_tokens/get_token_by_date") // Load query
+	err := db.QueryRow(query, dateStr).Scan(&token)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil // Not found is not necessarily an error here
+		}
+		return "", err // Other DB error
+	}
+	return token, nil
 }

@@ -22,6 +22,11 @@ func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userSe
 	// Login/Logout page handlers
 	mux.HandleFunc("/login", HandleLogin)
 	mux.HandleFunc("/logout", HandleLogout)
+
+	// Password Login
+	mux.HandleFunc("/password-login", func(w http.ResponseWriter, r *http.Request) {
+		HandlePasswordLogin(w, r, userService)
+	})
 }
 
 // AuthMiddleware checks if a user is authenticated and sets user context

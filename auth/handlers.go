@@ -125,8 +125,13 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 		}
 
 		// No admin exists - this is first-user scenario
-		// Create the user (who will be an admin)
-		user, err = userService.CreateUser(req.Email)
+		// For the first user, we need a temporary password to store.
+		// Ideally, this should prompt for setup, but for now, use a default or random one.
+		// IMPORTANT: This is insecure for production. First user setup needs a proper flow.
+		// Using the email temporarily as a placeholder password for hashing.
+		tempPassword := req.Email // Or generate a random string
+		log.Printf("WARN: Creating first user (%s) with temporary password derived from email. Needs proper setup flow.", req.Email)
+		user, err = userService.CreateUser(req.Email, tempPassword)
 		if err != nil {
 			log.Printf("Failed to create first admin user: %v", err)
 			SendJSONResponse(w, false, "Failed to create user account", nil, "")
@@ -139,7 +144,8 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 	// Send OTP
 	if err := SendOTP(req.Email); err != nil {
 		log.Printf("Failed to send OTP for user %s: %v", user.Email, err)
-		SendJSONResponse(w, false, "Failed to send OTP", nil, "")
+		// Send a specific response indicating OTP failure
+		SendJSONResponse(w, false, "Failed to send OTP. You can try logging in with your password.", map[string]bool{"otp_error": true}, "")
 		return
 	}
 
@@ -192,21 +198,19 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 	// Update last login
 	if err := userService.UpdateUserLastLogin(user.ID); err != nil {
 		log.Printf("Failed to update last login: %v", err)
-		// Continue anyway, this is not critical
+		// Don't fail the login for this, just log it
 	}
 
 	// Create session
-	session, err := CreateSession(user)
+	session, err := CreateSession(user) // Pass pointer *User
 	if err != nil {
 		log.Printf("Failed to create session: %v", err)
 		SendJSONResponse(w, false, "Failed to create session", nil, "")
 		return
 	}
 
-	// Get versioned cookie name
+	// Set session cookie (restoring original logic)
 	cookieName := GetSessionCookieName()
-
-	// Set versioned session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    session.Token,
@@ -214,8 +218,8 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 		HttpOnly: true,
 		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
 		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
 	})
-
 	// Also set regular session cookie for backward compatibility
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -224,9 +228,97 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 		HttpOnly: true,
 		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
 		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
 	})
 
-	SendJSONResponse(w, true, "Login successful", nil, "/")
+	// Determine redirect based on admin status
+	redirectURL := "/" // Default for non-admins
+	if user.IsAdmin {
+		redirectURL = "/dashboard"
+	}
+
+	SendJSONResponse(w, true, "OTP verified successfully", nil, redirectURL)
+}
+
+// PasswordLoginRequest represents the request body for password login
+type PasswordLoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// HandlePasswordLogin handles login attempts using email and password
+func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService *UserService) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse JSON request
+	var req PasswordLoginRequest
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		SendJSONResponse(w, false, "Invalid request format", nil, "")
+		return
+	}
+
+	// Validate request
+	if req.Email == "" || req.Password == "" {
+		SendJSONResponse(w, false, "Email and password are required", nil, "")
+		return
+	}
+
+	// Verify password
+	user, err := userService.VerifyPassword(req.Email, req.Password)
+	if err != nil {
+		// Log the specific error for debugging, but send a generic message to the client
+		log.Printf("Password verification failed for %s: %v", req.Email, err)
+		SendJSONResponse(w, false, "Invalid email or password", nil, "")
+		return
+	}
+
+	// Update last login
+	if err := userService.UpdateUserLastLogin(user.ID); err != nil {
+		log.Printf("Failed to update last login: %v", err)
+		// Don't fail the login for this, just log it
+	}
+
+	// Create session
+	session, err := CreateSession(user) // Pass pointer *User
+	if err != nil {
+		log.Printf("Failed to create session: %v", err)
+		SendJSONResponse(w, false, "Failed to create session", nil, "")
+		return
+	}
+
+	// Set session cookie (restoring original logic)
+	cookieName := GetSessionCookieName()
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieName,
+		Value:    session.Token,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
+	})
+	// Also set regular session cookie for backward compatibility
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    session.Token,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
+	})
+
+	// Determine redirect based on admin status
+	redirectURL := "/" // Default for non-admins
+	if user.IsAdmin {
+		redirectURL = "/dashboard"
+	}
+
+	SendJSONResponse(w, true, "Login successful", nil, redirectURL)
 }
 
 // SendJSONResponse sends a JSON response

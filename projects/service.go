@@ -7,8 +7,6 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/scriptmaster/openagent/common"
 )
 
 // projectService implements the ProjectService interface
@@ -30,11 +28,15 @@ func NewProjectService(db *sql.DB, repo ProjectRepository) ProjectService {
 	if db == nil {
 		log.Fatal("database connection is required")
 	}
-
-	// Load SQL queries
-	if err := common.LoadSQLQueries("data/projects.yaml"); err != nil {
-		log.Fatalf("Failed to load SQL queries: %v", err)
+	if repo == nil {
+		log.Fatal("project repository is required")
 	}
+
+	// SQL queries are now loaded centrally in server/server.go
+	// // Load SQL queries
+	// if err := common.LoadSQLQueries("data/projects.yaml"); err != nil {
+	// 	log.Fatalf("Failed to load SQL queries: %v", err)
+	// }
 
 	return &projectService{
 		db:               db,

@@ -1,0 +1,85 @@
+{{define "title"}}Dashboard - {{.AppName}}{{end}}
+
+{{define "content"}}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    Dashboard
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-deck row-cards">
+            <!-- Project Count Card -->
+            <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="bg-primary text-white avatar">
+                                    <i class="ti ti-briefcase"></i>
+                                </span>
+                            </div>
+                            <div class="col">
+                                <div class="font-weight-medium">
+                                    Total Projects
+                                </div>
+                                <div class="text-muted">
+                                    {{.ProjectCount}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Placeholder Cards (Add more relevant stats later) -->
+             <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                             <div class="col-auto">
+                                <span class="bg-green text-white avatar">
+                                    <i class="ti ti-users"></i>
+                                </span>
+                            </div>
+                            <div class="col">
+                                <div class="font-weight-medium">
+                                   Active Users (Placeholder)
+                                </div>
+                                <div class="text-muted">
+                                    N/A
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Add more cards here -->
+
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Quick Actions</h3>
+                    </div>
+                    <div class="card-body">
+                        <a href="/projects" class="btn btn-primary">
+                            <i class="ti ti-briefcase me-1"></i> View Projects
+                        </a>
+                        <!-- Add other quick action buttons here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

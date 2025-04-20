@@ -2,10 +2,12 @@ package projects
 
 import (
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/scriptmaster/openagent/auth"
@@ -110,6 +112,7 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 	// Get all projects
 	projects, err := service.List()
 	if err != nil {
+		log.Printf("Error fetching projects list: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -226,4 +229,128 @@ func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *t
 		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
+}
+
+// --- API Handlers ---
+
+// HandleListProjectsAPI handles GET requests to list projects as JSON
+func HandleListProjectsAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService) {
+	projects, err := projectService.List()
+	if err != nil {
+		log.Printf("API Error fetching projects: %v", err)
+		common.JSONError(w, "Failed to fetch projects", http.StatusInternalServerError)
+		return
+	}
+	common.JSONResponse(w, projects)
+}
+
+// HandleCreateProjectAPI handles POST requests to create a new project
+func HandleCreateProjectAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService, user *auth.User) {
+	var project Project
+	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
+		common.JSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Basic validation
+	if project.Name == "" || project.Domain == "" {
+		common.JSONError(w, "Project Name and Domain are required", http.StatusBadRequest)
+		return
+	}
+
+	// Set creator ID (assuming middleware provides user)
+	if user == nil {
+		common.JSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	project.CreatedBy = int64(user.ID)
+	project.IsActive = true // Default to active on creation?
+
+	newID, err := projectService.Create(&project)
+	if err != nil {
+		log.Printf("API Error creating project: %v", err)
+		common.JSONError(w, "Failed to create project: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	project.ID = newID
+	common.JSONResponseWithStatus(w, project, http.StatusCreated)
+}
+
+// HandleUpdateProjectAPI handles PUT requests to update a project
+func HandleUpdateProjectAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService) {
+	// Extract project ID from URL path, e.g., /api/projects/123
+	path := r.URL.Path
+	prefix := "/api/projects/"
+	if !strings.HasPrefix(path, prefix) {
+		common.JSONError(w, "Invalid URL path prefix for project update", http.StatusBadRequest)
+		return
+	}
+	idStr := strings.TrimPrefix(path, prefix)
+
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		common.JSONError(w, "Invalid project ID in URL", http.StatusBadRequest)
+		return
+	}
+
+	var projectUpdates Project
+	if err := json.NewDecoder(r.Body).Decode(&projectUpdates); err != nil {
+		common.JSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Ensure the ID from the body matches the URL (or set it)
+	projectUpdates.ID = projectID
+
+	// Basic validation
+	if projectUpdates.Name == "" || projectUpdates.Domain == "" {
+		common.JSONError(w, "Project Name and Domain are required", http.StatusBadRequest)
+		return
+	}
+
+	err = projectService.Update(&projectUpdates)
+	if err != nil {
+		log.Printf("API Error updating project %d: %v", projectID, err)
+		if errors.Is(err, ErrProjectNotFound) {
+			common.JSONError(w, "Project not found", http.StatusNotFound)
+		} else {
+			common.JSONError(w, "Failed to update project: "+err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	common.JSONResponse(w, projectUpdates) // Return updated project
+}
+
+// HandleDeleteProjectAPI handles DELETE requests to delete a project
+func HandleDeleteProjectAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService) {
+	// Extract project ID from URL path, e.g., /api/projects/123
+	path := r.URL.Path
+	prefix := "/api/projects/"
+	if !strings.HasPrefix(path, prefix) {
+		common.JSONError(w, "Invalid URL path prefix for project deletion", http.StatusBadRequest)
+		return
+	}
+	idStr := strings.TrimPrefix(path, prefix)
+
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		common.JSONError(w, "Invalid project ID in URL", http.StatusBadRequest)
+		return
+	}
+
+	err = projectService.Delete(projectID)
+	if err != nil {
+		log.Printf("API Error deleting project %d: %v", projectID, err)
+		if errors.Is(err, ErrProjectNotFound) {
+			// Arguably, deleting a non-existent resource is not an error (idempotent)
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			common.JSONError(w, "Failed to delete project: "+err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent) // Success, no content to return
 }

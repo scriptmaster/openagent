@@ -17,6 +17,7 @@ type UserServicer interface {
 type User struct {
 	ID           int       `json:"id"`
 	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"` // Store the hashed password, exclude from JSON
 	IsAdmin      bool      `json:"is_admin"`
 	CreatedAt    time.Time `json:"created_at"`
 	LastLoggedIn time.Time `json:"last_logged_in"` // Consider using sql.NullTime if nullable

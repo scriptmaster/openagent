@@ -1,0 +1,2 @@
+ALTER TABLE ai.projects
+ADD COLUMN IF NOT EXISTS options JSONB NOT NULL DEFAULT '{}'::jsonb;

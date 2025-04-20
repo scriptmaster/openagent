@@ -1,0 +1,3 @@
+ALTER TABLE ai.projects
+DROP COLUMN IF EXISTS updated_at,
+DROP COLUMN IF EXISTS is_active; 

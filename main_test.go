@@ -9,7 +9,7 @@ import (
 
 // TestEnvLoading verifies if .env variables are loaded correctly.
 func TestEnvLoading(t *testing.T) {
-	// Attempt to load .env file (best effort, might not exist in all test envs)
+	// Attempt to load .env from root
 	_ = godotenv.Load()
 
 	smtpHost := os.Getenv("SMTP_HOST")
