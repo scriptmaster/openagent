@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/scriptmaster/openagent/admin"
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
@@ -30,8 +31,8 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 		SetMaintenanceMode(true)
 	}
 
-	// Setup static file server
-	fs := http.FileServer(http.Dir("static"))
+	// Setup static file server (ensure web-llm-worker.js can be served)
+	fs := http.FileServer(http.Dir("static")) // Assuming worker JS is in static or root
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	// Register routes from sub-packages
@@ -39,28 +40,44 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 	admin.RegisterAdminRoutes(mux, templates, auth.IsMaintenanceAuthenticated,
 		UpdateDatabaseConfig, UpdateMigrationStart, InitDB, sessionSalt)
 
-	// Only register project routes if database is available
+	// Register project routes if database is available
 	if db != nil {
 		RegisterRootRoutes(mux, templates, userService, db)
 		projects.RegisterProjectRoutes(mux, templates, userService, db)
+	} else {
+		// Handle root differently if DB is down? Maybe redirect to maintenance?
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			// Simplified handler when DB is down
+			if IsMaintenanceMode() {
+				// Redirect to maintenance login or show a maintenance page
+				admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated)
+				return
+			}
+			// Otherwise, maybe show a generic error or minimal page
+			http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		})
 	}
 
 	// Register agent routes (internal to server package)
 	registerAgentRoutes(mux)
 
+	// Register the new voice page route
+	mux.HandleFunc("/voice", HandleVoicePage)
+
 	// Register catch-all handler for 404 errors - must be last
 	mux.HandleFunc("/{path:.*}", func(w http.ResponseWriter, r *http.Request) {
+		// Check if it's a known path before declaring 404 (e.g., /, /login, /voice)
+		// This basic catch-all might need refinement depending on your exact routing needs
+		// For now, assume other handlers take precedence.
 		common.Handle404(w, r, templates)
 	})
 }
 
 func RegisterRootRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB) {
-	projectService, err := projects.NewProjectService(db)
-	if err != nil {
-		log.Printf("Failed to create project service: %v", err)
-		SetMaintenanceMode(true)
-		return
-	}
+	// Initialize project repository and service
+	sqlxDB := sqlx.NewDb(db, "postgres") // Or the appropriate driver
+	projectRepo := projects.NewProjectRepository(sqlxDB)
+	projectService := projects.NewProjectService(db, projectRepo)
 
 	// Root and project page routes handler
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -5,18 +5,18 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
 )
 
 // HandleProjectsAPI handles the /api/projects endpoint
-func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service *ProjectService) {
+func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service ProjectService) {
 	if r.Method == http.MethodGet {
-		projects, err := service.ListProjects()
+		projects, err := service.List()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -32,15 +32,17 @@ func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service *ProjectS
 			return
 		}
 
-		project.ID = uuid.New().String()
+		// Generate ID via repository since it's an int64
 		project.CreatedAt = time.Now()
 		project.UpdatedAt = time.Now()
 
-		if err := service.CreateProject(&project); err != nil {
+		id, err := service.Create(&project)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		project.ID = id
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(project)
 		return
@@ -50,12 +52,17 @@ func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service *ProjectS
 }
 
 // HandleProjectAPI handles the /api/projects/{id} endpoint
-func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service *ProjectService) {
-	id := r.URL.Path[len("/api/projects/"):]
+func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service ProjectService) {
+	idStr := r.URL.Path[len("/api/projects/"):]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
-		project, err := service.GetProject(id)
+		project, err := service.GetByID(id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -72,7 +79,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service *ProjectSe
 		project.ID = id
 		project.UpdatedAt = time.Now()
 
-		if err := service.UpdateProject(&project); err != nil {
+		if err := service.Update(&project); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -80,7 +87,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service *ProjectSe
 		json.NewEncoder(w).Encode(project)
 
 	case http.MethodDelete:
-		if err := service.DeleteProject(id); err != nil {
+		if err := service.Delete(id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -92,7 +99,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service *ProjectSe
 }
 
 // HandleProjects handles the projects page
-func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.Template, service *ProjectService) {
+func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.Template, service ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
@@ -101,7 +108,7 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 	}
 
 	// Get all projects
-	projects, err := service.ListProjects()
+	projects, err := service.List()
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -124,7 +131,7 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 }
 
 // HandleIndex handles the root route
-func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Template, service *ProjectService) {
+func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Template, service ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 
@@ -144,7 +151,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 	// Try to get project based on host
 	host := r.Host
 	if host != "" {
-		project, err := service.GetProjectByDomain(host)
+		project, err := service.GetByDomain(host)
 		if err == nil && project != nil {
 			data.Project = project
 			data.PageTitle = project.Name
@@ -159,7 +166,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 }
 
 // HandleProjectsRoute handles the /projects route with authentication
-func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
 	// Get user from session
 	user, err := userService.GetUserFromSession(r)
 	if err != nil {
@@ -173,7 +180,7 @@ func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *temp
 }
 
 // HandleIndexRoute handles the root route with optional authentication
-func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
 	// Get user from session
 	user, err := userService.GetUserFromSession(r)
 	if err != nil {
@@ -188,9 +195,9 @@ func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *templat
 }
 
 // HandleProjectPageRoute handles project-specific pages based on domain and path
-func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService *ProjectService, userService *auth.UserService) {
+func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
 	// Get project by current domain
-	project, err := projectService.GetProjectByDomain(r.Host)
+	project, err := projectService.GetByDomain(r.Host)
 	if err != nil || project == nil {
 		// No project found for this domain, serve 404 page
 		common.Handle404(w, r, templates)

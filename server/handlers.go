@@ -1,14 +1,24 @@
 package server
 
-// AgentRequest moved to models/types.go or keep here if server-specific
-// type AgentRequest struct { ... }
+import (
+	"log"
+	"net/http"
+)
 
-// AgentResponse moved to models/types.go or keep here if server-specific
-// type AgentResponse struct { ... }
+// HandleVoicePage serves the voice agent page
+func HandleVoicePage(w http.ResponseWriter, r *http.Request) {
+	// Ensure templates are initialized (assuming 'templates' is the global var)
+	if templates == nil {
+		http.Error(w, "Templates not initialized", http.StatusInternalServerError)
+		log.Println("Error: HandleVoicePage called before templates were initialized")
+		return
+	}
 
-// Note: Agent handlers (HandleAgent, HandleStart, HandleNextStep, HandleStatus)
-// need to be defined here or in agent.go and EXPORTED.
-
-// Placeholder variables - these need to be initialized or passed appropriately
-// var appVersion string // Removed redeclaration
-// var templates *template.Template // Removed redeclaration
+	// Execute the voice template
+	// You might want to pass data similar to other pages if needed (e.g., AppName, User)
+	err := templates.ExecuteTemplate(w, "voice.html", nil) // Passing nil data for now
+	if err != nil {
+		log.Printf("Error executing voice template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}

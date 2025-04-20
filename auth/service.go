@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -137,4 +138,24 @@ func (s *UserService) CheckIfAdminExists() (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+// MakeUserAdmin makes a user an admin
+func (s *UserService) MakeUserAdmin(email string) error {
+	user, err := s.GetUserByEmail(email)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %v", err)
+	}
+
+	if user == nil {
+		return fmt.Errorf("user not found")
+	}
+
+	_, err = s.db.Exec(`
+		UPDATE ai.users 
+		SET is_admin = true 
+		WHERE id = $1
+	`, user.ID)
+
+	return err
 }

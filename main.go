@@ -1,23 +1,51 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/scriptmaster/openagent/cmd"
 	"github.com/scriptmaster/openagent/server"
+	"github.com/spf13/cobra"
 )
 
+var serverCmd = &cobra.Command{
+	Use:   "server",
+	Short: "Start the OpenAgent server",
+	Long:  `Start the OpenAgent server and listen for connections.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		startServer()
+	},
+}
+
+func init() {
+	// Set the server start function as the default action
+	cmd.ServerStartFunc = startServer
+
+	// Add server command for explicit usage
+	cmd.RootCmd.AddCommand(serverCmd)
+}
+
 func main() {
+	// Use command structure with default command
+	if err := cmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func startServer() {
 	// Set up signal catching
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 
 	// Outer loop for restarting the server
 	for {
-		log.Println("Attempting to start server...")
+		log.Println("--- Server Starting ---")
 		errCh := make(chan error, 1)
 		go func() {
 			errCh <- server.StartServer()
