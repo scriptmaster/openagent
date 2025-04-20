@@ -17,3 +17,8 @@ func DecodeConnectionString(encoded string) (string, error) {
 	}
 	return string(dcodedBytes), nil
 }
+
+// EncodeConnectionString encodes a connection string using base64.
+func EncodeConnectionString(connectionString string) string {
+	return base64.StdEncoding.EncodeToString([]byte(connectionString))
+}

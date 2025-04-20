@@ -3,6 +3,7 @@ package projects
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -346,24 +347,28 @@ func HandleDeleteProjectAPI(w http.ResponseWriter, r *http.Request, projectServi
 	w.WriteHeader(http.StatusNoContent) // Success, no content to return
 }
 
-// UpdateProjectDBConfigRequest represents the expected JSON body
+// UpdateProjectDBConfigRequest defines the structure for the request body
+// when updating a project's database configuration.
 type UpdateProjectDBConfigRequest struct {
-	DBType           string `json:"db_type"`           // e.g., postgres, mysql
-	SchemaName       string `json:"schema_name"`       // New schema name
-	ConnectionString string `json:"connection_string"` // Base64 encoded new connection string
-	// Fields for options A, B, C could be combined or use a type field
-	// We'll use presence/absence of fields for now
+	UpdateType       string `json:"update_type"`                 // "schema_only", "db_name_schema", "full_connection"
+	DBType           string `json:"db_type,omitempty"`           // Required for "full_connection", e.g., postgres, mysql
+	SchemaName       string `json:"schema_name"`                 // New schema name, required for all types
+	DBName           string `json:"db_name,omitempty"`           // New DB name, required for "db_name_schema"
+	ConnectionString string `json:"connection_string,omitempty"` // Base64 encoded new full connection string, required for "full_connection"
+	ProjectDBID      int64  `json:"project_db_id"`               // ID of the ai.project_dbs record to update
+	Name             string `json:"name,omitempty"`              // Optional: New name for the ProjectDB entry itself
+	Description      string `json:"description,omitempty"`       // Optional: New description for the ProjectDB entry
+	IsDefault        *bool  `json:"is_default,omitempty"`        // Optional: Make this connection the default for the project
 }
 
-// HandleUpdateProjectDBConfigAPI handles PUT /api/projects/{id}/dbconfig
-// Accepts common.ProjectDBService injected from routes
+// HandleUpdateProjectDBConfigAPI handles requests to update a project's database configuration.
 func HandleUpdateProjectDBConfigAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService, projectDBService common.ProjectDBService) {
-	// Extract project ID from URL
+	// Extract project ID from URL (This is the parent project's ID)
 	path := r.URL.Path
 	prefix := "/api/projects/"
 	suffix := "/dbconfig"
 	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, suffix) {
-		common.JSONError(w, "Invalid URL path", http.StatusBadRequest)
+		common.JSONError(w, "Invalid URL path format", http.StatusBadRequest)
 		return
 	}
 	idStr := strings.TrimSuffix(strings.TrimPrefix(path, prefix), suffix)
@@ -380,93 +385,224 @@ func HandleUpdateProjectDBConfigAPI(w http.ResponseWriter, r *http.Request, proj
 		return
 	}
 
-	// Use the injected projectDBService directly
+	// --- Service Check ---
 	if projectDBService == nil {
 		log.Println("ERROR: HandleUpdateProjectDBConfigAPI called with nil projectDBService")
 		common.JSONError(w, "Database service not available", http.StatusInternalServerError)
 		return
 	}
-
-	// --- Feature Logic ---
-	// 1. Find the *default* ProjectDB for the given projectID
-	//    (Need a method in ProjectDBService for this, e.g., GetProjectDBs(projectID) for now and find the default.
-	dbs, err := projectDBService.GetProjectDBs(int(projectID))
-	if err != nil {
-		log.Printf("Error fetching project DBs for project %d: %v", projectID, err)
-		common.JSONError(w, "Failed to retrieve project database configurations", http.StatusInternalServerError)
+	if projectService == nil {
+		log.Println("ERROR: HandleUpdateProjectDBConfigAPI called with nil projectService")
+		common.JSONError(w, "Project service not available", http.StatusInternalServerError)
 		return
 	}
 
-	var defaultDB *common.ProjectDB // Use common.ProjectDB type
-	for i := range dbs {
-		if dbs[i].IsDefault {
-			tempDB := dbs[i]    // Create a temporary variable
-			defaultDB = &tempDB // Assign the address of the temp variable
-			break
+	// --- Input Validation ---
+	if req.ProjectDBID == 0 {
+		common.JSONError(w, "Missing required field: project_db_id", http.StatusBadRequest)
+		return
+	}
+	if req.SchemaName == "" {
+		common.JSONError(w, "Missing required field: schema_name", http.StatusBadRequest)
+		return
+	}
+
+	var newEncodedConnStr string
+	var newDbType string
+
+	// Fetch the existing ProjectDB record
+	// Note: projectDBService methods use int, but projectID and req.ProjectDBID are int64
+	existingProjectDB, err := projectDBService.GetProjectDB(int(req.ProjectDBID))
+	if err != nil {
+		log.Printf("Error fetching project DB %d: %v", req.ProjectDBID, err)
+		common.JSONError(w, fmt.Sprintf("Failed to retrieve project database configuration with ID %d", req.ProjectDBID), http.StatusNotFound)
+		return
+	}
+
+	// Ensure the ProjectDB belongs to the project in the URL
+	if existingProjectDB.ProjectID != int(projectID) {
+		common.JSONError(w, "ProjectDB record does not belong to the specified project", http.StatusForbidden)
+		return
+	}
+
+	// --- Feature Logic based on UpdateType ---
+	switch req.UpdateType {
+	case "schema_only": // Option B
+		if existingProjectDB.ConnectionString == "" {
+			common.JSONError(w, "Cannot update schema_only for a ProjectDB with no existing connection string", http.StatusBadRequest)
+			return
+		}
+		// Keep existing connection string and DB type
+		newEncodedConnStr = existingProjectDB.ConnectionString
+		newDbType = existingProjectDB.DBType
+
+	case "db_name_schema": // Option A
+		if req.DBName == "" {
+			common.JSONError(w, "Missing required field for db_name_schema update: db_name", http.StatusBadRequest)
+			return
+		}
+		if existingProjectDB.ConnectionString == "" {
+			common.JSONError(w, "Cannot update db_name_schema for a ProjectDB with no existing connection string", http.StatusBadRequest)
+			return
+		}
+
+		// Decode existing connection string
+		decodedConnStr, err := projectDBService.DecodeConnectionString(existingProjectDB.ConnectionString)
+		if err != nil {
+			log.Printf("Error decoding existing connection string for ProjectDB %d: %v", existingProjectDB.ID, err)
+			common.JSONError(w, "Internal error processing existing configuration", http.StatusInternalServerError)
+			return
+		}
+
+		// Update the DB name part (this requires parsing the conn string, which is driver-specific)
+		// TODO: Implement robust connection string parsing and modification based on DBType
+		// For now, assume a simple key=value format for demonstration (e.g., for postgres)
+		updatedConnStr := updateConnectionStringDBName(decodedConnStr, req.DBName, existingProjectDB.DBType)
+		if updatedConnStr == "" { // Indicate failure
+			common.JSONError(w, fmt.Sprintf("Failed to update database name in connection string for type %s", existingProjectDB.DBType), http.StatusInternalServerError)
+			return
+		}
+
+		// Re-encode the modified connection string
+		newEncodedConnStr = common.EncodeConnectionString(updatedConnStr)
+		newDbType = existingProjectDB.DBType
+
+	case "full_connection": // Option C
+		if req.DBType == "" {
+			common.JSONError(w, "Missing required field for full_connection update: db_type", http.StatusBadRequest)
+			return
+		}
+		if req.ConnectionString == "" {
+			common.JSONError(w, "Missing required field for full_connection update: connection_string", http.StatusBadRequest)
+			return
+		}
+		// Validate if the provided string is valid base64 before using it
+		_, err := common.DecodeConnectionString(req.ConnectionString) // Use the service decoder for consistency
+		if err != nil {
+			common.JSONError(w, "Invalid base64 encoding for connection_string", http.StatusBadRequest)
+			return
+		}
+
+		newEncodedConnStr = req.ConnectionString
+		newDbType = req.DBType
+
+	default:
+		common.JSONError(w, fmt.Sprintf("Invalid update_type: %s. Must be one of 'schema_only', 'db_name_schema', 'full_connection'", req.UpdateType), http.StatusBadRequest)
+		return
+	}
+
+	// --- Prepare fields for UpdateProjectDB ---
+	// Use existing values unless overridden by the request
+	name := existingProjectDB.Name
+	if req.Name != "" {
+		name = req.Name
+	}
+	description := existingProjectDB.Description
+	if req.Description != "" {
+		description = req.Description
+	}
+	isDefault := existingProjectDB.IsDefault
+	if req.IsDefault != nil {
+		isDefault = *req.IsDefault
+	}
+
+	// --- Test the new connection (optional but recommended) ---
+	// Create a temporary ProjectDB struct with the new details to test
+	testDB := common.ProjectDB{
+		DBType:           newDbType,
+		ConnectionString: newEncodedConnStr,
+		SchemaName:       req.SchemaName, // Use the new schema name for testing
+	}
+	if err := projectDBService.TestConnection(testDB); err != nil {
+		log.Printf("New DB connection test failed for ProjectDB %d update: %v", req.ProjectDBID, err)
+		// Provide a more specific error message if possible
+		common.JSONError(w, fmt.Sprintf("Failed to connect using the new database configuration: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// --- Update the ProjectDB record in the database ---
+	err = projectDBService.UpdateProjectDB(
+		int(req.ProjectDBID),
+		name,
+		description,
+		newDbType,
+		newEncodedConnStr,
+		req.SchemaName, // Update with the new schema name from the request
+		isDefault,
+	)
+	if err != nil {
+		log.Printf("Error updating ProjectDB %d: %v", req.ProjectDBID, err)
+		common.JSONError(w, "Failed to save database configuration changes", http.StatusInternalServerError)
+		return
+	}
+
+	// --- Update Project Options (Requirement D) ---
+	// Fetch the parent project
+	project, err := projectService.GetByID(projectID)
+	if err != nil {
+		// Log the error, but proceed with success response as DB config was saved
+		log.Printf("WARN: Failed to fetch project %d after updating DB config %d: %v", projectID, req.ProjectDBID, err)
+	} else {
+		if project.Options == nil {
+			project.Options = make(ProjectOptions)
+		}
+		// Store relevant *new* config details in the project's Options JSONB field
+		// We store under a key related to the ProjectDB ID for clarity
+		dbConfigKey := fmt.Sprintf("db_config_%d", req.ProjectDBID)
+		project.Options[dbConfigKey] = map[string]interface{}{
+			"name":              name,
+			"db_type":           newDbType,
+			"schema_name":       req.SchemaName,
+			"connection_string": newEncodedConnStr, // Store the encoded string
+			"is_default":        isDefault,
+			"updated_at":        time.Now().UTC().Format(time.RFC3339),
+		}
+
+		if err := projectService.Update(project); err != nil {
+			log.Printf("WARN: Failed to update project options for project %d after updating DB config %d: %v", projectID, req.ProjectDBID, err)
+			// Don't fail the request, but log the warning
 		}
 	}
 
-	if defaultDB == nil {
-		log.Printf("No default database configuration found for project %d", projectID)
-		common.JSONError(w, "No default database configuration found for this project", http.StatusNotFound)
-		return
-	}
-
-	// 2. Determine which option (A, B, C) based on request fields
-	// Option C: Change entire connection (db_type and connection_string provided)
-	if req.DBType != "" && req.ConnectionString != "" {
-		log.Printf("Handling DB Config Option C for project %d, DB ID %d", projectID, defaultDB.ID)
-		// Decode connection string from request (assuming base64)
-		// TODO: Test the new connection string before saving?
-		err = projectDBService.UpdateProjectDB(
-			defaultDB.ID,
-			defaultDB.Name,        // Keep original name?
-			defaultDB.Description, // Keep original desc?
-			req.DBType,
-			req.ConnectionString, // Save encoded string
-			req.SchemaName,       // Use new schema name if provided, else keep old?
-			defaultDB.IsDefault,  // Keep default status
-		)
-		// TODO: Add more logic for SchemaName update if only DBType/ConnStr provided
-		// For now, assume SchemaName is always provided with ConnStr in Option C
-
-		// Option B: Change only schema (schema_name provided, others empty)
-	} else if req.SchemaName != "" && req.DBType == "" && req.ConnectionString == "" {
-		log.Printf("Handling DB Config Option B for project %d, DB ID %d", projectID, defaultDB.ID)
-		err = projectDBService.UpdateProjectDB(
-			defaultDB.ID,
-			defaultDB.Name,
-			defaultDB.Description,
-			defaultDB.DBType,           // Keep old type
-			defaultDB.ConnectionString, // Keep old connection string
-			req.SchemaName,             // Use new schema name
-			defaultDB.IsDefault,
-		)
-		// Option A: Change DB name/schema (using *current* conn string - not implemented fully based on spec E)
-		// Spec says "don't expose connection string on UI".
-		// Backend *could* re-use existing string, but how to get DB name change?
-		// For now, Option A is implicitly handled by Option B if only schema changes,
-		// or Option C if type/conn changes. A specific DB name change isn't handled.
-
-	} else {
-		common.JSONError(w, "Invalid combination of parameters for DB config update", http.StatusBadRequest)
-		return
-	}
-
-	// 3. Call UpdateProjectDB with appropriate parameters
-	if err != nil {
-		log.Printf("Error updating project DB config for project %d, DB ID %d: %v", projectID, defaultDB.ID, err)
-		common.JSONError(w, "Failed to update database configuration: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Fetch the updated DB to return it
-	updatedDB, err := projectDBService.GetProjectDB(defaultDB.ID)
-	if err != nil {
-		log.Printf("Error fetching updated project DB %d: %v", defaultDB.ID, err)
-		common.JSONResponse(w, map[string]string{"message": "Database configuration updated successfully"})
-		return
-	}
-
-	common.JSONResponse(w, updatedDB)
+	// --- Success Response ---
+	// Optionally return the updated ProjectDB object
+	updatedProjectDB, _ := projectDBService.GetProjectDB(int(req.ProjectDBID)) // Ignore error, best effort
+	common.JSONResponse(w, map[string]interface{}{
+		"message": "Database configuration updated successfully",
+		"data":    updatedProjectDB, // Send back the (potentially updated) data
+	})
 }
+
+// updateConnectionStringDBName is a helper function to modify the database name
+// in a connection string. This is a simplified example and needs robust implementation.
+// It returns an empty string on failure.
+func updateConnectionStringDBName(connStr, newDBName, dbType string) string {
+	// VERY basic example for PostgreSQL key=value format
+	if dbType == "postgres" || dbType == "postgresql" {
+		parts := strings.Fields(connStr) // Split by space
+		found := false
+		for i, part := range parts {
+			if strings.HasPrefix(part, "dbname=") {
+				parts[i] = "dbname=" + newDBName
+				found = true
+				break
+			}
+		}
+		if !found {
+			// dbname might not be present, append it
+			parts = append(parts, "dbname="+newDBName)
+		}
+		return strings.Join(parts, " ")
+	}
+
+	// Add logic for other database types (MySQL, MSSQL etc.) here
+	log.Printf("WARN: updateConnectionStringDBName not implemented for dbType: %s", dbType)
+	return "" // Indicate failure for unsupported types
+}
+
+/*
+// HandleProjectSettingsAPI handles settings specific to a project
+func HandleProjectSettingsAPI(w http.ResponseWriter, r *http.Request, settingsService common.SettingsService) {
+	// ... existing code ...
+}
+*/

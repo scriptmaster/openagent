@@ -20,14 +20,16 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 
 	// --- HTML Page Routes ---
 	// Handle the main /projects page (renders HTML)
-	mux.Handle("/projects", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		HandleProjectsRoute(w, r, templates, projectService, userService)
-	})))
+	// Removed duplicate registration: mux.Handle("/projects", ...)
 
 	// Handle root index page (might list projects)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		HandleIndexRoute(w, r, templates, projectService, userService)
-	})
+	// TODO: Decide if this registration is needed here or only in server/routes.go
+	// Commenting out for now as server/routes.go seems to handle root routing.
+	/*
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			HandleIndexRoute(w, r, templates, projectService, userService)
+		})
+	*/
 	// Note: Project specific page routes (e.g., /project/{id}) might be handled within HandleProjectPageRoute
 	// called from server/routes.go based on domain context.
 
