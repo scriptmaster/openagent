@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"sync"
 	"time"
+
 	// Needed if structs reference auth.User directly
+	"github.com/scriptmaster/openagent/auth"
+	// "github.com/scriptmaster/openagent/common" // REMOVED - Unused import
 )
 
 // --- Structs moved from database.go ---
@@ -22,15 +25,15 @@ type Project struct {
 
 // ProjectDB represents a database connection configured for a project
 type ProjectDB struct {
-	ID               int
-	ProjectID        int
-	Name             string
-	Description      string
-	DBType           string // e.g., "postgresql"
-	ConnectionString string // Base64 encoded
-	SchemaName       string
-	IsDefault        bool
-	CreatedAt        time.Time
+	ID               int    `db:"id"`
+	ProjectID        int    `db:"project_id"`
+	Name             string `db:"name"`
+	Description      string `db:"description"`
+	DBType           string `db:"db_type"`
+	ConnectionString string `db:"connection_string"` // Encoded
+	SchemaName       string `db:"schema_name"`
+	IsDefault        bool   `db:"is_default"`
+	CreatedAt        string `db:"created_at"` // Assuming time.Time maps ok
 }
 
 // ProjectService provides methods to work with projects
@@ -45,33 +48,28 @@ type TableService struct {
 
 // ManagedTable represents a table managed by the system within a project's database
 type ManagedTable struct {
-	ID          int
-	ProjectID   int
-	ProjectDBID int
-	Name        string
-	SchemaName  string
-	Description string
-	Initialized bool
-	ReadOnly    bool
-	CreatedAt   time.Time
-	Columns     []ManagedColumn `json:"columns,omitempty"` // Include columns when needed
+	ID          int    `db:"id"`
+	ProjectID   int    `db:"project_id"`
+	ProjectDBID int    `db:"project_db_id"`
+	Name        string `db:"name"`
+	SchemaName  string `db:"schema_name"`
+	Description string `db:"description"`
+	Initialized bool   `db:"initialized"`
+	ReadOnly    bool   `db:"read_only"`
+	CreatedAt   string `db:"created_at"`
 }
 
 // ManagedColumn represents a column within a ManagedTable
 type ManagedColumn struct {
-	ID             int
-	ManagedTableID int
-	Name           string
-	DisplayName    string
-	DataType       string // Original DB data type
-	ColumnType     string // System type (text, number, date, boolean)
-	Ordinal        int    // Added field for ordinal position
-	IsPrimaryKey   bool
-	IsNullable     bool
-	DefaultValue   sql.NullString
-	Visible        bool
-	IsGenerated    bool // e.g., SERIAL, auto-increment
-	CreatedAt      time.Time
+	ID             int    `db:"id"`
+	ManagedTableID int    `db:"managed_table_id"`
+	Name           string `db:"name"`
+	DisplayName    string `db:"display_name"`
+	DataType       string `db:"data_type"`
+	ColumnType     string `db:"type"`
+	Ordinal        int    `db:"ordinal"`
+	Visible        bool   `db:"visible"`
+	CreatedAt      string `db:"created_at"`
 }
 
 // DatabaseMetadataService provides methods for retrieving database metadata
@@ -97,29 +95,27 @@ type DirectDataService struct {
 
 // TableMetadata holds combined information about a table
 type TableMetadata struct {
-	SchemaName     string           `json:"schema_name"`
-	TableName      string           `json:"table_name"`
-	Description    string           `json:"description"` // From managed_tables if managed
-	IsManaged      bool             `json:"is_managed"`
-	ManagedTableID int              `json:"managed_table_id,omitempty"`
-	Columns        []ColumnMetadata `json:"columns"`
-	Initialized    bool             `json:"initialized"` // From managed_tables
-	ReadOnly       bool             `json:"read_only"`   // From managed_tables
+	SchemaName     string `json:"schema_name"`
+	TableName      string `json:"table_name"`
+	IsManaged      bool   `json:"is_managed"`
+	ManagedTableID int    `json:"managed_table_id"`
+	Description    string `json:"description"`
+	Initialized    bool   `json:"initialized"`
+	ReadOnly       bool   `json:"read_only"`
 }
 
 // ColumnMetadata holds combined information about a column
 type ColumnMetadata struct {
-	ColumnName      string `json:"column_name"`
-	DataType        string `json:"data_type"`
-	IsNullable      string `json:"is_nullable"`             // Raw value from DB ('YES'/'NO')
-	DefaultValue    string `json:"default_value,omitempty"` // Raw value from DB
-	OrdinalPos      int    `json:"ordinal_pos"`             // Added field for ordinal position
-	IsPrimaryKey    bool   `json:"is_primary_key"`
-	IsManaged       bool   `json:"is_managed"`
-	ManagedColumnID int    `json:"managed_column_id,omitempty"`
-	Visible         bool   `json:"visible"`      // From managed_columns
-	DisplayName     string `json:"display_name"` // From managed_columns
-	SystemType      string `json:"system_type"`  // From managed_columns (text, number, etc.)
+	ColumnName      string  `json:"column_name"`
+	DataType        string  `json:"data_type"`
+	IsNullable      bool    `json:"is_nullable"`
+	OrdinalPosition int     `json:"ordinal_position"`
+	ColumnDefault   *string `json:"column_default"`
+	IsManaged       bool    `json:"is_managed"`
+	ManagedColumnID int     `json:"managed_column_id"`
+	DisplayName     string  `json:"display_name"`
+	Visible         bool    `json:"visible"`
+	SystemType      string  `json:"system_type"`
 }
 
 // SettingsService provides methods to work with settings
@@ -129,16 +125,21 @@ type SettingsService struct {
 
 // Setting represents a system setting
 type Setting struct {
-	ID          int
-	Key         string
-	Value       string
-	Description string
-	Scope       string // "system", "project", or "user"
-	ScopeID     int    // ID of the project or user (0 for system)
-	UpdatedAt   time.Time
+	ID          int    `db:"id"`
+	Key         string `db:"key"`
+	Value       string `db:"value"`
+	Description string `db:"description"`
+	Scope       string `db:"scope"`
+	ScopeID     *int   `db:"scope_id"`   // Use pointer for nullable int
+	UpdatedAt   string `db:"updated_at"` // Assuming time.Time maps ok
 }
 
-// ProjectDBService provides methods to work with project database connections
-type ProjectDBService struct {
-	db *sql.DB
+// PageData holds common data for HTML templates
+type PageData struct {
+	AppName     string
+	PageTitle   string
+	User        *auth.User // Use pointer from auth package
+	AppVersion  string
+	CurrentHost string
+	Error       string
 }

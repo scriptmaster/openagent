@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/scriptmaster/openagent/common"
@@ -82,52 +81,6 @@ func (s *UserService) UpdateUserLastLogin(userID int) error {
 	_, err := s.db.Exec(updateQuery, time.Now(), userID)
 
 	return err
-}
-
-// GetUserFromSession retrieves the user from the session cookie
-func (s *UserService) GetUserFromSession(r *http.Request) (*User, error) {
-	// Get session cookie with versioned name
-	cookieName := GetSessionCookieName()
-	cookie, err := r.Cookie(cookieName)
-
-	// Fall back to the generic "session" cookie for backward compatibility
-	if err != nil {
-		cookie, err = r.Cookie("session")
-		if err != nil {
-			return nil, errors.New("no session cookie found")
-		}
-	}
-
-	// Validate session
-	session, valid := GetSession(cookie.Value)
-	if !valid {
-		return nil, errors.New("invalid or expired session")
-	}
-
-	return session.User, nil
-}
-
-// GetSession retrieves a session from a request
-func (s *UserService) GetSession(r *http.Request) (*Session, error) {
-	// Get session cookie with versioned name
-	cookieName := GetSessionCookieName()
-	cookie, err := r.Cookie(cookieName)
-
-	// Fall back to the generic "session" cookie for backward compatibility
-	if err != nil {
-		cookie, err = r.Cookie("session")
-		if err != nil {
-			return nil, errors.New("no session cookie found")
-		}
-	}
-
-	// Validate session
-	session, valid := GetSession(cookie.Value)
-	if !valid {
-		return nil, errors.New("invalid or expired session")
-	}
-
-	return &session, nil
 }
 
 // CheckIfAdminExists checks if any admin user exists in the system

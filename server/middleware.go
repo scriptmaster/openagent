@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"strings"
@@ -57,15 +56,15 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 		}
 
 		if project != nil {
-			// Project found, add it to context and proceed
-			ctx := context.WithValue(r.Context(), projectCtxKey{}, project)
+			// Project found, add it to context using the projects package function
+			ctx := projects.SetProjectContext(r.Context(), project)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		} else {
 			// Project not found for this host, serve/redirect to config page
 			log.Printf("No project found for host '%s', serving config page.", host)
 			// Add user info if logged in, for display on config page
-			// Use the passed userService instance
-			user, _ := userService.GetUserFromSession(r) // Use userService method
+			// Use GetUserFromContext now
+			user := auth.GetUserFromContext(r.Context())
 			ctx := r.Context()
 			if user != nil {
 				ctx = auth.SetUserContext(ctx, user) // SetUserContext is likely still in auth package
@@ -73,12 +72,4 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			HandleConfigPage(w, r.WithContext(ctx))
 		}
 	})
-}
-
-// GetProjectFromContext retrieves the project from the request context.
-func GetProjectFromContext(ctx context.Context) *projects.Project {
-	if project, ok := ctx.Value(projectCtxKey{}).(*projects.Project); ok {
-		return project
-	}
-	return nil
 }

@@ -33,12 +33,14 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		AdminEmail string
 		AppVersion string
 		Error      string
+		User       *User
 	}{
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  "Login - " + common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
 		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
 		Error:      r.URL.Query().Get("error"),
+		User:       nil,
 	}
 	if err := authTemplates.ExecuteTemplate(w, "login.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -47,30 +49,21 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 // HandleLogout clears session cookies and redirects to login
 func HandleLogout(w http.ResponseWriter, r *http.Request) {
-	// Get versioned cookie name
 	cookieName := GetSessionCookieName()
 
-	// Clear the versioned session cookie
+	// Clear the versioned JWT session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   -1,
-		Expires:  time.Now().Add(-24 * time.Hour),
+		MaxAge:   -1,              // Expire immediately
+		Expires:  time.Unix(0, 0), // Set explicit expiry in the past
 		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
 	})
 
-	// Clear the regular session cookie for backward compatibility
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-		Expires:  time.Now().Add(-24 * time.Hour),
-		SameSite: http.SameSiteLaxMode,
-	})
+	// No need to clear the old "session" cookie anymore if unused
 
 	// Redirect to login page
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -201,35 +194,27 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 		// Don't fail the login for this, just log it
 	}
 
-	// Create session
-	session, err := CreateSession(user) // Pass pointer *User
+	// Create session JWT
+	jwtString, err := CreateSession(user) // Returns JWT string
 	if err != nil {
-		log.Printf("Failed to create session: %v", err)
+		log.Printf("Failed to create session JWT: %v", err)
 		SendJSONResponse(w, false, "Failed to create session", nil, "")
 		return
 	}
 
-	// Set session cookie (restoring original logic)
+	// Set session cookie with JWT
 	cookieName := GetSessionCookieName()
+	expiryDuration := 168 * time.Hour // Match JWT expiry (7 days)
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
-		Value:    session.Token,
+		Value:    jwtString,
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
+		MaxAge:   int(expiryDuration.Seconds()),
 		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
 	})
-	// Also set regular session cookie for backward compatibility
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    session.Token,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
-	})
+	// No need for backward compatible "session" cookie with JWT
 
 	// Determine redirect based on admin status
 	redirectURL := "/" // Default for non-admins
@@ -282,35 +267,27 @@ func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService *Us
 		// Don't fail the login for this, just log it
 	}
 
-	// Create session
-	session, err := CreateSession(user) // Pass pointer *User
+	// Create session JWT
+	jwtString, err := CreateSession(user)
 	if err != nil {
-		log.Printf("Failed to create session: %v", err)
+		log.Printf("Failed to create session JWT: %v", err)
 		SendJSONResponse(w, false, "Failed to create session", nil, "")
 		return
 	}
 
-	// Set session cookie (restoring original logic)
+	// Set session cookie with JWT
 	cookieName := GetSessionCookieName()
+	expiryDuration := 168 * time.Hour // Match JWT expiry (7 days)
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
-		Value:    session.Token,
+		Value:    jwtString,
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
+		MaxAge:   int(expiryDuration.Seconds()),
 		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
 	})
-	// Also set regular session cookie for backward compatibility
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    session.Token,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   int((session.ExpiresAt.Sub(time.Now())).Seconds()),
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
-	})
+	// No need for backward compatible "session" cookie with JWT
 
 	// Determine redirect based on admin status
 	redirectURL := "/" // Default for non-admins

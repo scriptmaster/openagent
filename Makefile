@@ -45,7 +45,8 @@ migrations:
 	@echo "Migrations check/apply completed."
 
 # Run tests (includes running migrations first if needed)
-test: stop
+test:
+	make stop
 	# Optionally run migrations before testing if tests depend on schema
 	# make migrations
 	@echo "Running go mod tidy..."

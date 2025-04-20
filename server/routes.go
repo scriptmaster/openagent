@@ -19,9 +19,19 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 	appVersion = common.GetEnvOrDefault("APP_VERSION", "1.0.0.0")
 
 	// Initialize templates
-	templates = template.Must(template.New("").Funcs(GetTemplateFuncs()).ParseGlob("tpl/*.html"))
+	// Start with base name and functions
+	baseTemplate := template.New("base").Funcs(GetTemplateFuncs())
+	// Parse all files from tpl (including layout.html)
+	templates, err := baseTemplate.ParseGlob("tpl/*.html")
+	if err != nil {
+		log.Fatalf("FATAL: Failed to parse tpl/*.html: %v", err)
+	}
+	// Parse partials into the same template set
 	templates = template.Must(templates.ParseGlob("tpl/_partials/*.html"))
-	InitAgentTemplates(templates) // Assuming this is still needed
+
+	// Initialize other template sets if needed (e.g., for auth or agent)
+	auth.InitAuthTemplates(templates) // Pass the main template set to auth
+	InitAgentTemplates(templates)     // Pass the main template set to agent
 
 	// Initialize database connection (includes admin token check now)
 	db, err := InitDB()
@@ -43,6 +53,50 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 		// Handle the case where projectService is nil if necessary in middleware/handlers
 		// Or provide a dummy service that always returns "not found"?
 	}
+
+	// Instantiate ProjectDBService
+	var projectDBService common.ProjectDBService // Use the interface type from common
+	if db != nil {
+		projectDBService = NewProjectDBService(db) // Use the constructor from server/database.go
+	} else {
+		log.Println("WARN: Database not available, ProjectDBService not initialized.")
+		// Assign a nil or dummy service if needed, or ensure handlers check for nil
+	}
+
+	// Register application routes
+	// Passing db directly for now, will refactor later if needed.
+	// Passing userService as required by the current signature.
+	// projects.RegisterProjectRoutes(mux, templates, userService, db) // Reverted to pass userService and db - REMOVED DUPLICATE CALL
+	// Pass projectDBService to project routes when needed
+	// TODO: Refactor RegisterProjectRoutes to accept projectDBService
+
+	// Register domain-specific routes
+	domainMux := http.NewServeMux()
+	domainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Middleware should have already determined if we are here because:
+		// 1. It's the actual root path "/" for an unknown host (served by HandleIndexRoute -> HandleIndex)
+		// 2. It's a path on a known project host (served by HandleProjectPageRoute)
+
+		// Let the existing project handlers decide based on path and context
+		projectFromCtx := projects.GetProjectFromContext(r.Context()) // Use projects.GetProjectFromContext
+
+		if r.URL.Path == "/" && projectFromCtx == nil {
+			// Handle root path for unconfigured domain (middleware sends to config, but maybe HandleIndex is fallback?)
+			// This case might be handled by middleware redirecting to config already.
+			// If we reach here, perhaps it's an explicit visit to "/" on an unknown host.
+			projects.HandleIndexRoute(w, r, templates, projectService, userService)
+		} else if projectFromCtx != nil {
+			// Host matched a project in middleware, let the page route handler render it.
+			// HandleProjectPageRoute might need adjustment to use projectFromCtx if available.
+			projects.HandleProjectPageRoute(w, r, templates, projectService, userService)
+		} else {
+			// Fallback: No project context, not root path? Should be 404.
+			// This case *should* be handled by the HostProjectMiddleware sending to config.
+			// If it reaches here, something is wrong in the logic flow.
+			log.Printf("WARN: Reached root handler unexpectedly for path %s on host %s", r.URL.Path, r.Host)
+			common.Handle404(w, r, templates)
+		}
+	})
 
 	// --- Middleware Definition ---
 	exemptPaths := []string{
@@ -68,6 +122,14 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 	auth.RegisterAuthRoutes(baseMux, templates, userService) // Handles login, logout, otp, etc.
 	admin.RegisterAdminRoutes(baseMux, templates, auth.IsMaintenanceAuthenticated,
 		UpdateDatabaseConfig, UpdateMigrationStart, InitDB, sessionSalt) // Handles /maintenance/*
+
+	// Register project HTML & API routes (Needs DB access)
+	if db != nil {
+		// Correct arguments: mux, templates, userService, db, projectDBService
+		projects.RegisterProjectRoutes(baseMux, templates, userService, db, projectDBService) // Pass projectDBService
+	} else {
+		log.Println("WARN: DB not available, skipping project route registration.")
+	}
 
 	// Config page submit handler (exempted, but needs services)
 	baseMux.HandleFunc("/config/submit", func(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +193,17 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 	mux.Handle("/", finalHandler)                                                            // Route ALL requests through the middleware first
 
 	// Remove the old catch-all from the main mux if it existed.
+
+	// Log database connection status
+	// if db != nil { - REMOVED block related to duplicate call
+	// 	log.Println("Successfully connected to the database.")
+	// 	// Pass db and projectDBService to routes that need them
+	// 	projects.RegisterProjectRoutes(mux, templates, userService, db) // Pass db and userService
+	// } else {
+	// 	log.Println("CRITICAL: Failed to connect to the database. Routes requiring DB access may not function.")
+	// 	// Optionally handle this case further, e.g., by setting maintenance mode
+	// 	SetMaintenanceMode(true)
+	// } - REMOVED block related to duplicate call
 }
 
 // Modify RegisterRootRoutes to accept ProjectService and potentially use context
@@ -144,7 +217,7 @@ func RegisterRootRoutes(mux *http.ServeMux, templates *template.Template, userSe
 		// 2. It's a path on a known project host (served by HandleProjectPageRoute)
 
 		// Let the existing project handlers decide based on path and context
-		projectFromCtx := GetProjectFromContext(r.Context()) // Get project potentially added by middleware
+		projectFromCtx := projects.GetProjectFromContext(r.Context()) // Use projects.GetProjectFromContext
 
 		if r.URL.Path == "/" && projectFromCtx == nil {
 			// Handle root path for unconfigured domain (middleware sends to config, but maybe HandleIndex is fallback?)
@@ -173,3 +246,6 @@ func registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/next", HandleNextStep) // Expects exported HandleNextStep
 	mux.HandleFunc("/status", HandleStatus) // Expects exported HandleStatus
 }
+
+// InitDB initializes the database connection based on environment variables
+// ... existing code ...

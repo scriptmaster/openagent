@@ -12,7 +12,7 @@ import (
 )
 
 // RegisterProjectRoutes registers HTML and API routes for projects
-func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB) {
+func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB, projectDBService common.ProjectDBService) {
 	// Initialize project repository and service
 	sqlxDB := sqlx.NewDb(db, "postgres") // Or the appropriate driver
 	projectRepo := NewProjectRepository(sqlxDB)
@@ -41,6 +41,21 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 
 		// Basic routing based on method and path structure
 		path := r.URL.Path
+
+		// Handle specific /dbconfig path FIRST
+		dbConfigPrefix := "/api/projects/"
+		dbConfigSuffix := "/dbconfig"
+		if strings.HasPrefix(path, dbConfigPrefix) && strings.HasSuffix(path, dbConfigSuffix) {
+			if r.Method == http.MethodPut {
+				// Pass projectService AND projectDBService here
+				HandleUpdateProjectDBConfigAPI(w, r, projectService, projectDBService)
+			} else {
+				common.JSONError(w, "Method not allowed for /dbconfig", http.StatusMethodNotAllowed)
+			}
+			return // Handled
+		}
+
+		// Handle other /api/projects/... paths
 		if path == "/api/projects" || path == "/api/projects/" {
 			switch r.Method {
 			case http.MethodGet:
@@ -65,6 +80,7 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 	}
 
 	// Register the API handler under /api/projects/, ensuring auth
+	// NOTE: The internal routing in apiProjectHandler now handles /dbconfig explicitly
 	mux.Handle("/api/projects/", auth.AuthMiddleware(http.HandlerFunc(apiProjectHandler)))
 }
 

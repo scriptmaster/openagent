@@ -15,6 +15,8 @@ import (
 	"github.com/scriptmaster/openagent/models"
 )
 
+// --- Interfaces (to avoid import cycles) ---
+
 // HandleProjectsAPI handles the /api/projects endpoint
 func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service ProjectService) {
 	if r.Method == http.MethodGet {
@@ -170,49 +172,37 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 
 // HandleProjectsRoute handles the /projects route with authentication
 func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
-	// Get user from session
-	user, err := userService.GetUserFromSession(r)
-	if err != nil {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-
-	// Add user to request context
-	ctx := auth.SetUserContext(r.Context(), user)
-	HandleProjects(w, r.WithContext(ctx), templates, projectService)
+	HandleProjects(w, r, templates, projectService)
 }
 
 // HandleIndexRoute handles the root route with optional authentication
 func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
-	// Get user from session
-	user, err := userService.GetUserFromSession(r)
-	if err != nil {
-		// For index page, we don't redirect to login
-		HandleIndex(w, r, templates, projectService)
-		return
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		log.Println("No user context found for HandleIndexRoute")
 	}
-
-	// Add user to request context
-	ctx := auth.SetUserContext(r.Context(), user)
-	HandleIndex(w, r.WithContext(ctx), templates, projectService)
+	HandleIndex(w, r, templates, projectService)
 }
 
 // HandleProjectPageRoute handles project-specific pages based on domain and path
 func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
-	// Get project by current domain
-	project, err := projectService.GetByDomain(r.Host)
-	if err != nil || project == nil {
-		// No project found for this domain, serve 404 page
+	user := auth.GetUserFromContext(r.Context())
+	project := GetProjectFromContext(r.Context())
+
+	if project == nil {
+		log.Printf("WARN: HandleProjectPageRoute called without project context for host %s, path %s", r.Host, r.URL.Path)
 		common.Handle404(w, r, templates)
 		return
 	}
 
-	// Get user from session if available
-	user, _ := userService.GetUserFromSession(r)
-	if user != nil {
-		// Add user to request context
-		ctx := auth.SetUserContext(r.Context(), user)
-		r = r.WithContext(ctx)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
 	}
 
 	// Prepare page data
@@ -274,7 +264,8 @@ func HandleCreateProjectAPI(w http.ResponseWriter, r *http.Request, projectServi
 	}
 
 	project.ID = newID
-	common.JSONResponseWithStatus(w, project, http.StatusCreated)
+	w.WriteHeader(http.StatusCreated)
+	common.JSONResponse(w, project)
 }
 
 // HandleUpdateProjectAPI handles PUT requests to update a project
@@ -353,4 +344,129 @@ func HandleDeleteProjectAPI(w http.ResponseWriter, r *http.Request, projectServi
 	}
 
 	w.WriteHeader(http.StatusNoContent) // Success, no content to return
+}
+
+// UpdateProjectDBConfigRequest represents the expected JSON body
+type UpdateProjectDBConfigRequest struct {
+	DBType           string `json:"db_type"`           // e.g., postgres, mysql
+	SchemaName       string `json:"schema_name"`       // New schema name
+	ConnectionString string `json:"connection_string"` // Base64 encoded new connection string
+	// Fields for options A, B, C could be combined or use a type field
+	// We'll use presence/absence of fields for now
+}
+
+// HandleUpdateProjectDBConfigAPI handles PUT /api/projects/{id}/dbconfig
+// Accepts common.ProjectDBService injected from routes
+func HandleUpdateProjectDBConfigAPI(w http.ResponseWriter, r *http.Request, projectService ProjectService, projectDBService common.ProjectDBService) {
+	// Extract project ID from URL
+	path := r.URL.Path
+	prefix := "/api/projects/"
+	suffix := "/dbconfig"
+	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, suffix) {
+		common.JSONError(w, "Invalid URL path", http.StatusBadRequest)
+		return
+	}
+	idStr := strings.TrimSuffix(strings.TrimPrefix(path, prefix), suffix)
+	projectID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		common.JSONError(w, "Invalid project ID in URL", http.StatusBadRequest)
+		return
+	}
+
+	// Decode request body
+	var req UpdateProjectDBConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		common.JSONError(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Use the injected projectDBService directly
+	if projectDBService == nil {
+		log.Println("ERROR: HandleUpdateProjectDBConfigAPI called with nil projectDBService")
+		common.JSONError(w, "Database service not available", http.StatusInternalServerError)
+		return
+	}
+
+	// --- Feature Logic ---
+	// 1. Find the *default* ProjectDB for the given projectID
+	//    (Need a method in ProjectDBService for this, e.g., GetProjectDBs(projectID) for now and find the default.
+	dbs, err := projectDBService.GetProjectDBs(int(projectID))
+	if err != nil {
+		log.Printf("Error fetching project DBs for project %d: %v", projectID, err)
+		common.JSONError(w, "Failed to retrieve project database configurations", http.StatusInternalServerError)
+		return
+	}
+
+	var defaultDB *common.ProjectDB // Use common.ProjectDB type
+	for i := range dbs {
+		if dbs[i].IsDefault {
+			tempDB := dbs[i]    // Create a temporary variable
+			defaultDB = &tempDB // Assign the address of the temp variable
+			break
+		}
+	}
+
+	if defaultDB == nil {
+		log.Printf("No default database configuration found for project %d", projectID)
+		common.JSONError(w, "No default database configuration found for this project", http.StatusNotFound)
+		return
+	}
+
+	// 2. Determine which option (A, B, C) based on request fields
+	// Option C: Change entire connection (db_type and connection_string provided)
+	if req.DBType != "" && req.ConnectionString != "" {
+		log.Printf("Handling DB Config Option C for project %d, DB ID %d", projectID, defaultDB.ID)
+		// Decode connection string from request (assuming base64)
+		// TODO: Test the new connection string before saving?
+		err = projectDBService.UpdateProjectDB(
+			defaultDB.ID,
+			defaultDB.Name,        // Keep original name?
+			defaultDB.Description, // Keep original desc?
+			req.DBType,
+			req.ConnectionString, // Save encoded string
+			req.SchemaName,       // Use new schema name if provided, else keep old?
+			defaultDB.IsDefault,  // Keep default status
+		)
+		// TODO: Add more logic for SchemaName update if only DBType/ConnStr provided
+		// For now, assume SchemaName is always provided with ConnStr in Option C
+
+		// Option B: Change only schema (schema_name provided, others empty)
+	} else if req.SchemaName != "" && req.DBType == "" && req.ConnectionString == "" {
+		log.Printf("Handling DB Config Option B for project %d, DB ID %d", projectID, defaultDB.ID)
+		err = projectDBService.UpdateProjectDB(
+			defaultDB.ID,
+			defaultDB.Name,
+			defaultDB.Description,
+			defaultDB.DBType,           // Keep old type
+			defaultDB.ConnectionString, // Keep old connection string
+			req.SchemaName,             // Use new schema name
+			defaultDB.IsDefault,
+		)
+		// Option A: Change DB name/schema (using *current* conn string - not implemented fully based on spec E)
+		// Spec says "don't expose connection string on UI".
+		// Backend *could* re-use existing string, but how to get DB name change?
+		// For now, Option A is implicitly handled by Option B if only schema changes,
+		// or Option C if type/conn changes. A specific DB name change isn't handled.
+
+	} else {
+		common.JSONError(w, "Invalid combination of parameters for DB config update", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Call UpdateProjectDB with appropriate parameters
+	if err != nil {
+		log.Printf("Error updating project DB config for project %d, DB ID %d: %v", projectID, defaultDB.ID, err)
+		common.JSONError(w, "Failed to update database configuration: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch the updated DB to return it
+	updatedDB, err := projectDBService.GetProjectDB(defaultDB.ID)
+	if err != nil {
+		log.Printf("Error fetching updated project DB %d: %v", defaultDB.ID, err)
+		common.JSONResponse(w, map[string]string{"message": "Database configuration updated successfully"})
+		return
+	}
+
+	common.JSONResponse(w, updatedDB)
 }

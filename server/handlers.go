@@ -43,6 +43,7 @@ func HandleDashboard(w http.ResponseWriter, r *http.Request, projectService proj
 			ProjectCount: 0,
 		}
 		if err := templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+			log.Printf("Error executing layout template for dashboard: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -67,8 +68,9 @@ func HandleDashboard(w http.ResponseWriter, r *http.Request, projectService proj
 		ProjectCount: len(projectList),
 	}
 
-	// Execute the template
-	if err := templates.ExecuteTemplate(w, "layout.html", data); err != nil { // Assuming layout includes dashboard
+	// Execute the layout template using the globally parsed set
+	if err := templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+		log.Printf("Error executing layout template for dashboard: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -96,3 +97,21 @@ type ProjectRepository interface {
 
 // ErrProjectNotFound is returned when a project is not found
 var ErrProjectNotFound = errors.New("project not found")
+
+// --- Context Handling ---
+
+// projectCtxKey is a private type for the context key to avoid collisions.
+type projectCtxKey struct{}
+
+// SetProjectContext adds the project to the request context.
+func SetProjectContext(ctx context.Context, project *Project) context.Context {
+	return context.WithValue(ctx, projectCtxKey{}, project)
+}
+
+// GetProjectFromContext retrieves the project from the request context.
+func GetProjectFromContext(ctx context.Context) *Project {
+	if project, ok := ctx.Value(projectCtxKey{}).(*Project); ok {
+		return project
+	}
+	return nil
+}

@@ -1,189 +1,201 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projects</title>
-    <script src="//unpkg.com/alpinejs" defer></script>
-    <style>
-        body { font-family: sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h1, h2 { color: #444; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
-        .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .card h3 { margin-top: 0; color: #333; }
-        .card p { color: #666; margin: 10px 0; }
-        .card .domain { color: #007bff; font-weight: bold; }
-        .card .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.9em; }
-        .card .status.active { background: #d4edda; color: #155724; }
-        .card .status.inactive { background: #f8d7da; color: #721c24; }
-        .card .actions { margin-top: 15px; display: flex; gap: 10px; }
-        .card .actions button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
-        .card .actions .edit { background: #007bff; color: white; }
-        .card .actions .delete { background: #dc3545; color: white; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal.active { display: flex; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 500px; max-width: 90%; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; }
-        .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .error { color: #dc3545; margin-top: 5px; font-size: 0.9em; }
-    </style>
-</head>
-<body x-data="projectsApp()" x-init="loadProjects()">
-    <div class="container">
-        <h1>Projects</h1>
-        
-        <div class="actions">
-            <button @click="showCreateModal()" style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Create New Project
-            </button>
-        </div>
+{{/* Execute the layout template, passing the current data context */}}
+{{template "layout.html" .}}
 
-        <div class="grid">
-            <template x-for="project in projects" :key="project.id">
-                <div class="card">
-                    <h3 x-text="project.name"></h3>
-                    <p x-text="project.description"></p>
-                    <p class="domain" x-text="project.domain"></p>
-                    <p>
-                        <span class="status" :class="project.is_active ? 'active' : 'inactive'" 
-                              x-text="project.is_active ? 'Active' : 'Inactive'">
-                        </span>
-                    </p>
-                    <div class="actions">
-                        <button class="edit" @click="showEditModal(project)">Edit</button>
-                        <button class="delete" @click="deleteProject(project.id)">Delete</button>
+{{define "title"}}Projects - {{.AppName}}{{end}}
+
+{{/* Define an empty page-title block (layout handles structure) */}}
+{{define "page-title"}}Projects{{end}} 
+
+{{define "content"}}
+<div x-data="projectsApp()" x-init="loadProjects()">
+    
+    <div class="d-flex justify-content-end mb-3">
+        <button class="btn btn-success" @click="showCreateModal()">
+             <i class="ti ti-plus me-1"></i> Create New Project
+        </button>
+    </div>
+
+    <div class="row row-cards">
+        <template x-for="project in projects" :key="project.id">
+            <div class="col-md-6 col-lg-4">
+                 <div class="card">
+                     <div class="card-body">
+                         <h3 class="card-title" x-text="project.name"></h3>
+                         <p class="text-muted" x-text="project.description"></p>
+                         <p class="domain">Domain: <strong x-text="project.domain"></strong></p>
+                         <p>
+                             Status:
+                             <span class="badge" :class="project.is_active ? 'bg-green-lt' : 'bg-red-lt'" 
+                                   x-text="project.is_active ? 'Active' : 'Inactive'">
+                             </span>
+                         </p>
+                     </div>
+                    <div class="card-footer">
+                        <button class="btn btn-primary btn-sm me-1" @click="showEditModal(project)">Edit</button>
+                        <button class="btn btn-danger btn-sm" @click="deleteProject(project.id)">Delete</button>
                     </div>
+                 </div>
+            </div>
+        </template>
+        <template x-if="projects.length === 0">
+            <div class="col-12">
+                <div class="alert alert-info" role="alert">
+                    No projects found.
                 </div>
-            </template>
-        </div>
+            </div>
+        </template>
+    </div>
 
-        <!-- Create/Edit Modal -->
-        <div class="modal" :class="{ active: showModal }">
-            <div class="modal-content">
-                <h2 x-text="editingProject ? 'Edit Project' : 'Create Project'"></h2>
+    <!-- Create/Edit Modal -->
+     <div class="modal modal-blur fade" :class="{ 'show': showModal }" :style="{ display: showModal ? 'block' : 'none' }" tabindex="-1" role="dialog" aria-hidden="!showModal">
+         <div class="modal-dialog modal-dialog-centered" role="document">
+             <div class="modal-content">
                 <form @submit.prevent="saveProject()">
-                    <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" x-model="currentProject.name" required>
+                    <div class="modal-header">
+                        <h5 class="modal-title" x-text="editingProject ? 'Edit Project' : 'Create Project'"></h5>
+                        <button type="button" class="btn-close" @click="closeModal()" aria-label="Close"></button>
                     </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea x-model="currentProject.description"></textarea>
+                    <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" x-model="currentProject.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" rows="3" x-model="currentProject.description"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Domain</label>
+                                <input type="text" class="form-control" x-model="currentProject.domain" required>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="project-active-check" x-model="currentProject.is_active">
+                                <label class="form-check-label" for="project-active-check">Active</label>
+                            </div>
                     </div>
-                    <div class="form-group">
-                        <label>Domain</label>
-                        <input type="text" x-model="currentProject.domain" required>
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" x-model="currentProject.is_active">
-                            Active
-                        </label>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" @click="closeModal()">Cancel</button>
-                        <button type="submit" style="background: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px;">
+                    <div class="modal-footer">
+                        <button type="button" class="btn me-auto" @click="closeModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
                             Save
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
+                 </form>
+             </div>
+         </div>
+     </div>
 
-    <script>
-        function projectsApp() {
-            return {
-                projects: [],
-                showModal: false,
-                editingProject: null,
-                currentProject: {
+</div><!-- End x-data -->
+
+<script>
+    // Keep script within content block for now, or move to layout script block if preferred
+    function projectsApp() {
+        return {
+            projects: [],
+            showModal: false,
+            editingProject: null,
+            currentProject: {
+                id: null, // Include id for updates
+                name: '',
+                description: '',
+                domain: '',
+                is_active: true
+            },
+
+            async loadProjects() {
+                try {
+                    this.clearCurrent(); // Clear form on load
+                    const response = await fetch('/api/projects');
+                    if (!response.ok) throw new Error('Failed to load projects: ' + response.statusText);
+                    this.projects = await response.json();
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                    // Maybe show an error message to the user?
+                }
+            },
+
+            clearCurrent() {
+                 this.currentProject = {
+                    id: null,
                     name: '',
                     description: '',
                     domain: '',
                     is_active: true
-                },
+                };
+            },
 
-                async loadProjects() {
-                    try {
-                        const response = await fetch('/api/projects');
-                        if (!response.ok) throw new Error('Failed to load projects');
-                        this.projects = await response.json();
-                    } catch (error) {
-                        console.error('Error loading projects:', error);
-                        alert('Failed to load projects');
+            showCreateModal() {
+                this.editingProject = null;
+                this.clearCurrent();
+                this.showModal = true;
+                // Use Bootstrap's JS API if available and preferred:
+                // var myModal = new bootstrap.Modal(document.getElementById('projectModal'))
+                // myModal.show()
+            },
+
+            showEditModal(project) {
+                this.editingProject = project; // Store the original for ID
+                this.currentProject = { ...project }; // Copy for editing
+                this.showModal = true;
+            },
+
+            closeModal() {
+                this.showModal = false;
+                this.editingProject = null;
+                 this.clearCurrent();
+            },
+
+            async saveProject() {
+                try {
+                    const url = this.editingProject
+                        ? `/api/projects/${this.editingProject.id}`
+                        : '/api/projects';
+
+                    const method = this.editingProject ? 'PUT' : 'POST';
+
+                    const response = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.currentProject)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ message: 'Failed to save project: ' + response.statusText }));
+                        throw new Error(errorData.message || 'Failed to save project');
                     }
-                },
 
-                showCreateModal() {
-                    this.editingProject = null;
-                    this.currentProject = {
-                        name: '',
-                        description: '',
-                        domain: '',
-                        is_active: true
-                    };
-                    this.showModal = true;
-                },
+                    this.closeModal();
+                    await this.loadProjects(); // Reload list after save
+                } catch (error) {
+                    console.error('Error saving project:', error);
+                    alert(error.message || 'Failed to save project');
+                }
+            },
 
-                showEditModal(project) {
-                    this.editingProject = project;
-                    this.currentProject = { ...project };
-                    this.showModal = true;
-                },
+            async deleteProject(id) {
+                if (!confirm('Are you sure you want to delete this project?')) return;
 
-                closeModal() {
-                    this.showModal = false;
-                    this.editingProject = null;
-                },
+                try {
+                    const response = await fetch(`/api/projects/${id}`, {
+                        method: 'DELETE'
+                    });
 
-                async saveProject() {
-                    try {
-                        const url = this.editingProject 
-                            ? `/api/projects/${this.editingProject.id}`
-                            : '/api/projects';
-                        
-                        const method = this.editingProject ? 'PUT' : 'POST';
-                        
-                        const response = await fetch(url, {
-                            method,
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(this.currentProject)
-                        });
-
-                        if (!response.ok) throw new Error('Failed to save project');
-
-                        this.closeModal();
-                        await this.loadProjects();
-                    } catch (error) {
-                        console.error('Error saving project:', error);
-                        alert('Failed to save project');
+                    if (!response.ok && response.status !== 204) { // Allow 204 No Content
+                         const errorData = await response.json().catch(() => ({ message: 'Failed to delete project: ' + response.statusText }));
+                        throw new Error(errorData.message || 'Failed to delete project');
                     }
-                },
 
-                async deleteProject(id) {
-                    if (!confirm('Are you sure you want to delete this project?')) return;
-
-                    try {
-                        const response = await fetch(`/api/projects/${id}`, {
-                            method: 'DELETE'
-                        });
-
-                        if (!response.ok) throw new Error('Failed to delete project');
-
-                        await this.loadProjects();
-                    } catch (error) {
-                        console.error('Error deleting project:', error);
-                        alert('Failed to delete project');
-                    }
+                    await this.loadProjects(); // Reload list after delete
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    alert(error.message || 'Failed to delete project');
                 }
             }
         }
-    </script>
-</body>
-</html>
+    }
+document.addEventListener('alpine:init', () => {
+    Alpine.data('projectsApp', projectsApp);
+});
+</script>
+{{end}}

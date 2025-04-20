@@ -10,11 +10,13 @@ import (
 	"log"
 	"net/smtp"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 )
 
@@ -30,6 +32,26 @@ var (
 	sessions     = make(map[string]Session) // Uses Session from types.go
 	sessionMutex = &sync.RWMutex{}
 )
+
+var jwtSecret []byte
+
+// InitializeJWT loads the secret key
+func InitializeJWT() error {
+	secret := os.Getenv("JWT_SECRET_KEY")
+	if secret == "" {
+		return errors.New("JWT_SECRET_KEY environment variable not set")
+	}
+	jwtSecret = []byte(secret)
+	return nil
+}
+
+// JWT custom claims structure
+type UserClaims struct {
+	UserID  int    `json:"user_id"`
+	Email   string `json:"email"`
+	IsAdmin bool   `json:"is_admin"`
+	jwt.RegisteredClaims
+}
 
 // SendOTP generates and sends an OTP to the specified email
 func SendOTP(email string) error {
@@ -117,53 +139,72 @@ func GenerateSessionToken() (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// CreateSession creates a new session for the given user
-func CreateSession(user *User) (Session, error) { // Uses User and Session from types.go
-	token, err := GenerateSessionToken()
+// CreateSession generates a JWT for the given user
+func CreateSession(user *User) (string, error) {
+	if jwtSecret == nil {
+		// Attempt to initialize if not already done (e.g., during tests or race conditions)
+		if initErr := InitializeJWT(); initErr != nil {
+			return "", fmt.Errorf("JWT not initialized: %w", initErr)
+		}
+	}
+
+	expirationTime := time.Now().Add(168 * time.Hour) // 7 days expiry
+	claims := &UserClaims{
+		UserID:  user.ID,
+		Email:   user.Email,
+		IsAdmin: user.IsAdmin,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "openagent",                // Optional: Identify the issuer
+			Subject:   fmt.Sprintf("%d", user.ID), // Optional: Subject is the user ID
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
-		return Session{}, err
+		return "", fmt.Errorf("failed to sign JWT: %w", err)
 	}
 
-	session := Session{ // Uses Session from types.go
-		Token:     token,
-		User:      user,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(24 * time.Hour), // 24 hour session
-	}
-
-	// Store session
-	sessionMutex.Lock()
-	sessions[token] = session
-	sessionMutex.Unlock()
-
-	return session, nil
+	return tokenString, nil
 }
 
-// GetSession retrieves a session by token
-func GetSession(token string) (Session, bool) { // Uses Session from types.go
-	sessionMutex.RLock()
-	defer sessionMutex.RUnlock()
-
-	session, found := sessions[token]
-	if !found {
-		return Session{}, false
+// ValidateJWT parses and validates a JWT string, returning the claims if valid
+func ValidateJWT(tokenString string) (*UserClaims, error) {
+	if jwtSecret == nil {
+		return nil, errors.New("JWT secret not initialized")
 	}
 
-	// Check if session is expired
-	if time.Now().After(session.ExpiresAt) {
-		delete(sessions, token)
-		return Session{}, false
+	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the signing method is what we expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+
+	if err != nil {
+		// Handle specific JWT errors (like expiry)
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, errors.New("token has expired")
+		}
+		return nil, fmt.Errorf("token parsing error: %w", err)
 	}
 
-	return session, true
+	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
+		return claims, nil
+	} else {
+		return nil, errors.New("invalid token")
+	}
 }
 
-// ClearSession removes a session by token
-func ClearSession(token string) {
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	delete(sessions, token)
-}
+// GetSession and ClearSession are no longer needed with JWT
+/*
+func GetSession(token string) (Session, bool) { ... }
+func ClearSession(token string) { ... }
+*/
 
 // SetUserContext adds the user to the request context
 func SetUserContext(ctx context.Context, user *User) context.Context { // Uses User from types.go
@@ -257,16 +298,24 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 // GetSessionCookieName returns the versioned session cookie name
 func GetSessionCookieName() string {
-	version := os.Getenv("APP_VERSION")
-	if version == "" {
-		version = "1.0.0.0" // Default version
+	appName := getEnvOrDefault("APP_NAME", "OpenAgent")  // Use helper
+	version := getEnvOrDefault("APP_VERSION", "1.0.0.0") // Use helper
+
+	// Sanitize appName and version (replace spaces/invalid chars with underscore)
+	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	sanitizedAppName := re.ReplaceAllString(appName, "_")
+	sanitizedVersion := re.ReplaceAllString(version, "_")
+
+	// Construct the name
+	cookieName := fmt.Sprintf("%s_%s", sanitizedAppName, sanitizedVersion)
+
+	// Cookie names have restrictions, ensure it's valid (e.g., length, characters)
+	// Basic check for length, could add more validation
+	if len(cookieName) > 64 {
+		cookieName = cookieName[:64] // Truncate if too long
 	}
-	// Use only major.minor for cookie name to reduce frequency of cookie invalidation on patch/build
-	parts := strings.Split(version, ".")
-	if len(parts) >= 2 {
-		version = parts[0] + "_" + parts[1]
-	}
-	return "session_v" + version
+
+	return cookieName
 }
 
 // isPublicPath returns true for paths that don't require authentication

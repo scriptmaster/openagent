@@ -1,18 +1,13 @@
+{{/* Execute the layout template, passing the current data context */}}
+{{template "layout.html" .}}
+
 {{define "title"}}Dashboard - {{.AppName}}{{end}}
 
-{{define "content"}}
-<div class="page-header d-print-none">
-    <div class="container-xl">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <h2 class="page-title">
-                    Dashboard
-                </h2>
-            </div>
-        </div>
-    </div>
-</div>
+{{/* Define page title text (layout handles structure) */}}
+{{define "page-title"}}Dashboard{{end}}
 
+{{define "content"}}
+{{/* Page header structure is now in layout.html */}}
 <div class="page-body">
     <div class="container-xl">
         <div class="row row-deck row-cards">

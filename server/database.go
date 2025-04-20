@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -704,8 +703,8 @@ func (s *DirectDataService) getConnection(ctx context.Context, projectDBID int) 
 		return nil, fmt.Errorf("failed to get project DB info: %v", err)
 	}
 
-	// Decode connection string
-	connStr, err := DecodeConnectionString(projectDB.ConnectionString)
+	// Decode connection string using common.DecodeConnectionString
+	connStr, err := common.DecodeConnectionString(projectDB.ConnectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode connection string: %v", err)
 	}
@@ -974,7 +973,8 @@ func (s *SettingsService) GetAllSettings() ([]Setting, error) {
 			return nil, err
 		}
 		if scopeID.Valid {
-			setting.ScopeID = int(scopeID.Int64)
+			intVal := int(scopeID.Int64) // Correct assignment to *int
+			setting.ScopeID = &intVal
 		}
 		settings = append(settings, setting)
 	}
@@ -1091,10 +1091,12 @@ func (s *DatabaseMetadataService) ListDatabaseTables(ctx context.Context, projec
 			// Check if this table is managed
 			managedTable, isManaged := managedTables[key]
 
+			// Correct struct literal based on server/types.go:TableMetadata
 			metadata := TableMetadata{
-				TableName:  tableName,
-				SchemaName: schema,
-				IsManaged:  isManaged,
+				TableName:      tableName,
+				SchemaName:     schema,
+				IsManaged:      isManaged,
+				ManagedTableID: 0, // Default, updated below if managed
 			}
 
 			if isManaged {
@@ -1130,7 +1132,7 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 		for rows.Next() {
 			var c ManagedColumn
 			var displayName sql.NullString
-			if err := rows.Scan(&c.ID, &c.Name, &displayName, &c.DataType, &c.Ordinal, &c.Visible); err != nil {
+			if err := rows.Scan(&c.ID, &c.ManagedTableID, &c.Name, &displayName, &c.DataType, &c.Ordinal, &c.Visible); err != nil {
 				return nil, err
 			}
 			if displayName.Valid {
@@ -1177,16 +1179,14 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 		var col ColumnMetadata
 		var defaultValue sql.NullString
 		var isNullableBool bool
-		if err := rows.Scan(&col.ColumnName, &col.DataType, &isNullableBool, &col.OrdinalPos, &defaultValue); err != nil {
+		if err := rows.Scan(&col.ColumnName, &col.DataType, &isNullableBool, &col.OrdinalPosition, &defaultValue); err != nil {
 			return nil, err
 		}
-		if isNullableBool {
-			col.IsNullable = "YES"
-		} else {
-			col.IsNullable = "NO"
-		}
+
+		col.IsNullable = isNullableBool // Assign bool directly
+
 		if defaultValue.Valid {
-			col.DefaultValue = defaultValue.String
+			col.ColumnDefault = &defaultValue.String // Assign *string directly
 		}
 
 		// Check if column is managed
@@ -1197,7 +1197,7 @@ func (s *DatabaseMetadataService) GetTableColumns(ctx context.Context, projectDB
 			col.DisplayName = managedColumn.DisplayName
 			col.Visible = managedColumn.Visible
 			col.ManagedColumnID = managedColumn.ID
-			col.SystemType = managedColumn.ColumnType
+			col.SystemType = managedColumn.ColumnType // Use ColumnType from ManagedColumn struct
 		} else {
 			col.DisplayName = col.ColumnName
 			col.Visible = true
@@ -1323,203 +1323,179 @@ func mapDbTypeToColumnType(dbType string) string {
 	}
 }
 
-// NewProjectDBService creates a new ProjectDBService
-func NewProjectDBService(db *sql.DB) *ProjectDBService {
-	return &ProjectDBService{db: db}
+// dbService is the concrete implementation of common.ProjectDBService
+type dbService struct {
+	db *sql.DB
 }
 
-// EncodeConnectionString encodes a connection string to base64
-func EncodeConnectionString(connStr string) string {
-	return base64.StdEncoding.EncodeToString([]byte(connStr))
+// NewProjectDBService creates a new instance of the dbService
+// It now returns the common.ProjectDBService interface type
+func NewProjectDBService(db *sql.DB) common.ProjectDBService {
+	if db == nil {
+		panic("Database connection is nil for NewProjectDBService")
+	}
+	return &dbService{db: db} // Return the concrete type that implements the interface
 }
 
-// DecodeConnectionString decodes a base64 encoded connection string
-func DecodeConnectionString(encoded string) (string, error) {
-	bytes, err := base64.StdEncoding.DecodeString(encoded)
+// Implement the common.ProjectDBService interface methods on *dbService
+
+func (s *dbService) GetProjectDBs(projectID int) ([]common.ProjectDB, error) {
+	// Refactor existing GetProjectDBs to use s.db and return common.ProjectDB
+	// Assuming original function GetProjectDBs exists and takes *sql.DB
+	// return GetProjectDBs(s.db, projectID) // REMOVED - Standalone GetProjectDBs is gone
+	query := common.MustGetSQL("GetProjectDBsByProjectID")
+	rows, err := s.db.Query(query, projectID)
 	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
-}
-
-// CreateProjectDB creates a new database connection for a project
-func (s *ProjectDBService) CreateProjectDB(projectID int, name, description, dbType,
-	connectionString, schemaName string, isDefault bool) (ProjectDB, error) {
-
-	// Encode connection string
-	encodedConnStr := EncodeConnectionString(connectionString)
-
-	// Start a transaction
-	tx, err := s.db.Begin()
-	if err != nil {
-		return ProjectDB{}, err
-	}
-	defer tx.Rollback()
-
-	// If this is the default connection, unset any existing default
-	if isDefault {
-		_, err = tx.Exec(`
-			UPDATE ai.project_dbs
-			SET is_default = false
-			WHERE project_id = $1
-		`, projectID)
-		if err != nil {
-			return ProjectDB{}, err
-		}
-	}
-
-	// Create the new connection
-	var projectDB ProjectDB
-	query := `
-		INSERT INTO ai.project_dbs (project_id, name, description, db_type, connection_string, schema_name, is_default) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7) 
-		RETURNING id, project_id, name, description, db_type, connection_string, schema_name, is_default, created_at
-	`
-	err = tx.QueryRow(query, projectID, name, description, dbType, encodedConnStr, schemaName, isDefault).Scan(
-		&projectDB.ID, &projectDB.ProjectID, &projectDB.Name, &projectDB.Description,
-		&projectDB.DBType, &projectDB.ConnectionString, &projectDB.SchemaName, &projectDB.IsDefault, &projectDB.CreatedAt)
-	if err != nil {
-		return ProjectDB{}, err
-	}
-
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
-		return ProjectDB{}, err
-	}
-
-	return projectDB, nil
-}
-
-// GetProjectDBs retrieves all database connections for a project
-func (s *ProjectDBService) GetProjectDBs(projectID int) ([]ProjectDB, error) {
-	rows, err := s.db.Query(`
-		SELECT id, project_id, name, description, db_type, connection_string, schema_name, is_default, created_at 
-		FROM ai.project_dbs 
-		WHERE project_id = $1
-		ORDER BY name
-	`, projectID)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query project DBs: %w", err)
 	}
 	defer rows.Close()
 
-	var projectDBs []ProjectDB
+	var dbs []common.ProjectDB // Use common.ProjectDB
 	for rows.Next() {
-		var db ProjectDB
-		if err := rows.Scan(&db.ID, &db.ProjectID, &db.Name, &db.Description,
-			&db.DBType, &db.ConnectionString, &db.SchemaName, &db.IsDefault, &db.CreatedAt); err != nil {
-			return nil, err
+		var pdb common.ProjectDB // Use common.ProjectDB
+		if err := rows.Scan(&pdb.ID, &pdb.ProjectID, &pdb.Name, &pdb.Description, &pdb.DBType, &pdb.ConnectionString, &pdb.SchemaName, &pdb.IsDefault, &pdb.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan project DB row: %w", err)
 		}
-		projectDBs = append(projectDBs, db)
+		dbs = append(dbs, pdb)
 	}
-	return projectDBs, nil
+	return dbs, rows.Err()
 }
 
-// GetProjectDB retrieves a database connection by ID
-func (s *ProjectDBService) GetProjectDB(id int) (ProjectDB, error) {
-	var projectDB ProjectDB
+func (s *dbService) GetProjectDB(id int) (common.ProjectDB, error) {
+	// return GetProjectDB(s.db, id) // REMOVED - Implementation needed
+	var pdb common.ProjectDB
+	// TODO: Implement SQL query to get ProjectDB by ID
+	query := `SELECT id, project_id, name, description, db_type, connection_string, schema_name, is_default, created_at FROM ai.project_dbs WHERE id = $1`
+	err := s.db.QueryRow(query, id).Scan(
+		&pdb.ID, &pdb.ProjectID, &pdb.Name, &pdb.Description, &pdb.DBType,
+		&pdb.ConnectionString, &pdb.SchemaName, &pdb.IsDefault, &pdb.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return common.ProjectDB{}, fmt.Errorf("project DB with id %d not found", id)
+		}
+		return common.ProjectDB{}, fmt.Errorf("failed to get project DB %d: %w", id, err)
+	}
+	return pdb, nil
+}
+
+func (s *dbService) CreateProjectDB(projectID int, name, description, dbType, connectionString, schemaName string, isDefault bool) (common.ProjectDB, error) {
+	// return CreateProjectDB(s.db, projectID, name, description, dbType, connectionString, schemaName, isDefault) // REMOVED - Implementation needed
+	var pdb common.ProjectDB
+	// TODO: Implement SQL query to insert ProjectDB
+	// TODO: Handle connection string encoding (e.g., base64)
 	query := `
-		SELECT id, project_id, name, description, db_type, connection_string, schema_name, is_default, created_at 
-		FROM ai.project_dbs 
+		INSERT INTO ai.project_dbs (project_id, name, description, db_type, connection_string, schema_name, is_default, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		RETURNING id, project_id, name, description, db_type, connection_string, schema_name, is_default, created_at
+	`
+	err := s.db.QueryRow(query, projectID, name, description, dbType, connectionString, schemaName, isDefault).Scan(
+		&pdb.ID, &pdb.ProjectID, &pdb.Name, &pdb.Description, &pdb.DBType,
+		&pdb.ConnectionString, &pdb.SchemaName, &pdb.IsDefault, &pdb.CreatedAt,
+	)
+	if err != nil {
+		return common.ProjectDB{}, fmt.Errorf("failed to create project DB: %w", err)
+	}
+	return pdb, nil
+}
+
+func (s *dbService) UpdateProjectDB(id int, name, description, dbType, connectionString, schemaName string, isDefault bool) error {
+	// return UpdateProjectDB(s.db, id, name, description, dbType, connectionString, schemaName, isDefault) // REMOVED - Implementation needed
+	// TODO: Implement SQL query to update ProjectDB
+	// TODO: Handle connection string encoding (e.g., base64)
+	query := `
+		UPDATE ai.project_dbs
+		SET name = $2, description = $3, db_type = $4, connection_string = $5, schema_name = $6, is_default = $7
 		WHERE id = $1
 	`
-	err := s.db.QueryRow(query, id).Scan(&projectDB.ID, &projectDB.ProjectID, &projectDB.Name,
-		&projectDB.Description, &projectDB.DBType, &projectDB.ConnectionString,
-		&projectDB.SchemaName, &projectDB.IsDefault, &projectDB.CreatedAt)
+	_, err := s.db.Exec(query, id, name, description, dbType, connectionString, schemaName, isDefault)
 	if err != nil {
-		return ProjectDB{}, err
+		return fmt.Errorf("failed to update project DB %d: %w", id, err)
 	}
-	return projectDB, nil
-}
-
-// UpdateProjectDB updates a database connection
-func (s *ProjectDBService) UpdateProjectDB(id int, name, description, dbType,
-	connectionString, schemaName string, isDefault bool) error {
-
-	// Retrieve current DB connection info
-	currentDB, err := s.GetProjectDB(id)
-	if err != nil {
-		return err
-	}
-
-	// Encode connection string if it changed
-	encodedConnStr := currentDB.ConnectionString
-	if connectionString != "" {
-		// Connection string provided - it's a new one
-		encodedConnStr = EncodeConnectionString(connectionString)
-	}
-
-	// Start a transaction
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// If this is the default connection, unset any existing default
-	if isDefault {
-		_, err = tx.Exec(`
-			UPDATE ai.project_dbs
-			SET is_default = false
-			WHERE project_id = $1 AND id != $2
-		`, currentDB.ProjectID, id)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Update the connection
-	_, err = tx.Exec(`
-		UPDATE ai.project_dbs
-		SET name = $1, description = $2, db_type = $3, connection_string = $4, schema_name = $5, is_default = $6
-		WHERE id = $7
-	`, name, description, dbType, encodedConnStr, schemaName, isDefault, id)
-	if err != nil {
-		return err
-	}
-
-	// Commit transaction
-	return tx.Commit()
-}
-
-// DeleteProjectDB deletes a database connection
-func (s *ProjectDBService) DeleteProjectDB(id int) error {
-	_, err := s.db.Exec(`
-		DELETE FROM ai.project_dbs
-		WHERE id = $1
-	`, id)
-	return err
-}
-
-// TestConnection tests a database connection
-func (s *ProjectDBService) TestConnection(projectDB ProjectDB) error {
-	// Decode connection string
-	connStr, err := DecodeConnectionString(projectDB.ConnectionString)
-	if err != nil {
-		return fmt.Errorf("failed to decode connection string: %v", err)
-	}
-
-	// Test connection based on db type
-	switch projectDB.DBType {
-	case "postgresql":
-		testDB, err := sql.Open("postgres", connStr)
-		if err != nil {
-			return fmt.Errorf("failed to open connection: %v", err)
-		}
-		defer testDB.Close()
-
-		err = testDB.Ping()
-		if err != nil {
-			return fmt.Errorf("failed to ping database: %v", err)
-		}
-
-	// Add more database types as needed
-	default:
-		return fmt.Errorf("unsupported database type: %s", projectDB.DBType)
-	}
-
 	return nil
 }
+
+func (s *dbService) DeleteProjectDB(id int) error {
+	// return DeleteProjectDB(s.db, id) // REMOVED - Implementation needed
+	// TODO: Implement SQL query to delete ProjectDB
+	query := `DELETE FROM ai.project_dbs WHERE id = $1`
+	_, err := s.db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete project DB %d: %w", id, err)
+	}
+	return nil
+}
+
+func (s *dbService) TestConnection(projectDB common.ProjectDB) error {
+	// Pass the common.ProjectDB type to the original TestConnection
+	// This might require the original TestConnection to also use common.ProjectDB
+	// return TestConnection(projectDB) // REMOVED - Implementation needed
+
+	// Decode connection string
+	connStr, err := common.DecodeConnectionString(projectDB.ConnectionString)
+	if err != nil {
+		return fmt.Errorf("failed to decode connection string for testing: %w", err)
+	}
+
+	// Determine driver name
+	var driverName string
+	switch projectDB.DBType {
+	case "postgres", "postgresql":
+		driverName = "postgres"
+	case "mysql":
+		driverName = "mysql"
+	// Add other supported drivers
+	default:
+		return fmt.Errorf("unsupported database type for testing: %s", projectDB.DBType)
+	}
+
+	// Open temporary connection
+	testDB, err := sql.Open(driverName, connStr)
+	if err != nil {
+		return fmt.Errorf("failed to open test connection: %w", err)
+	}
+	defer testDB.Close()
+
+	// Ping the database
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // 5 second timeout
+	defer cancel()
+
+	if err := testDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("failed to ping test database: %w", err)
+	}
+
+	return nil // Connection successful
+}
+
+func (s *dbService) DecodeConnectionString(encoded string) (string, error) {
+	// return DecodeConnectionString(encoded) // REMOVED - Use common implementation
+	return common.DecodeConnectionString(encoded)
+}
+
+// --- Original Standalone Functions (Need adjustment) --- REMOVED
+// These must now accept/return common.ProjectDB where appropriate
+
+// func GetProjectDBs(db *sql.DB, projectID int) ([]common.ProjectDB, error) {
+// 	query := common.MustGetSQL("GetProjectDBsByProjectID")
+// 	rows, err := db.Query(query, projectID)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to query project DBs: %w", err)
+// 	}
+// 	defer rows.Close()
+//
+// 	var dbs []common.ProjectDB // Use common.ProjectDB
+// 	for rows.Next() {
+// 		var pdb common.ProjectDB // Use common.ProjectDB
+// 		if err := rows.Scan(&pdb.ID, &pdb.ProjectID, &pdb.Name, &pdb.Description, &pdb.DBType, &pdb.ConnectionString, &pdb.SchemaName, &pdb.IsDefault, &pdb.CreatedAt); err != nil {
+// 			return nil, fmt.Errorf("failed to scan project DB row: %w", err)
+// 		}
+// 		dbs = append(dbs, pdb)
+// 	}
+// 	return dbs, rows.Err()
+// }
+
+// Adjust GetProjectDB, CreateProjectDB, UpdateProjectDB, DeleteProjectDB, TestConnection similarly
+// to use common.ProjectDB type in their signatures and logic.
 
 // CheckOrCreateAdminToken checks if an admin token exists for today (UTC).
 // If not, it creates one, stores it, and returns it. It also prints the token.
