@@ -5,7 +5,7 @@ Implement the missing features from docs/FEATURES.md
 
 also correct the errors from go vet ./...
 
-Ensure before and after implementation of the features, git add, commit, push and go vet ./... commands are run in a loop to ensure there are no errors. Keep doing until done.
+Ensure before and after implementation of the features, git add, commit, push and go vet ./... and make test and make stop commands are run in a loop to ensure there are no errors. Keep doing until done.
 
 -- PROMPT: TESTING --
 Run make test to ensure all tests are run. Add any missing tests. Run the tests. Ensure testing code coverage is 100%.
