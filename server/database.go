@@ -640,6 +640,79 @@ func (s *UserService) CheckIfAdminExists(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
+// UpdateUserName updates the user's display name in the appropriate database.
+func (s *UserService) UpdateUserName(ctx context.Context, userID int, newName string) error {
+	dbConn, err := s.getDBForUserOp(ctx)
+	if err != nil {
+		log.Printf("Error getting DB for UpdateUserName (userID: %d): %v", userID, err)
+		return err
+	}
+
+	// TODO: Adjust table name if needed
+	query := `UPDATE ai.users SET name = $1 WHERE id = $2`
+	result, err := dbConn.ExecContext(ctx, query, newName, userID)
+	if err != nil {
+		log.Printf("Error updating name for user %d: %v", userID, err)
+		return fmt.Errorf("database error updating name: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user with ID %d not found", userID)
+	}
+	return nil
+}
+
+// UpdatePasswordHash updates the user's password hash in the appropriate database.
+func (s *UserService) UpdatePasswordHash(ctx context.Context, userID int, newHash string) error {
+	dbConn, err := s.getDBForUserOp(ctx)
+	if err != nil {
+		log.Printf("Error getting DB for UpdatePasswordHash (userID: %d): %v", userID, err)
+		return err
+	}
+
+	if newHash == "" {
+		return errors.New("cannot update password to an empty hash")
+	}
+
+	// TODO: Adjust table name if needed
+	query := `UPDATE ai.users SET password_hash = $1 WHERE id = $2`
+	result, err := dbConn.ExecContext(ctx, query, newHash, userID)
+	if err != nil {
+		log.Printf("Error updating password hash for user %d: %v", userID, err)
+		return fmt.Errorf("database error updating password: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user with ID %d not found", userID)
+	}
+	return nil
+}
+
+// UpdateUserProfileIcon updates the user's profile icon URL in the appropriate database.
+func (s *UserService) UpdateUserProfileIcon(ctx context.Context, userID int, iconURL string) error {
+	dbConn, err := s.getDBForUserOp(ctx)
+	if err != nil {
+		log.Printf("Error getting DB for UpdateUserProfileIcon (userID: %d): %v", userID, err)
+		return err
+	}
+
+	// TODO: Adjust table name if needed
+	query := `UPDATE ai.users SET profile_icon = $1 WHERE id = $2`
+	result, err := dbConn.ExecContext(ctx, query, iconURL, userID)
+	if err != nil {
+		log.Printf("Error updating profile icon for user %d: %v", userID, err)
+		return fmt.Errorf("database error updating profile icon: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user with ID %d not found", userID)
+	}
+	return nil
+}
+
 // --- Deprecated / Needs Review ---
 
 // GetOrCreateUser combines GetUserByEmail and CreateUser. Needs context.

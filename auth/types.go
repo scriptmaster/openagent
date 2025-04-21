@@ -23,6 +23,14 @@ type UserServicer interface {
 	// MakeUserAdmin grants admin privileges to a user.
 	MakeUserAdmin(ctx context.Context, userID int) error
 
+	// --- Profile Methods ---
+	// UpdateUserName updates the user's display name.
+	UpdateUserName(ctx context.Context, userID int, newName string) error
+	// UpdatePasswordHash updates the user's password hash after verification.
+	UpdatePasswordHash(ctx context.Context, userID int, newHash string) error
+	// UpdateUserProfileIcon updates the user's profile icon URL.
+	UpdateUserProfileIcon(ctx context.Context, userID int, iconURL string) error
+
 	// TODO: Add methods for profile updates (Name, Password, Icon)
 }
 
@@ -31,9 +39,11 @@ type User struct {
 	ID           int       `json:"id"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"` // Store the hashed password, exclude from JSON
-	IsAdmin      bool      `json:"is_admin"`
-	CreatedAt    time.Time `json:"created_at"`
-	LastLoggedIn time.Time `json:"last_logged_in"` // Consider using sql.NullTime if nullable
+	Name         string    `json:"name" db:"name"`
+	ProfileIcon  string    `json:"profile_icon" db:"profile_icon"`
+	IsAdmin      bool      `json:"is_admin" db:"is_admin"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	LastLoggedIn time.Time `json:"last_logged_in" db:"last_logged_in"`
 }
 
 // OTPData stores information about an OTP
