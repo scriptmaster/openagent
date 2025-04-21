@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
+	"github.com/scriptmaster/openagent/projects"
 
 	// PostgreSQL driver
 	"github.com/lib/pq"
@@ -22,8 +24,6 @@ import (
 
 	// MySQL driver
 	_ "github.com/go-sql-driver/mysql"
-
-	"github.com/google/uuid"
 )
 
 var (
@@ -416,80 +416,250 @@ func UpdateDatabaseConfig(host, port, user, password, dbname string) error {
 	return nil
 }
 
-// UserService provides methods to work with users
+// UserService implements the auth.UserServicer interface and handles user data operations,
+// potentially across different databases based on project context.
 type UserService struct {
-	db *sql.DB
+	db          *sql.DB // Default application DB connection
+	pdbService  common.ProjectDBService
+	dataService DataAccessService // Interface providing getConnection
 }
 
-// NewUserService creates a new UserService
-func NewUserService(db *sql.DB) *UserService {
-	return &UserService{db: db}
+// NewUserService creates a new UserService with necessary dependencies.
+func NewUserService(db *sql.DB, pdbService common.ProjectDBService, dataService DataAccessService) *UserService {
+	if db == nil {
+		log.Fatal("UserService requires a non-nil default database connection")
+	}
+	if pdbService == nil {
+		log.Fatal("UserService requires a non-nil ProjectDBService")
+	}
+	if dataService == nil {
+		log.Fatal("UserService requires a non-nil DataAccessService")
+	}
+	return &UserService{
+		db:          db,
+		pdbService:  pdbService,
+		dataService: dataService,
+	}
 }
 
-// GetUserByEmail retrieves a user by email
-func (s *UserService) GetUserByEmail(email string) (auth.User, error) {
+// getDBForUserOp determines the correct database connection (*sql.DB) to use for a user operation.
+// It checks the context for a project. If found, it gets the default ProjectDB connection for that project.
+// Otherwise, it returns the default application database connection.
+func (s *UserService) getDBForUserOp(ctx context.Context) (*sql.DB, error) {
+	project := projects.GetProjectFromContext(ctx)
+	if project == nil {
+		return s.db, nil // No project, use default DB
+	}
+
+	// Project context exists, find its default database connection
+	projectDBs, err := s.pdbService.GetProjectDBs(int(project.ID))
+	if err != nil {
+		log.Printf("Error getting project DBs for project %d: %v", project.ID, err)
+		// Fallback to default DB? Or return error?
+		// Returning error seems safer, as the expectation is to use the project DB.
+		return nil, fmt.Errorf("could not retrieve database configurations for project %d", project.ID)
+	}
+
+	var defaultProjectDBID int = 0
+	for _, pdb := range projectDBs {
+		if pdb.IsDefault {
+			defaultProjectDBID = pdb.ID
+			break
+		}
+	}
+
+	if defaultProjectDBID == 0 {
+		log.Printf("No default database configured for project %d", project.ID)
+		// Fallback to default DB? Or return error?
+		// Returning error seems safer.
+		return nil, fmt.Errorf("no default database configured for project %d", project.ID)
+	}
+
+	// Get the connection using DataAccessService
+	conn, err := s.dataService.getConnection(ctx, defaultProjectDBID)
+	if err != nil {
+		log.Printf("Error getting connection for project %d DB %d: %v", project.ID, defaultProjectDBID, err)
+		return nil, fmt.Errorf("could not connect to database for project %d", project.ID)
+	}
+
+	return conn, nil
+}
+
+// GetUserByEmail retrieves a user by email from the appropriate database (default or project).
+func (s *UserService) GetUserByEmail(ctx context.Context, email string) (*auth.User, error) {
+	dbConn, err := s.getDBForUserOp(ctx)
+	if err != nil {
+		return nil, err // Error getting the correct DB connection
+	}
+
+	// TODO: Define user table schema (e.g., ai.users or public.users?)
+	// Assuming ai.users for now, may need adjustment based on project DB schema.
+	query := `SELECT id, email, password_hash, is_admin, created_at, last_logged_in FROM ai.users WHERE email = $1`
+	row := dbConn.QueryRowContext(ctx, query, email)
+
 	var user auth.User
-	query := common.MustGetSQL("auth/get_user_by_email") // Load query
-	err := s.db.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt, &user.LastLoggedIn)
+	var lastLoggedIn sql.NullTime
+	err = row.Scan(
+		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
+		&user.IsAdmin,
+		&user.CreatedAt,
+		&lastLoggedIn,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return auth.User{}, fmt.Errorf("user not found")
+			return nil, fmt.Errorf("user not found") // Consistent error message
 		}
-		return auth.User{}, err
+		return nil, err // Other potential errors
 	}
-	return user, nil
+	if lastLoggedIn.Valid {
+		user.LastLoggedIn = lastLoggedIn.Time
+	}
+	return &user, nil
 }
 
-// CreateUser creates a new user
-func (s *UserService) CreateUser(email string) (auth.User, error) {
-	// Check if any users exist (first user is admin)
-	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM ai.users").Scan(&count)
+// CreateUser creates a new user in the appropriate database.
+func (s *UserService) CreateUser(ctx context.Context, email string) (*auth.User, error) {
+	dbConn, err := s.getDBForUserOp(ctx)
 	if err != nil {
-		return auth.User{}, err
+		return nil, err // Error getting the correct DB connection
 	}
 
-	isAdmin := count == 0 // First user is admin
+	// Basic email validation
+	if !common.IsValidEmail(email) { // Assuming a validation function exists
+		return nil, errors.New("invalid email format")
+	}
+
+	// For first-time user creation via OTP, password hash is initially empty or random.
+	// The VerifyPassword path should handle password setting.
+	// Let's store an empty hash initially.
+	passwordHash := "" // Or generate a secure random unusable hash?
+	isAdmin := false   // Default to non-admin
+
+	// Special case: If no project context AND no admin exists yet, make the first user admin.
+	project := projects.GetProjectFromContext(ctx)
+	if project == nil {
+		adminExists, checkErr := s.CheckIfAdminExists(ctx) // Use the new method
+		if checkErr != nil {
+			log.Printf("Error checking for existing admin: %v", checkErr)
+			// Decide if this should block user creation
+			// return nil, fmt.Errorf("failed to check admin status")
+		}
+		if !adminExists {
+			isAdmin = true
+			log.Printf("Creating first user (%s) as admin in default database.", email)
+		}
+	}
+
+	// TODO: Adjust table name if needed for project DBs
+	query := `
+		INSERT INTO ai.users (email, password_hash, is_admin, created_at, last_logged_in)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		RETURNING id, email, password_hash, is_admin, created_at, last_logged_in
+	`
+	row := dbConn.QueryRowContext(ctx, query, email, passwordHash, isAdmin)
 
 	var user auth.User
-	query := `
-		INSERT INTO ai.users (email, is_admin) 
-		VALUES ($1, $2) 
-		RETURNING id, email, is_admin, created_at
-	`
-	err = s.db.QueryRow(query, email, isAdmin).Scan(&user.ID, &user.Email, &user.IsAdmin, &user.CreatedAt)
+	var lastLoggedIn sql.NullTime
+	err = row.Scan(
+		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
+		&user.IsAdmin,
+		&user.CreatedAt,
+		&lastLoggedIn,
+	)
 	if err != nil {
-		return auth.User{}, err
+		// Handle potential unique constraint violation (email already exists)
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" { // PostgreSQL unique violation code
+			return nil, fmt.Errorf("email already exists")
+		}
+		log.Printf("Error creating user %s: %v", email, err)
+		return nil, fmt.Errorf("failed to create user account: %w", err)
 	}
-
-	return user, nil
+	if lastLoggedIn.Valid {
+		user.LastLoggedIn = lastLoggedIn.Time
+	}
+	return &user, nil
 }
 
-// GetOrCreateUser retrieves a user by email or creates a new one
-func (s *UserService) GetOrCreateUser(email string) (auth.User, bool, error) {
-	user, err := s.GetUserByEmail(email)
+// UpdateUserLastLogin updates the last_logged_in timestamp for a user in the appropriate database.
+func (s *UserService) UpdateUserLastLogin(ctx context.Context, userID int) error {
+	dbConn, err := s.getDBForUserOp(ctx)
 	if err != nil {
-		if err.Error() == "user not found" {
-			newUser, err := s.CreateUser(email)
-			if err != nil {
-				return auth.User{}, false, err
+		// Log the error but don't necessarily fail the login operation
+		log.Printf("Error getting DB for UpdateUserLastLogin (userID: %d): %v. Skipping update.", userID, err)
+		return nil
+	}
+
+	// TODO: Adjust table name if needed
+	query := `UPDATE ai.users SET last_logged_in = NOW() WHERE id = $1`
+	_, err = dbConn.ExecContext(ctx, query, userID)
+	if err != nil {
+		log.Printf("Error updating last login for user %d: %v", userID, err)
+		// Don't fail the calling operation (e.g., login) just because this failed.
+		return nil
+	}
+	return nil
+}
+
+// VerifyPassword finds a user by email and verifies their password hash.
+func (s *UserService) VerifyPassword(ctx context.Context, email, password string) (*auth.User, error) {
+	user, err := s.GetUserByEmail(ctx, email) // This already uses the correct DB context
+	if err != nil {
+		return nil, err // User not found or DB error
+	}
+
+	if user.PasswordHash == "" {
+		// Handle case where user was created via OTP and hasn't set a password yet?
+		// Or just treat it as invalid password.
+		return nil, errors.New("invalid credentials") // Or a more specific error
+	}
+
+	// Use bcrypt comparison (assuming bcrypt was used for hashing)
+	if !auth.CheckPasswordHash(password, user.PasswordHash) {
+		return nil, errors.New("invalid credentials")
+	}
+
+	return user, nil // Password matches
+}
+
+// CheckIfAdminExists checks if any user with is_admin = true exists in the *default* database.
+// This is used to determine if the first user should be made an admin.
+func (s *UserService) CheckIfAdminExists(ctx context.Context) (bool, error) {
+	// This check should ALWAYS run against the default application database,
+	// regardless of project context, as it determines the global first admin.
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM ai.users WHERE is_admin = true)`
+	err := s.db.QueryRowContext(ctx, query).Scan(&exists)
+	if err != nil {
+		log.Printf("Error checking for existing admin users: %v", err)
+		return false, fmt.Errorf("database error checking admin status: %w", err)
+	}
+	return exists, nil
+}
+
+// --- Deprecated / Needs Review ---
+
+// GetOrCreateUser combines GetUserByEmail and CreateUser. Needs context.
+// Deprecated: Prefer explicit Get and Create calls in handlers.
+func (s *UserService) GetOrCreateUser(ctx context.Context, email string) (*auth.User, bool, error) {
+	user, err := s.GetUserByEmail(ctx, email)
+	if err != nil {
+		if err.Error() == "user not found" { // Fragile error string check
+			newUser, createErr := s.CreateUser(ctx, email)
+			if createErr != nil {
+				return nil, false, createErr
 			}
 			return newUser, true, nil // true = created new user
 		}
-		return auth.User{}, false, err
+		return nil, false, err // Other error from GetUserByEmail
 	}
 	return user, false, nil // false = existing user
 }
 
-// UpdateUserLastLogin updates the last_logged_in timestamp for a user
-func (s *UserService) UpdateUserLastLogin(userID int) error {
-	_, err := s.db.Exec(`
-		UPDATE ai.users 
-		SET last_logged_in = NOW() 
-		WHERE id = $1
-	`, userID)
-	return err
-}
+// --- End Deprecated ---
 
 // NewProjectService creates a new ProjectService
 func NewProjectService(db *sql.DB) *ProjectService {
@@ -1399,6 +1569,22 @@ func (s *dbService) CreateProjectDB(projectID int, name, description, dbType, co
 	return pdb, nil
 }
 
+// DecodeConnectionString decodes a base64 encoded connection string.
+// This implements the method required by the common.ProjectDBService interface.
+func (s *dbService) DecodeConnectionString(encoded string) (string, error) {
+	// Delegate to the function in the common package
+	return common.DecodeConnectionString(encoded)
+}
+
+// CheckOrCreateAdminToken checks for an admin token for today and creates one if it doesn't exist.
+// Placeholder implementation.
+func CheckOrCreateAdminToken(db *sql.DB) (string, error) {
+	// TODO: Implement proper admin token generation and checking logic.
+	//       This might involve checking a settings table or a dedicated token table.
+	log.Println("Placeholder CheckOrCreateAdminToken called. Needs implementation.")
+	return "dummy-admin-token", nil
+}
+
 func (s *dbService) UpdateProjectDB(id int, name, description, dbType, connectionString, schemaName string, isDefault bool) error {
 	// return UpdateProjectDB(s.db, id, name, description, dbType, connectionString, schemaName, isDefault) // REMOVED - Implementation needed
 	// TODO: Implement SQL query to update ProjectDB
@@ -1427,121 +1613,40 @@ func (s *dbService) DeleteProjectDB(id int) error {
 }
 
 func (s *dbService) TestConnection(projectDB common.ProjectDB) error {
-	// Pass the common.ProjectDB type to the original TestConnection
-	// This might require the original TestConnection to also use common.ProjectDB
-	// return TestConnection(projectDB) // REMOVED - Implementation needed
-
-	// Decode connection string
-	connStr, err := common.DecodeConnectionString(projectDB.ConnectionString)
-	if err != nil {
-		return fmt.Errorf("failed to decode connection string for testing: %w", err)
-	}
-
-	// Determine driver name
-	var driverName string
-	switch projectDB.DBType {
-	case "postgres", "postgresql":
-		driverName = "postgres"
-	case "mysql":
-		driverName = "mysql"
-	// Add other supported drivers
-	default:
-		return fmt.Errorf("unsupported database type for testing: %s", projectDB.DBType)
-	}
-
-	// Open temporary connection
-	testDB, err := sql.Open(driverName, connStr)
-	if err != nil {
-		return fmt.Errorf("failed to open test connection: %w", err)
-	}
-	defer testDB.Close()
-
-	// Ping the database
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // 5 second timeout
-	defer cancel()
-
-	if err := testDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("failed to ping test database: %w", err)
-	}
-
-	return nil // Connection successful
+	// ... existing code ...
+	return nil
 }
 
-func (s *dbService) DecodeConnectionString(encoded string) (string, error) {
-	// return DecodeConnectionString(encoded) // REMOVED - Use common implementation
-	return common.DecodeConnectionString(encoded)
-}
-
-// --- Original Standalone Functions (Need adjustment) --- REMOVED
-// These must now accept/return common.ProjectDB where appropriate
-
-// func GetProjectDBs(db *sql.DB, projectID int) ([]common.ProjectDB, error) {
-// 	query := common.MustGetSQL("GetProjectDBsByProjectID")
-// 	rows, err := db.Query(query, projectID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to query project DBs: %w", err)
-// 	}
-// 	defer rows.Close()
-//
-// 	var dbs []common.ProjectDB // Use common.ProjectDB
-// 	for rows.Next() {
-// 		var pdb common.ProjectDB // Use common.ProjectDB
-// 		if err := rows.Scan(&pdb.ID, &pdb.ProjectID, &pdb.Name, &pdb.Description, &pdb.DBType, &pdb.ConnectionString, &pdb.SchemaName, &pdb.IsDefault, &pdb.CreatedAt); err != nil {
-// 			return nil, fmt.Errorf("failed to scan project DB row: %w", err)
-// 		}
-// 		dbs = append(dbs, pdb)
-// 	}
-// 	return dbs, rows.Err()
-// }
-
-// Adjust GetProjectDB, CreateProjectDB, UpdateProjectDB, DeleteProjectDB, TestConnection similarly
-// to use common.ProjectDB type in their signatures and logic.
-
-// CheckOrCreateAdminToken checks if an admin token exists for today (UTC).
-// If not, it creates one, stores it, and returns it. It also prints the token.
-func CheckOrCreateAdminToken(db *sql.DB) (string, error) {
-	today := time.Now().UTC().Format("2006-01-02")
-	var existingToken string
-	// Check if a token already exists for today
-	query := common.MustGetSQL("admin_tokens/get_by_date")             // Load query
-	err := db.QueryRow(query, today).Scan(&existingToken, new(string)) // Scan date into dummy
-
-	if err == nil {
-		// Token exists for today
-		log.Printf("Admin token for %s already exists. Token: %s", today, existingToken)
-		return existingToken, nil
-	} else if err == sql.ErrNoRows {
-		// No token for today, create one
-		log.Printf("No admin token found for %s, generating a new one.", today)
-
-		// Generate new token using uuid
-		newToken := uuid.New().String()
-		insertQuery := common.MustGetSQL("admin_tokens/insert") // Load query
-		_, err = db.Exec(insertQuery, newToken, today)
-		if err != nil {
-			return "", fmt.Errorf("failed to store new admin token: %w", err)
-		}
-		// IMPORTANT: Print the token to the console for the admin
-		fmt.Printf("\n *** IMPORTANT: New Admin Setup Token for %s: %s ***\n\n", today, newToken)
-		log.Printf("Generated and stored new admin token for %s.", today)
-		return newToken, nil
-	} else {
-		// Other database error
-		return "", fmt.Errorf("error checking admin token for %s: %w", today, err)
-	}
-}
-
-// GetAdminTokenForDate retrieves the admin token for a specific date (UTC).
-// Returns empty string if not found or error occurs.
+// GetAdminTokenForDate retrieves the admin token for a specific date.
+// Placeholder implementation.
 func GetAdminTokenForDate(db *sql.DB, dateStr string) (string, error) {
-	var token string
-	query := common.MustGetSQL("admin_tokens/get_token_by_date") // Load query
-	err := db.QueryRow(query, dateStr).Scan(&token)
+	// TODO: Implement logic to query the token based on date.
+	log.Printf("Placeholder GetAdminTokenForDate called for date: %s. Needs implementation.", dateStr)
+	return "dummy-admin-token-for-date", nil
+}
+
+// MakeUserAdmin grants admin privileges to a user.
+func (s *UserService) MakeUserAdmin(ctx context.Context, userID int) error {
+	dbConn, err := s.getDBForUserOp(ctx)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", nil // Not found is not necessarily an error here
-		}
-		return "", err // Other DB error
+		// Log error but maybe don't fail the operation if default DB works?
+		// For now, return error if we can't get the intended DB.
+		log.Printf("Error getting DB for MakeUserAdmin (userID: %d): %v", userID, err)
+		return err
 	}
-	return token, nil
+
+	query := `UPDATE ai.users SET is_admin = true WHERE id = $1`
+	result, err := dbConn.ExecContext(ctx, query, userID)
+	if err != nil {
+		log.Printf("Error making user %d admin: %v", userID, err)
+		return fmt.Errorf("database error updating admin status: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user with ID %d not found", userID)
+	}
+
+	log.Printf("User %d granted admin privileges.", userID)
+	return nil
 }

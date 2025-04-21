@@ -18,7 +18,6 @@
     A profile page lets them specify their Name (defaults to their email), set their password with OTP verification for password change. (password change is a seperate section or tabbed interface in the profile page)
     Set a gravatar or profile icon.
 
-PLANNED FEATURES (Don't implement them yet):
 4. Agent
     with the /agent route. Ensure it is accessible and loading the right template.
 

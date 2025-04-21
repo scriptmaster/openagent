@@ -6,7 +6,7 @@ import (
 )
 
 // RegisterAuthRoutes registers all authentication-related routes using named handlers
-func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userService *UserService) {
+func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userService UserServicer) {
 	// Initialize templates for auth handlers
 	InitAuthTemplates(templates)
 

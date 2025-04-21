@@ -12,7 +12,7 @@ import (
 )
 
 // RegisterProjectRoutes registers HTML and API routes for projects
-func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB, projectDBService common.ProjectDBService) {
+func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService auth.UserServicer, db *sql.DB, projectDBService common.ProjectDBService) {
 	// Initialize project repository and service
 	sqlxDB := sqlx.NewDb(db, "postgres") // Or the appropriate driver
 	projectRepo := NewProjectRepository(sqlxDB)

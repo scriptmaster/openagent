@@ -18,7 +18,7 @@ type projectCtxKey struct{}
 // If a project matches, it adds it to the context.
 // If no project matches, it serves the configuration page.
 // Specific paths can be exempted.
-func HostProjectMiddleware(next http.Handler, projectService projects.ProjectService, userService *auth.UserService, exemptPaths []string) http.Handler {
+func HostProjectMiddleware(next http.Handler, projectService projects.ProjectService, userService auth.UserServicer, exemptPaths map[string]bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check for maintenance mode first
 		if IsMaintenanceMode() && !strings.HasPrefix(r.URL.Path, "/maintenance") {
@@ -28,7 +28,7 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 		}
 
 		// Check if the path is exempt
-		for _, prefix := range exemptPaths {
+		for prefix := range exemptPaths {
 			if strings.HasPrefix(r.URL.Path, prefix) {
 				next.ServeHTTP(w, r) // Serve the original request directly
 				return

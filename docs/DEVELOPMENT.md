@@ -58,4 +58,6 @@ Each feature package (like `auth`, `server`, `projects`) should ideally follow t
 ## Tools and Workflow
 
 *   **Dependencies:** Use `go mod tidy` regularly to keep `go.mod` and `go.sum` consistent.
-*   **Code Verification:** Use `go vet ./...` to check for suspicious constructs and potential errors. Aim for zero `vet` errors. 
+*   **Code Verification:** Use `go vet ./...` to check for suspicious constructs and potential errors. Aim for zero `vet` errors.
+* Ensure relevant tools are installed and configured. aws. eksctl. golang. dev env is setup with git repo.
+* Git repo: 

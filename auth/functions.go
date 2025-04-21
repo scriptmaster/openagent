@@ -18,6 +18,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserServicer moved to types.go
@@ -351,4 +352,16 @@ func isAdminPath(path string) bool {
 	}
 
 	return false
+}
+
+// GeneratePasswordHash generates a bcrypt hash of the password
+func GeneratePasswordHash(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14) // 14 is the cost factor
+	return string(bytes), err
+}
+
+// CheckPasswordHash compares a plain text password with a stored bcrypt hash
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

@@ -1,10 +1,10 @@
 package server
 
 import (
-	"database/sql"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/scriptmaster/openagent/admin"
@@ -13,12 +13,134 @@ import (
 	"github.com/scriptmaster/openagent/projects"
 )
 
-// RegisterRoutes registers all application routes for the server package
-func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt string) {
-	// Load app version
-	appVersion = common.GetEnvOrDefault("APP_VERSION", "1.0.0.0")
+// RegisterRoutes sets up all the application routes
+func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt string) {
+	// Load HTML templates
+	templates := LoadTemplates()
 
-	// Initialize templates
+	// Initialize database and other services (handle potential nil db)
+	db := GetDB() // Get the initialized DB instance
+	var projectService projects.ProjectService
+	var pdbService common.ProjectDBService
+	// var settingsService *SettingsService // Declared and not used
+	// var dataService DataAccessService // Declared and not used
+
+	if db != nil {
+		log.Println("Database connection available, initializing DB-dependent services.")
+		pdbService = NewProjectDBService(db)
+		// settingsService = NewSettingsService(db) // Commented out: Not used yet
+		// dataService = NewDirectDataService(db) // Commented out: Not used yet
+
+		// Initialize project service (needs sqlx wrapper)
+		sqlxDB := sqlx.NewDb(db, common.GetEnvOrDefault("DB_DRIVER", "postgres")) // Use configured driver
+		projectRepo := projects.NewProjectRepository(sqlxDB)
+		projectService = projects.NewProjectService(db, projectRepo)
+
+	} else {
+		log.Println("Warning: Database connection is nil. DB-dependent services will not be available.")
+		// Services remain nil
+	}
+
+	// --- Static Files ---
+	fs := http.FileServer(http.Dir("./static"))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// --- Exempt Paths Middleware (Applied Later) ---
+	exemptPaths := map[string]bool{
+		"/static/":          true,
+		"/login":            true,
+		"/logout":           true,
+		"/auth/request-otp": true,
+		"/auth/verify-otp":  true,
+		"/password-login":   true,
+		"/config":           true,
+		"/config/save":      true,
+		"/maintenance":      true,
+		"/admin/login":      true,
+	}
+
+	// Create a base mux for routes that might be wrapped by middleware
+	baseMux := http.NewServeMux()
+
+	// --- Register Non-Project/Public Routes Directly on baseMux ---
+
+	// Maintenance Page
+	baseMux.HandleFunc("/maintenance", func(w http.ResponseWriter, r *http.Request) {
+		admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated)
+	})
+	// Admin Login for Maintenance
+	/* // Commented out: admin.HandleAdminLogin undefined
+	baseMux.HandleFunc("/admin/login", func(w http.ResponseWriter, r *http.Request) {
+		admin.HandleAdminLogin(w, r, templates)
+	})
+	*/
+
+	// Configuration Page & Save Endpoint
+	baseMux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		HandleConfigPage(w, r)
+	})
+	baseMux.HandleFunc("/config/save", func(w http.ResponseWriter, r *http.Request) {
+		if userService == nil || projectService == nil {
+			common.JSONError(w, "System not fully configured", http.StatusServiceUnavailable)
+			return
+		}
+		HandleConfigSubmit(w, r, userService, projectService)
+	})
+
+	// --- Register Auth Routes --- (Use baseMux)
+	if userService != nil {
+		auth.RegisterAuthRoutes(baseMux, templates, userService)
+	} else {
+		// Handle auth routes gracefully if userService is nil
+		log.Println("Auth routes disabled: userService is nil (DB connection likely failed)")
+		// Optionally redirect /login, etc., to /config
+		handleNilService(baseMux, "/login", "/auth/")
+	}
+
+	// --- Register Project Routes --- (Use baseMux)
+	if db != nil && userService != nil && pdbService != nil { // Ensure all needed services are available
+		projects.RegisterProjectRoutes(baseMux, templates, userService, db, pdbService)
+	} else {
+		// Handle project routes gracefully if services are nil
+		log.Println("Project routes disabled: required services (db, userService, pdbService) not available")
+		handleNilService(baseMux, "/projects", "/api/projects/")
+	}
+
+	// --- Register Other Protected Routes --- (Use baseMux)
+
+	// Dashboard (requires auth)
+	baseMux.Handle("/dashboard", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if projectService == nil { // Check if projectService is initialized
+			http.Error(w, "Project service not available", http.StatusInternalServerError)
+			return
+		}
+		HandleDashboard(w, r, projectService)
+	})))
+
+	// Voice Page (assuming it needs auth)
+	baseMux.Handle("/voice", auth.AuthMiddleware(http.HandlerFunc(HandleVoicePage)))
+
+	// --- Apply Middleware ---
+	finalHandler := HostProjectMiddleware(baseMux, projectService, userService, exemptPaths)
+	mux.Handle("/", finalHandler) // Route ALL requests through the middleware first
+}
+
+// handleNilService registers handlers for paths when required services are unavailable.
+func handleNilService(mux *http.ServeMux, paths ...string) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			common.JSONError(w, "Service unavailable: Database not configured or connection failed.", http.StatusServiceUnavailable)
+		} else {
+			http.Redirect(w, r, "/config?error=db_unavailable", http.StatusSeeOther)
+		}
+	}
+	for _, path := range paths {
+		mux.HandleFunc(path, handler)
+	}
+}
+
+// LoadTemplates loads HTML templates from the tpl directory
+func LoadTemplates() *template.Template {
 	// Start with base name and functions
 	baseTemplate := template.New("base").Funcs(GetTemplateFuncs())
 	// Parse all files from tpl (including layout.html)
@@ -28,224 +150,32 @@ func RegisterRoutes(mux *http.ServeMux, userService *auth.UserService, salt stri
 	}
 	// Parse partials into the same template set
 	templates = template.Must(templates.ParseGlob("tpl/_partials/*.html"))
-
-	// Initialize other template sets if needed (e.g., for auth or agent)
-	auth.InitAuthTemplates(templates) // Pass the main template set to auth
-	InitAgentTemplates(templates)     // Pass the main template set to agent
-
-	// Initialize database connection (includes admin token check now)
-	db, err := InitDB()
-	if err != nil {
-		log.Printf("CRITICAL: Failed to initialize database: %v. Entering maintenance.", err)
-		SetMaintenanceMode(true)
-		// Don't exit, allow maintenance routes
-	}
-
-	// Initialize Services Needed by Middleware/Handlers
-	// Make sure db is not nil if needed by services, handle maintenance mode appropriately
-	var projectService projects.ProjectService
-	if db != nil {
-		sqlxDB := sqlx.NewDb(db, "postgres") // Assuming postgres driver
-		projectRepo := projects.NewProjectRepository(sqlxDB)
-		projectService = projects.NewProjectService(db, projectRepo) // db might be nil here if InitDB failed!
-	} else {
-		log.Println("WARN: Database not available, project functionality will be limited.")
-		// Handle the case where projectService is nil if necessary in middleware/handlers
-		// Or provide a dummy service that always returns "not found"?
-	}
-
-	// Instantiate ProjectDBService
-	var projectDBService common.ProjectDBService // Use the interface type from common
-	if db != nil {
-		projectDBService = NewProjectDBService(db) // Use the constructor from server/database.go
-	} else {
-		log.Println("WARN: Database not available, ProjectDBService not initialized.")
-		// Assign a nil or dummy service if needed, or ensure handlers check for nil
-	}
-
-	// Register application routes
-	// Passing db directly for now, will refactor later if needed.
-	// Passing userService as required by the current signature.
-	// projects.RegisterProjectRoutes(mux, templates, userService, db) // Reverted to pass userService and db - REMOVED DUPLICATE CALL
-	// Pass projectDBService to project routes when needed
-	// TODO: Refactor RegisterProjectRoutes to accept projectDBService
-
-	// Register domain-specific routes
-	domainMux := http.NewServeMux()
-	domainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Middleware should have already determined if we are here because:
-		// 1. It's the actual root path "/" for an unknown host (served by HandleIndexRoute -> HandleIndex)
-		// 2. It's a path on a known project host (served by HandleProjectPageRoute)
-
-		// Let the existing project handlers decide based on path and context
-		projectFromCtx := projects.GetProjectFromContext(r.Context()) // Use projects.GetProjectFromContext
-
-		if r.URL.Path == "/" && projectFromCtx == nil {
-			// Handle root path for unconfigured domain (middleware sends to config, but maybe HandleIndex is fallback?)
-			// This case might be handled by middleware redirecting to config already.
-			// If we reach here, perhaps it's an explicit visit to "/" on an unknown host.
-			projects.HandleIndexRoute(w, r, templates, projectService, userService)
-		} else if projectFromCtx != nil {
-			// Host matched a project in middleware, let the page route handler render it.
-			// HandleProjectPageRoute might need adjustment to use projectFromCtx if available.
-			projects.HandleProjectPageRoute(w, r, templates, projectService, userService)
-		} else {
-			// Fallback: No project context, not root path? Should be 404.
-			// This case *should* be handled by the HostProjectMiddleware sending to config.
-			// If it reaches here, something is wrong in the logic flow.
-			log.Printf("WARN: Reached root handler unexpectedly for path %s on host %s", r.URL.Path, r.Host)
-			common.Handle404(w, r, templates)
-		}
-	})
-
-	// --- Middleware Definition ---
-	exemptPaths := []string{
-		"/static/",
-		"/login",
-		"/logout",
-		"/request-otp",
-		"/verify-otp",
-		"/password-login",
-		"/config",        // Allow access to the config page itself
-		"/config/submit", // Allow access to the submit endpoint
-		"/maintenance",   // Allow maintenance routes
-		// Add any other public API endpoints or essential paths here
-	}
-	// IMPORTANT: Apply middleware *after* static files and exempt routes
-	// We create a new mux here to wrap the main one with middleware easily
-	baseMux := http.NewServeMux()
-
-	// --- Register Exempt Routes Directly on baseMux ---
-	fs := http.FileServer(http.Dir("static"))
-	baseMux.Handle("/static/", http.StripPrefix("/static/", fs))
-
-	auth.RegisterAuthRoutes(baseMux, templates, userService) // Handles login, logout, otp, etc.
-	admin.RegisterAdminRoutes(baseMux, templates, auth.IsMaintenanceAuthenticated,
-		UpdateDatabaseConfig, UpdateMigrationStart, InitDB, sessionSalt) // Handles /maintenance/*
-
-	// Register project HTML & API routes (Needs DB access)
-	if db != nil {
-		// Correct arguments: mux, templates, userService, db, projectDBService
-		projects.RegisterProjectRoutes(baseMux, templates, userService, db, projectDBService) // Pass projectDBService
-	} else {
-		log.Println("WARN: DB not available, skipping project route registration.")
-	}
-
-	// Config page submit handler (exempted, but needs services)
-	baseMux.HandleFunc("/config/submit", func(w http.ResponseWriter, r *http.Request) {
-		// Check if services are available due to potential DB init failure
-		if userService == nil || projectService == nil {
-			common.JSONError(w, "Service not available due to configuration issue", http.StatusServiceUnavailable)
-			return
-		}
-		HandleConfigSubmit(w, r, userService, projectService)
-	})
-
-	// --- Register Protected/Project-Specific Routes (will be wrapped) ---
-
-	// Dashboard (requires auth, doesn't necessarily need project context from middleware)
-	baseMux.Handle("/dashboard", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		HandleDashboard(w, r, projectService) // Pass projectService
-	})))
-
-	// Voice Page (assuming it needs auth and possibly project context?)
-	baseMux.Handle("/voice", auth.AuthMiddleware(http.HandlerFunc(HandleVoicePage)))
-
-	// Project List Page (needs auth, project context determined by host via middleware)
-	// The HandleProjectsRoute might need refactoring if projectService isn't passed directly anymore
-	// or if it should fetch projects based on user permissions instead of host context?
-	// For now, let's assume it needs auth. The project context is handled by middleware.
-	if projectService != nil { // Only register if service is available
-		baseMux.Handle("/projects", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Refactor: HandleProjectsRoute expects projectService passed in.
-			// We might need to modify HandleProjectsRoute or HandleProjects
-			// to get the service differently or rely purely on context/user.
-			// For now, passing the globally available one (if not nil).
-			// This needs careful review based on HandleProjectsRoute/HandleProjects implementation.
-			projects.HandleProjectsRoute(w, r, templates, projectService, userService)
-		})))
-	}
-
-	// Root route "/" (and domain-specific project pages)
-	// RegisterRootRoutes sets up its own HandleFunc for "/"
-	// This needs careful integration with the middleware.
-	// The middleware *should* add project context *before* this handler is called for a specific domain.
-	// The handler inside RegisterRootRoutes should perhaps use GetProjectFromContext now?
-	if projectService != nil {
-		RegisterRootRoutes(baseMux, templates, userService, db, projectService) // Pass projectService
-	} else {
-		// Handle "/" when DB/ProjectService is down (maybe redirect to maintenance/config?)
-		baseMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if IsMaintenanceMode() {
-				admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated)
-				return
-			}
-			// Redirect to config page if project service isn't available?
-			HandleConfigPage(w, r) // Show config page
-		})
-	}
-
-	// --- Apply Middleware ---
-	// The HostProjectMiddleware wraps all routes registered on baseMux *except* the exempt ones handled above.
-	// Correct approach: Wrap the baseMux itself.
-
-	finalHandler := HostProjectMiddleware(baseMux, projectService, userService, exemptPaths) // Pass userService here
-	mux.Handle("/", finalHandler)                                                            // Route ALL requests through the middleware first
-
-	// Remove the old catch-all from the main mux if it existed.
-
-	// Log database connection status
-	// if db != nil { - REMOVED block related to duplicate call
-	// 	log.Println("Successfully connected to the database.")
-	// 	// Pass db and projectDBService to routes that need them
-	// 	projects.RegisterProjectRoutes(mux, templates, userService, db) // Pass db and userService
-	// } else {
-	// 	log.Println("CRITICAL: Failed to connect to the database. Routes requiring DB access may not function.")
-	// 	// Optionally handle this case further, e.g., by setting maintenance mode
-	// 	SetMaintenanceMode(true)
-	// } - REMOVED block related to duplicate call
+	return templates
 }
 
-// Modify RegisterRootRoutes to accept ProjectService and potentially use context
-func RegisterRootRoutes(mux *http.ServeMux, templates *template.Template, userService *auth.UserService, db *sql.DB, projectService projects.ProjectService) {
-	// Don't need to init projectService here anymore, it's passed in.
-
-	// Root and project page routes handler
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Middleware should have already determined if we are here because:
-		// 1. It's the actual root path "/" for an unknown host (served by HandleIndexRoute -> HandleIndex)
-		// 2. It's a path on a known project host (served by HandleProjectPageRoute)
-
-		// Let the existing project handlers decide based on path and context
-		projectFromCtx := projects.GetProjectFromContext(r.Context()) // Use projects.GetProjectFromContext
-
-		if r.URL.Path == "/" && projectFromCtx == nil {
-			// Handle root path for unconfigured domain (middleware sends to config, but maybe HandleIndex is fallback?)
-			// This case might be handled by middleware redirecting to config already.
-			// If we reach here, perhaps it's an explicit visit to "/" on an unknown host.
-			projects.HandleIndexRoute(w, r, templates, projectService, userService)
-		} else if projectFromCtx != nil {
-			// Host matched a project in middleware, let the page route handler render it.
-			// HandleProjectPageRoute might need adjustment to use projectFromCtx if available.
-			projects.HandleProjectPageRoute(w, r, templates, projectService, userService)
-		} else {
-			// Fallback: No project context, not root path? Should be 404.
-			// This case *should* be handled by the HostProjectMiddleware sending to config.
-			// If it reaches here, something is wrong in the logic flow.
-			log.Printf("WARN: Reached root handler unexpectedly for path %s on host %s", r.URL.Path, r.Host)
-			common.Handle404(w, r, templates)
-		}
-	})
+// Commented out duplicate GetTemplateFuncs
+/*
+// GetTemplateFuncs returns a map of template functions
+func GetTemplateFuncs() template.FuncMap {
+	return template.FuncMap{
+		// Add any custom template functions here
+		"safeHTML": func(s string) template.HTML {
+			return template.HTML(s)
+		},
+	}
 }
+*/
 
-// registerAgentRoutes registers all agent-related routes
-// This is now internal to the server package
+// Commented out potentially obsolete RegisterRootRoutes
+/*
+func RegisterRootRoutes(mux *http.ServeMux, templates *template.Template, userService auth.UserServicer, db *sql.DB, projectService projects.ProjectService) {
+	// ... implementation ...
+}
+*/
+
+// Commented out unused registerAgentRoutes
+/*
 func registerAgentRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/agent", HandleAgent)   // Expects exported HandleAgent
-	mux.HandleFunc("/start", HandleStart)   // Expects exported HandleStart
-	mux.HandleFunc("/next", HandleNextStep) // Expects exported HandleNextStep
-	mux.HandleFunc("/status", HandleStatus) // Expects exported HandleStatus
+	// ... implementation ...
 }
-
-// InitDB initializes the database connection based on environment variables
-// ... existing code ...
+*/

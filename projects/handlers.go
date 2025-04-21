@@ -172,7 +172,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 }
 
 // HandleProjectsRoute handles the /projects route with authentication
-func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
+func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -182,7 +182,7 @@ func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *temp
 }
 
 // HandleIndexRoute handles the root route with optional authentication
-func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
+func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		log.Println("No user context found for HandleIndexRoute")
@@ -191,7 +191,7 @@ func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *templat
 }
 
 // HandleProjectPageRoute handles project-specific pages based on domain and path
-func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService *auth.UserService) {
+func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	project := GetProjectFromContext(r.Context())
 

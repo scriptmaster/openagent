@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"time"
 )
 
@@ -8,9 +9,21 @@ import (
 
 // UserServicer defines the interface for user service operations
 type UserServicer interface {
-	GetUserByEmail(email string) (*User, error)
-	CreateUser(email string) (*User, error)
-	UpdateUserLastLogin(userID int) error
+	// GetUserByEmail retrieves a user by email, checking project context first.
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	// CreateUser creates a user, potentially in a project-specific database.
+	CreateUser(ctx context.Context, email string) (*User, error)
+	// UpdateUserLastLogin updates the last login time, checking project context.
+	UpdateUserLastLogin(ctx context.Context, userID int) error
+	// VerifyPassword verifies a user's password, checking project context.
+	VerifyPassword(ctx context.Context, email, password string) (*User, error)
+	// CheckIfAdminExists checks if any admin user exists in the default database.
+	CheckIfAdminExists(ctx context.Context) (bool, error)
+
+	// MakeUserAdmin grants admin privileges to a user.
+	MakeUserAdmin(ctx context.Context, userID int) error
+
+	// TODO: Add methods for profile updates (Name, Password, Icon)
 }
 
 // User represents a user in the system

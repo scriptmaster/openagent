@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/joho/godotenv"                 // Keep godotenv for loading .env
-	"github.com/scriptmaster/openagent/auth"   // Keep auth for UserService
+	"github.com/joho/godotenv" // Keep godotenv for loading .env
+
+	// Keep auth for UserService
 	"github.com/scriptmaster/openagent/common" // Updated import path
 )
 
@@ -62,42 +63,45 @@ func StartServer() error {
 		log.Println("Continuing server start in maintenance mode...")
 	}
 
-	// Create user service (Requires *sql.DB, handle nil case if in maintenance)
-	var userService *auth.UserService
-	if db != nil {
-		userService = auth.NewUserService(db)
-		if userService == nil {
-			return fmt.Errorf("failed to create user service")
-		}
-	} else {
-		log.Println("Warning: Database connection is nil, running without user service features.")
-		// userService remains nil, routes needing it should handle this
+	// Initialize services
+	pdbService := NewProjectDBService(db)
+	dataService := NewDirectDataService(db)
+	userService := NewUserService(db, pdbService, dataService) // Use server.NewUserService
+	// projectService := NewProjectService(db) // ProjectService initialization might depend on repository
+	/* // Commented out projectService and settingsService initialization as they are done in routes.go
+	sqlxDB := sqlx.NewDb(db, "postgres") // Assuming postgres, adjust if needed
+	projectRepo := projects.NewProjectRepository(sqlxDB)
+	projectService := projects.NewProjectService(db, projectRepo) // Use projects.NewProjectService
+	settingsService := NewSettingsService(db)
+	*/
+
+	// Check if setup is needed (no admin user) - Logic moved to RegisterRoutes or handlers
+	/*
+	   adminExists, err := userService.CheckIfAdminExists(context.Background()) // Pass context
+	   if err != nil {
+	       log.Printf("CRITICAL: Failed to check for admin user: %v. Server cannot start securely.", err)
+	       // os.Exit(1) // Consider exiting if this check fails
+	       // For now, log and continue, but configuration page might be needed
+	   }
+	*/
+
+	// Load session salt (used by auth middleware/routes)
+	salt := common.GetEnvOrDefault("SESSION_SALT", "default-insecure-salt-change-me")
+	if salt == "default-insecure-salt-change-me" {
+		log.Println("WARNING: Using default insecure session salt. Set SESSION_SALT environment variable.")
 	}
 
-	// Create main router
+	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	salt := GetSessionSalt()
-
 	// Register all routes (uses RegisterRoutes from the server package)
-	// Pass potentially nil userService if in maintenance mode
+	// Pass the initialized userService and salt.
+	// Other services (db, templates, projectService, etc.) will be initialized *within* RegisterRoutes.
 	RegisterRoutes(mux, userService, salt)
 
-	// Create HTTP server
-	httpServer := &http.Server{
-		Addr:    ":" + common.GetEnvOrDefault("PORT", "8800"), // Use common.GetEnvOrDefault
-		Handler: mux,
+	log.Println("Server starting on port " + common.GetEnvOrDefault("PORT", "8800"))
+	if err := http.ListenAndServe(common.GetEnvOrDefault("PORT", "8800"), mux); err != nil {
+		return err
 	}
-
-	// Channel to listen for server errors
-	serverErrors := make(chan error, 1)
-
-	// Start the server in a goroutine
-	go func() {
-		log.Printf("Server starting on port %s", httpServer.Addr)
-		serverErrors <- httpServer.ListenAndServe()
-	}()
-
-	// Return the error from the channel (blocks until server stops or errors)
-	return <-serverErrors
+	return nil
 }

@@ -136,8 +136,8 @@ type ConfigSubmitRequest struct {
 	AliasHosts    []string `json:"alias_hosts"`    // Assuming frontend sends as array
 }
 
-// HandleConfigSubmit processes the configuration form submission
-func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService *auth.UserService, projectService projects.ProjectService) {
+// HandleConfigSubmit handles the configuration form submission
+func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService auth.UserServicer, projectService projects.ProjectService) {
 	if r.Method != http.MethodPost {
 		common.JSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -173,24 +173,37 @@ func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService *aut
 		return
 	}
 
-	// --- Create Admin User ---
-	// Use the CreateUser function that handles hashing
-	adminUser, err := userService.CreateUser(req.AdminEmail, req.AdminPassword)
+	// Create or find the admin user
+	// Use GetUserByEmail first, then CreateUser if not found
+	adminUser, err := userService.GetUserByEmail(r.Context(), req.AdminEmail)
 	if err != nil {
-		// Handle potential "user already exists" errors more gracefully if needed
-		log.Printf("Error creating admin user '%s': %v", req.AdminEmail, err)
-		common.JSONError(w, "Failed to create admin user: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	log.Printf("Admin user %s created successfully.", adminUser.Email)
-	// Ensure the user is explicitly marked as admin (CreateUser should handle first user, but maybe force here?)
-	if !adminUser.IsAdmin {
-		err = userService.MakeUserAdmin(adminUser.Email) // Make sure MakeUserAdmin exists and works
-		if err != nil {
-			log.Printf("WARN: Failed to ensure user %s is admin: %v", adminUser.Email, err)
-			// Decide if this is fatal. Maybe proceed?
+		if strings.Contains(err.Error(), "user not found") {
+			log.Printf("Admin user %s not found, creating...", req.AdminEmail)
+			adminUser, err = userService.CreateUser(r.Context(), req.AdminEmail) // Pass context
+			if err != nil {
+				common.JSONError(w, "Failed to create admin user: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// Ensure the newly created user is admin
+			if !adminUser.IsAdmin {
+				err = userService.MakeUserAdmin(r.Context(), adminUser.ID) // Use new method
+				if err != nil {
+					log.Printf("Failed to make user %d (%s) admin: %v", adminUser.ID, adminUser.Email, err)
+					// Continue but log error
+				}
+			}
 		} else {
-			log.Printf("User %s explicitly set as admin.", adminUser.Email)
+			common.JSONError(w, "Error checking admin user: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// User exists, ensure they are admin
+		if !adminUser.IsAdmin {
+			err = userService.MakeUserAdmin(r.Context(), adminUser.ID) // Use new method
+			if err != nil {
+				log.Printf("Failed to make existing user %d (%s) admin: %v", adminUser.ID, adminUser.Email, err)
+				// Continue but log error
+			}
 		}
 	}
 

@@ -70,7 +70,7 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleRequestOTP handles OTP requests
-func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserService) {
+func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService UserServicer) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -98,12 +98,12 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 	}
 
 	// Check if user exists
-	user, err := userService.GetUserByEmail(req.Email)
+	user, err := userService.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		// User doesn't exist - check if we should allow registration
 
-		// Check if any admin exists in the system
-		adminExists, err := userService.CheckIfAdminExists()
+		// Check if any admin exists in the system (uses context implicitly in CheckIfAdminExists)
+		adminExists, err := userService.CheckIfAdminExists(r.Context())
 		if err != nil {
 			log.Printf("Failed to check if admin exists: %v", err)
 			SendJSONResponse(w, false, "System error, please try again later", nil, "")
@@ -118,20 +118,15 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 		}
 
 		// No admin exists - this is first-user scenario
-		// For the first user, we need a temporary password to store.
-		// Ideally, this should prompt for setup, but for now, use a default or random one.
-		// IMPORTANT: This is insecure for production. First user setup needs a proper flow.
-		// Using the email temporarily as a placeholder password for hashing.
-		tempPassword := req.Email // Or generate a random string
-		log.Printf("WARN: Creating first user (%s) with temporary password derived from email. Needs proper setup flow.", req.Email)
-		user, err = userService.CreateUser(req.Email, tempPassword)
+		// CreateUser now handles setting the admin flag based on context and admin check
+		log.Printf("WARN: Attempting to create first user: %s", req.Email)
+		user, err = userService.CreateUser(r.Context(), req.Email)
 		if err != nil {
-			log.Printf("Failed to create first admin user: %v", err)
-			SendJSONResponse(w, false, "Failed to create user account", nil, "")
+			log.Printf("Failed to create first user: %v", err)
+			SendJSONResponse(w, false, "Failed to create user account: "+err.Error(), nil, "")
 			return
 		}
-
-		log.Printf("Created first admin user: %s", req.Email)
+		log.Printf("Created first user: %s (Admin: %v)", user.Email, user.IsAdmin)
 	}
 
 	// Send OTP
@@ -147,7 +142,7 @@ func HandleRequestOTP(w http.ResponseWriter, r *http.Request, userService *UserS
 }
 
 // HandleVerifyOTP handles OTP verification
-func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserService) {
+func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService UserServicer) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -181,7 +176,7 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 	}
 
 	// Get user
-	user, err := userService.GetUserByEmail(req.Email)
+	user, err := userService.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		log.Printf("Failed to get user: %v", err)
 		SendJSONResponse(w, false, "User not found", nil, "")
@@ -189,7 +184,7 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService *UserSe
 	}
 
 	// Update last login
-	if err := userService.UpdateUserLastLogin(user.ID); err != nil {
+	if err := userService.UpdateUserLastLogin(r.Context(), user.ID); err != nil {
 		log.Printf("Failed to update last login: %v", err)
 		// Don't fail the login for this, just log it
 	}
@@ -232,7 +227,7 @@ type PasswordLoginRequest struct {
 }
 
 // HandlePasswordLogin handles login attempts using email and password
-func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService *UserService) {
+func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService UserServicer) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -253,7 +248,7 @@ func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService *Us
 	}
 
 	// Verify password
-	user, err := userService.VerifyPassword(req.Email, req.Password)
+	user, err := userService.VerifyPassword(r.Context(), req.Email, req.Password)
 	if err != nil {
 		// Log the specific error for debugging, but send a generic message to the client
 		log.Printf("Password verification failed for %s: %v", req.Email, err)
@@ -262,7 +257,7 @@ func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService *Us
 	}
 
 	// Update last login
-	if err := userService.UpdateUserLastLogin(user.ID); err != nil {
+	if err := userService.UpdateUserLastLogin(r.Context(), user.ID); err != nil {
 		log.Printf("Failed to update last login: %v", err)
 		// Don't fail the login for this, just log it
 	}
