@@ -73,6 +73,29 @@ func GetEnvOrDefault(key, fallback string) string {
 	return fallback
 }
 
+func GetDefaultFallback(key string) string {
+	switch key {
+	case "APP_VERSION":
+		return "1.0.0.0"
+	case "SYSADMIN_EMAIL":
+		return "admin@example.com"
+	default:
+		return ""
+	}
+}
+
+// GetEnv looks up an environment variable or returns a fallback.
+func GetEnv(key string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+
+	fallback := GetDefaultFallback(key)
+
+	log.Printf("Using default for env var %s: %s", key, fallback)
+	return fallback
+}
+
 // getDriverName returns the normalized driver name from a database connection
 func getDriverName(db *sql.DB) string {
 	return strings.ToLower(fmt.Sprintf("%T", db.Driver()))

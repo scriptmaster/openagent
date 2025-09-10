@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/scriptmaster/openagent/cmd"
+	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/server"
 	"github.com/spf13/cobra"
 )
@@ -66,10 +67,7 @@ func startServer() {
 
 		case sig := <-signals:
 			// Received termination signal
-			appVersion := os.Getenv("APP_VERSION")
-			if appVersion == "" {
-				appVersion = "1.0.0.0" // Default if not set
-			}
+			appVersion := common.GetEnv("APP_VERSION")
 
 			log.Printf("\n📡 Received signal %v. Bye bye! OpenAgent version %s shutting down...\n", sig, appVersion)
 

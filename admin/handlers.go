@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,8 +20,8 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request, templates *template.Tem
 	data := models.PageData{
 		AppName:    "OpenAgent",
 		PageTitle:  "Admin Dashboard - OpenAgent",
-		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
 	}
 
 	if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
@@ -41,8 +40,8 @@ func HandleMaintenance(w http.ResponseWriter, r *http.Request, templates *templa
 	// Show login page using the new struct from types.go
 	data := MaintenanceLoginData{
 		Error:      r.URL.Query().Get("error"),
-		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance-login.html", data); err != nil {
@@ -65,7 +64,7 @@ func HandleMaintenanceAuth(w http.ResponseWriter, r *http.Request, sessionSalt s
 
 	// Validate token
 	submittedToken := r.FormValue("token")
-	envToken := os.Getenv("MAINTENANCE_TOKEN")
+	envToken := common.GetEnv("MAINTENANCE_TOKEN")
 
 	if envToken == "" || submittedToken != envToken {
 		http.Redirect(w, r, "/maintenance?error="+url.QueryEscape("Invalid maintenance token"), http.StatusSeeOther)
@@ -101,7 +100,7 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
-	appVersion := os.Getenv("APP_VERSION")
+	appVersion := common.GetEnv("APP_VERSION")
 	if appVersion != "" {
 		parts := strings.Split(appVersion, ".")
 		if len(parts) == 4 {
@@ -115,19 +114,19 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 	build, _ := strconv.Atoi(versionParts[3])
 
 	// Get current migration start number - always retrieve the latest from environment
-	migrationStart := os.Getenv("MIGRATION_START")
+	migrationStart := common.GetEnv("MIGRATION_START")
 	if migrationStart == "" {
 		migrationStart = "000" // Ensure consistent formatting with leading zeros
 	}
 
 	// Use the new struct from types.go
 	data := MaintenanceConfigData{
-		DBHost:         os.Getenv("DB_HOST"),
-		DBPort:         os.Getenv("DB_PORT"),
-		DBUser:         os.Getenv("DB_USER"),
-		DBPassword:     os.Getenv("DB_PASSWORD"), // Populate even if not always shown
-		DBName:         os.Getenv("DB_NAME"),
-		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		DBHost:         common.GetEnv("DB_HOST"),
+		DBPort:         common.GetEnv("DB_PORT"),
+		DBUser:         common.GetEnv("DB_USER"),
+		DBPassword:     common.GetEnv("DB_PASSWORD"), // Populate even if not always shown
+		DBName:         common.GetEnv("DB_NAME"),
+		AdminEmail:     common.GetEnv("SYSADMIN_EMAIL"),
 		Error:          errorMsg,
 		Success:        successMsg,
 		VersionMajor:   major,
@@ -135,11 +134,11 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 		VersionPatch:   patch,
 		VersionBuild:   build,
 		MigrationStart: migrationStart,
-		SMTPHost:       os.Getenv("SMTP_HOST"),
-		SMTPPort:       os.Getenv("SMTP_PORT"),
-		SMTPUser:       os.Getenv("SMTP_USER"),
-		SMTPPassword:   os.Getenv("SMTP_PASSWORD"), // Populate even if not always shown
-		SMTPFrom:       os.Getenv("SMTP_FROM"),
+		SMTPHost:       common.GetEnv("SMTP_HOST"),
+		SMTPPort:       common.GetEnv("SMTP_PORT"),
+		SMTPUser:       common.GetEnv("SMTP_USER"),
+		SMTPPassword:   common.GetEnv("SMTP_PASSWORD"), // Populate even if not always shown
+		SMTPFrom:       common.GetEnv("SMTP_FROM"),
 	}
 
 	if err := templates.ExecuteTemplate(w, "maintenance.html", data); err != nil {
@@ -273,7 +272,7 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 	log.Printf("Maintenance configuration error: %s", errorMsg)
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
-	appVersion := os.Getenv("APP_VERSION")
+	appVersion := common.GetEnv("APP_VERSION")
 	if appVersion != "" {
 		parts := strings.Split(appVersion, ".")
 		if len(parts) == 4 {
@@ -287,7 +286,7 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 	build, _ := strconv.Atoi(versionParts[3])
 
 	// Get current migration start number
-	migrationStart := os.Getenv("MIGRATION_START")
+	migrationStart := common.GetEnv("MIGRATION_START")
 	if migrationStart == "" {
 		migrationStart = "000"
 	}
@@ -299,7 +298,7 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 		DBUser:         r.FormValue("db_user"),
 		DBPassword:     r.FormValue("db_password"),
 		DBName:         r.FormValue("db_name"),
-		AdminEmail:     os.Getenv("SYSADMIN_EMAIL"),
+		AdminEmail:     common.GetEnv("SYSADMIN_EMAIL"),
 		Error:          errorMsg,
 		VersionMajor:   major,
 		VersionMinor:   minor,

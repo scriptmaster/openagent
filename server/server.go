@@ -99,8 +99,9 @@ func StartServer() error {
 	// Other services (db, templates, projectService, etc.) will be initialized *within* RegisterRoutes.
 	RegisterRoutes(mux, userService, salt)
 
-	log.Println("Server starting on port " + common.GetEnvOrDefault("PORT", "8800"))
-	if err := http.ListenAndServe(common.GetEnvOrDefault("PORT", "8800"), mux); err != nil {
+	port := common.GetEnvOrDefault("PORT", "8800")
+	log.Println("Server starting on port " + port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		return err
 	}
 	return nil

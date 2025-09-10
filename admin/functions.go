@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/scriptmaster/openagent/common"
 )
 
 // IsMaintenanceAuthenticated checks if the request has a valid maintenance authentication cookie
@@ -20,7 +22,7 @@ func IsMaintenanceAuthenticated(r *http.Request) bool {
 
 	// Expected value with current version salt
 	// Compare against first 8 chars of version for basic check
-	currentVersion := os.Getenv("APP_VERSION")
+	currentVersion := common.GetEnv("APP_VERSION")
 	if len(currentVersion) < 8 {
 		currentVersion = "1.0.0.0_" // Default to avoid panic
 	}
@@ -32,7 +34,7 @@ func IsMaintenanceAuthenticated(r *http.Request) bool {
 
 // GetBuildNumber extracts the build number from the APP_VERSION env var.
 func GetBuildNumber() int {
-	currentVersion := os.Getenv("APP_VERSION")
+	currentVersion := common.GetEnv("APP_VERSION")
 	if currentVersion == "" {
 		return 0
 	}
