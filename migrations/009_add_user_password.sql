@@ -4,4 +4,4 @@ ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''; -- Add temporar
 
 -- Remove the temporary default constraint
 ALTER TABLE ai.users
-ALTER COLUMN password_hash DROP DEFAULT; 
+ALTER COLUMN password_hash DROP DEFAULT;

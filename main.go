@@ -44,9 +44,11 @@ func startServer() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 
+	appVersion := common.GetEnv("APP_VERSION")
+
 	// Outer loop for restarting the server
 	for {
-		log.Println("--- Server Starting ---")
+		log.Printf("--- Server (Version %v) Starting ---", appVersion)
 		errCh := make(chan error, 1)
 		go func() {
 			errCh <- server.StartServer()
@@ -67,8 +69,6 @@ func startServer() {
 
 		case sig := <-signals:
 			// Received termination signal
-			appVersion := common.GetEnv("APP_VERSION")
-
 			log.Printf("\n📡 Received signal %v. Bye bye! OpenAgent version %s shutting down...\n", sig, appVersion)
 
 			// Exit gracefully - this breaks the restart loop

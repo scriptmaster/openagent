@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS ai.project_dbs (
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(project_id, name)
-); 
+);

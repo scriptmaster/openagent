@@ -7,3 +7,5 @@ tmp*
 *.exe
 openagent
 nul
+*.local
+.devcontainer

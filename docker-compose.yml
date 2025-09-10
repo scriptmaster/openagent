@@ -31,7 +31,6 @@ services:
       - APP_VERSION=${APP_VERSION:-1.0.0}
     depends_on:
       - postgres
-      - ollama
     networks:
       - app-net
     restart: unless-stopped
@@ -49,16 +48,16 @@ services:
       - app-net
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-service
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - app-net
-    restart: unless-stopped
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama-service
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - app-net
+  #   restart: unless-stopped
 
 networks:
   app-net:

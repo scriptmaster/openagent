@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -46,13 +47,13 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			project, err = projectService.GetByDomain(host)
 			if err != nil && err != projects.ErrProjectNotFound {
 				log.Printf("Error fetching project by domain '%s': %v", host, err)
-				http.Error(w, "Internal Server Error checking project domain", http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("Internal Server Error checking project domain. GetByDomain(\"%v\")", host), http.StatusInternalServerError)
 				return
 			}
 		} else {
 			// If projectService is nil (DB issue), treat as project not found
 			err = projects.ErrProjectNotFound
-			log.Printf("Project service not available, cannot check host: %s", host)
+			log.Printf("Project service not available, cannot check host: %s, %v", host, err)
 		}
 
 		if project != nil {
@@ -69,6 +70,7 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			if user != nil {
 				ctx = auth.SetUserContext(ctx, user) // SetUserContext is likely still in auth package
 			}
+			log.Printf("\t → \t → \t → 6.X.HPM: HandleConfigPage:")
 			HandleConfigPage(w, r.WithContext(ctx))
 		}
 	})

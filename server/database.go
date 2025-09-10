@@ -57,8 +57,11 @@ func applySchema(db *sql.DB) error {
 		// Reset migration tracking since schema was just potentially created
 		if err := UpdateMigrationStart(0); err != nil {
 			log.Printf("Warning: Failed to reset MIGRATION_START in .env: %v", err)
+			return err
 		}
 	}
+
+	log.Printf("\t → \t → Schemea 'ai' exists: %v", schemaExists)
 
 	// Read and execute migration files in order
 	files, err := os.ReadDir("migrations")
@@ -97,14 +100,14 @@ func applySchema(db *sql.DB) error {
 	highestAppliedThisRun := lastApplied // Track the highest number applied in this execution
 
 	// Execute migrations higher than lastApplied
-	log.Printf("Applying migrations starting after %d...", lastApplied)
+	log.Printf("\t → \t → Applying migrations starting after %d...", lastApplied)
 	migrationsApplied := 0
 	for _, fileName := range fileNames {
 		numStr := strings.SplitN(fileName, "_", 2)[0]
 		num, _ := strconv.Atoi(numStr) // Error already checked above
 
 		if num > lastApplied {
-			log.Printf("Applying migration: %s", fileName)
+			log.Printf("\t → \t → Applying migration file: %s", fileName)
 			migrationPath := filepath.Join("migrations", fileName)
 			migrationBytes, readErr := os.ReadFile(migrationPath)
 			if readErr != nil {
@@ -134,14 +137,14 @@ func applySchema(db *sql.DB) error {
 			}
 		}
 	} else {
-		log.Printf("No new migrations needed (last applied: %d).", lastApplied)
+		log.Printf("\t → \t → No new migrations applied (Last migration: %d).", lastApplied)
 	}
 
 	return nil
 }
 
 // updateMigrationStart updates the MIGRATION_START value in the .env file (local helper)
-func updateMigrationStart(migrationNum int) error {
+func updateMigrationStartInEnvFile(migrationNum int) error {
 	// Format migration number with leading zeros for consistent display
 	formattedNum := fmt.Sprintf("%03d", migrationNum)
 
@@ -198,7 +201,7 @@ func UpdateMigrationStart(migrationNum int) error {
 	// Update the environment variable in the current process for consistency
 	os.Setenv("MIGRATION_START", fmt.Sprintf("%03d", migrationNum))
 	// Update the .env file
-	return updateMigrationStart(migrationNum)
+	return updateMigrationStartInEnvFile(migrationNum)
 }
 
 // RunMigrations runs the database migrations (exported alias for applySchema)
@@ -253,28 +256,44 @@ func InitDB() (*sql.DB, error) {
 
 	initialDB, err := sql.Open(driver, initialDSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open initial connection to default database '%s': %w", defaultDbName, err)
+		return nil, fmt.Errorf("error: open initial connection to default database '%s': %w", defaultDbName, err)
 	}
 	defer initialDB.Close()
 
 	if err = initialDB.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping default database '%s': %w", defaultDbName, err)
+		return nil, fmt.Errorf("error: ping default database '%s': %w", defaultDbName, err)
 	}
+	log.Printf("\t → \t → Default Database Ping Successful: %v", defaultDbName)
 
 	// --- Step 2: Try to create the target database ---
-	// log.Printf("Ensuring database '%s' exists...", targetDbName)
-	_, err = initialDB.Exec(fmt.Sprintf("CREATE DATABASE \"%s\"", targetDbName)) // Use quoted identifier for safety
+	log.Printf("\t → \t → Switching from default to Target Database: '%s'. Ensuring it exists...", targetDbName)
+	// Check if the target database already exists using pg_database (PostgreSQL's system catalog for databases)
+	var dbExists bool
+	// Use pq.QuoteIdentifier for the database name in the WHERE clause for safety against SQL injection
+	// and to correctly handle database names with special characters.
+	// quotedTargetDbName := pq.QuoteIdentifier(targetDbName)
+	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = '%s')", targetDbName)
+	log.Printf("\t → \t → Running Query: %v", query)
+	err = initialDB.QueryRow(query).Scan(&dbExists)
 	if err != nil {
-		// Check if the error is "database already exists"
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "42P04" { // 42P04 is the code for duplicate_database
-			log.Printf("Database '%s' exists and is ready to connect to.", targetDbName)
-		} else {
-			// Another error occurred (e.g., permission denied)
-			return nil, fmt.Errorf("failed to create target database '%s': %w", targetDbName, err)
-		}
-	} else {
-		log.Printf("Database '%s' created successfully.", targetDbName)
+		return nil, fmt.Errorf("error checking if database '%s' exists: %w", targetDbName, err)
 	}
+
+	if dbExists {
+		log.Printf("\t → 2. Database %s exists and is ready to connect.", targetDbName)
+	} else {
+		// If the database does not exist, attempt to create it.
+		log.Printf("\t → \t → Database %s does not exist. Attempting to create...", targetDbName)
+		// Use pq.QuoteIdentifier for the CREATE DATABASE command as well.
+		_, err = initialDB.Exec(fmt.Sprintf("CREATE DATABASE %s", targetDbName))
+		if err != nil {
+			// If creation fails for reasons other than "already exists" (which is handled by the SELECT EXISTS check),
+			// then it's a genuine error (e.g., permissions).
+			return nil, fmt.Errorf("error: create target database '%s': %w", targetDbName, err)
+		}
+		log.Printf("\t → 2.100 Database '%s' created successfully.", targetDbName)
+	}
+
 	// Initial connection no longer needed
 	initialDB.Close()
 
@@ -292,26 +311,29 @@ func InitDB() (*sql.DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping target database '%s': %w", targetDbName, err)
 	}
-	log.Printf("→    Successfully connected to target database '%s'", targetDbName)
+	log.Printf("\t → 3. Successfully pinged to target database '%s'", targetDbName)
 
 	// --- Run Database Migrations (Old Method) ---
-	log.Println("Applying database schema/migrations...")
+	log.Println("\t → 4. Applying database schema/migrations...")
 	if err := applySchema(sqlDB); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to apply database schema/migrations: %w", err)
 	}
 	// -------------------------------------------
 
+	// Store the initialized instance globally
+	dbInstance = sqlDB
+
+	log.Printf("\t → 4.100 Database '%s' completely initialized.", targetDbName) // Consolidated message
+
+	// -------------------------------------------
+	log.Println("\t → 5. Checking/Creating Admin Token...")
 	// --- Check/Create Admin Token ---
 	_, tokenErr := CheckOrCreateAdminToken(sqlDB)
 	if tokenErr != nil {
 		log.Printf("WARNING: Failed to check/create admin token: %v", tokenErr)
 	}
-
-	// Store the initialized instance globally
-	dbInstance = sqlDB
-
-	log.Printf("Database '%s' completely initialized.", targetDbName) // Consolidated message
+	// -------------------------------------------
 
 	return dbInstance, nil
 }

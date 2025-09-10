@@ -68,8 +68,8 @@ clean:
 	rm -f $(BINARY_NAME)
 	go clean
 
-# Deploy using Git (push and pull)
-deploy: deploy-git
+deploy: deploy-scp
+# deploy: deploy-git
 
 # Deploy to server using git commit hash for versioning
 deploy-git: build
@@ -91,15 +91,21 @@ deploy-git: build
 # Deploy using SCP (legacy method)
 deploy-scp:
 	@echo "Deploying using SCP to $(REMOTE_HOST)..."
+	
 	# Copy Dockerfile from root, docker-compose.yml from cicd/
 	scp Dockerfile $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
-	scp cicd/docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/cicd/ # Copy to cicd subdir on remote
+	
+	# scp cicd/docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/cicd/ # Copy to cicd subdir on remote
+	scp docker-compose.yml $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/ # Copy to cicd subdir on remote
+	
 	# Use rsync for other files, excluding .git, .env, etc.
 	rsync -avz --exclude '.git' --exclude '.env' --exclude '.idea' --exclude '.vscode' --exclude 'node_modules' --exclude '*.log' ./ $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
+	
 	@echo "Executing remote build and run..."
 	# IMPORTANT: Ensure .env file is securely managed on the remote server in $(REMOTE_DIR)
 	# Run docker compose using the compose file in cicd/
-	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && docker compose -f cicd/docker-compose.yml up -d --build"
+	
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && docker compose -f docker-compose.yml up -d --build"
 	@echo "SCP Deployment complete!"
 
 # Docker commands

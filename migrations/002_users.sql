@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS ai.users (
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_logged_in TIMESTAMP WITH TIME ZONE
-); 
+);

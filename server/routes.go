@@ -26,7 +26,7 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 	// var dataService DataAccessService // Declared and not used
 
 	if db != nil {
-		log.Println("Database connection available, initializing DB-dependent services.")
+		log.Println("\t → \t → 6.1 Database connection available, initializing DB-dependent services and routes.")
 		pdbService = NewProjectDBService(db)
 		// settingsService = NewSettingsService(db) // Commented out: Not used yet
 		// dataService = NewDirectDataService(db) // Commented out: Not used yet
@@ -41,8 +41,10 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 		// Services remain nil
 	}
 
+	staticFilesRoot := "./static"
+	log.Printf("\t → \t → 6.2 Static files served from: %v", staticFilesRoot)
 	// --- Static Files ---
-	fs := http.FileServer(http.Dir("./static"))
+	fs := http.FileServer(http.Dir(staticFilesRoot))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	// --- Exempt Paths Middleware (Applied Later) ---
@@ -64,8 +66,10 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 
 	// --- Register Non-Project/Public Routes Directly on baseMux ---
 
+	maintenanceRoutePath := "/maintenance"
+	log.Printf("\t → \t → 6.3 Creating maintenance route: %v", maintenanceRoutePath)
 	// Maintenance Page
-	baseMux.HandleFunc("/maintenance", func(w http.ResponseWriter, r *http.Request) {
+	baseMux.HandleFunc(maintenanceRoutePath, func(w http.ResponseWriter, r *http.Request) {
 		admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated)
 	})
 	// Admin Login for Maintenance
@@ -75,8 +79,10 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 	})
 	*/
 
+	configRoutePath := "/config"
+	log.Printf("\t → \t → 6.3 Creating config route paths: %v and ./save", configRoutePath)
 	// Configuration Page & Save Endpoint
-	baseMux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+	baseMux.HandleFunc(configRoutePath, func(w http.ResponseWriter, r *http.Request) {
 		HandleConfigPage(w, r)
 	})
 	baseMux.HandleFunc("/config/save", func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +114,7 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 
 	// --- Register Other Protected Routes --- (Use baseMux)
 
+	log.Printf("\t → \t → 6.X Setting /dashboard handler with Auth")
 	// Dashboard (requires auth)
 	baseMux.Handle("/dashboard", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if projectService == nil { // Check if projectService is initialized
@@ -117,9 +124,11 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 		HandleDashboard(w, r, projectService)
 	})))
 
+	log.Printf("\t → \t → 6.X Setting /voice handler with Auth")
 	// Voice Page (assuming it needs auth)
 	baseMux.Handle("/voice", auth.AuthMiddleware(http.HandlerFunc(HandleVoicePage)))
 
+	log.Printf("\t → \t → Setting / handler to HostProjectMiddleware")
 	// --- Apply Middleware ---
 	finalHandler := HostProjectMiddleware(baseMux, projectService, userService, exemptPaths)
 	mux.Handle("/", finalHandler) // Route ALL requests through the middleware first

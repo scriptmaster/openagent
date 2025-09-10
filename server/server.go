@@ -39,9 +39,11 @@ func StartServer() error {
 
 	// Load SQL queries from the driver-specific directory
 	if err := common.LoadNamedSQLFiles(sqlDir); err != nil {
-		log.Fatalf("CRITICAL: Failed to load SQL files from %s: %v", sqlDir, err)
+		log.Printf("\t → 1. CRITICAL: Failed to load SQL files from %s: %v", sqlDir, err)
+		return err
+	} else {
+		log.Printf("\t → 1. Successfully loaded SQL queries from %s", sqlDir)
 	}
-	log.Printf("Successfully loaded SQL queries from %s", sqlDir)
 
 	// Initialize database (uses InitDB from the server package)
 	db, err := InitDB()
@@ -63,17 +65,10 @@ func StartServer() error {
 		log.Println("Continuing server start in maintenance mode...")
 	}
 
-	// Initialize services
+	// Initialize the 3 services
 	pdbService := NewProjectDBService(db)
 	dataService := NewDirectDataService(db)
 	userService := NewUserService(db, pdbService, dataService) // Use server.NewUserService
-	// projectService := NewProjectService(db) // ProjectService initialization might depend on repository
-	/* // Commented out projectService and settingsService initialization as they are done in routes.go
-	sqlxDB := sqlx.NewDb(db, "postgres") // Assuming postgres, adjust if needed
-	projectRepo := projects.NewProjectRepository(sqlxDB)
-	projectService := projects.NewProjectService(db, projectRepo) // Use projects.NewProjectService
-	settingsService := NewSettingsService(db)
-	*/
 
 	// Check if setup is needed (no admin user) - Logic moved to RegisterRoutes or handlers
 	/*
@@ -86,23 +81,27 @@ func StartServer() error {
 	*/
 
 	// Load session salt (used by auth middleware/routes)
-	salt := common.GetEnvOrDefault("SESSION_SALT", "default-insecure-salt-change-me")
-	if salt == "default-insecure-salt-change-me" {
+	salt := common.GetEnvOrDefault("SESSION_SALT", "DEFAULT-SALT-72815ECE-99A4-45FD-98C0-38D9EE04813F")
+	if salt == "DEFAULT-SALT-72815ECE-99A4-45FD-98C0-38D9EE04813F" {
 		log.Println("WARNING: Using default insecure session salt. Set SESSION_SALT environment variable.")
 	}
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
+	log.Printf("\t → 6. Registering Routes")
 	// Register all routes (uses RegisterRoutes from the server package)
 	// Pass the initialized userService and salt.
 	// Other services (db, templates, projectService, etc.) will be initialized *within* RegisterRoutes.
 	RegisterRoutes(mux, userService, salt)
 
-	port := common.GetEnvOrDefault("PORT", "8800")
-	log.Println("Server starting on port " + port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	startAddress := ":" + common.GetEnvOrDefault("PORT", "8800")
+	log.Println("Server starting on " + startAddress)
+
+	if err := http.ListenAndServe(startAddress, mux); err != nil {
 		return err
 	}
+
+	log.Println("!! Server STARTED !! " + startAddress)
 	return nil
 }

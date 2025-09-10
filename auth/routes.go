@@ -2,6 +2,7 @@ package auth
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 )
 
@@ -10,6 +11,7 @@ func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userSe
 	// Initialize templates for auth handlers
 	InitAuthTemplates(templates)
 
+	log.Printf("\t → \t → 6.X Registering Auth Routes /auth/*, /login, /logout, POST /password-login")
 	// Auth API endpoints
 	mux.HandleFunc("/auth/request-otp", func(w http.ResponseWriter, r *http.Request) {
 		HandleRequestOTP(w, r, userService)

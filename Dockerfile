@@ -1,11 +1,11 @@
 # Stage 1: Build the Go application
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /build
 
 # Copy module files first for caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod tidy
 
 # Copy all source code from root and subdirectories
 COPY . .
@@ -49,7 +49,7 @@ EXPOSE 8800
 # Set default environment variables
 ENV PORT=8800
 ENV DATA_DIR=/app/data
-ENV SQL_DIR=/app/data/sql # Point SQL loader to the new image location
+ENV SQL_DIR=/app/data/sql
 
 # Command to run when the container starts
-CMD ["/app/server"] 
+CMD ["/app/server"]
