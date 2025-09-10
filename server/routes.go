@@ -16,7 +16,7 @@ import (
 // RegisterRoutes sets up all the application routes
 func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt string) {
 	// Load HTML templates
-	templates := LoadTemplates()
+	globalTemplates = LoadTemplates() // Global Templates
 
 	// Initialize database and other services (handle potential nil db)
 	db := GetDB() // Get the initialized DB instance
@@ -70,7 +70,7 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 	log.Printf("\t → \t → 6.3 Creating maintenance route: %v", maintenanceRoutePath)
 	// Maintenance Page
 	baseMux.HandleFunc(maintenanceRoutePath, func(w http.ResponseWriter, r *http.Request) {
-		admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated)
+		admin.HandleMaintenance(w, r, globalTemplates, auth.IsMaintenanceAuthenticated)
 	})
 	// Admin Login for Maintenance
 	/* // Commented out: admin.HandleAdminLogin undefined
@@ -95,7 +95,7 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 
 	// --- Register Auth Routes --- (Use baseMux)
 	if userService != nil {
-		auth.RegisterAuthRoutes(baseMux, templates, userService)
+		auth.RegisterAuthRoutes(baseMux, globalTemplates, userService)
 	} else {
 		// Handle auth routes gracefully if userService is nil
 		log.Println("Auth routes disabled: userService is nil (DB connection likely failed)")
@@ -105,7 +105,7 @@ func RegisterRoutes(mux *http.ServeMux, userService auth.UserServicer, salt stri
 
 	// --- Register Project Routes --- (Use baseMux)
 	if db != nil && userService != nil && pdbService != nil { // Ensure all needed services are available
-		projects.RegisterProjectRoutes(baseMux, templates, userService, db, pdbService)
+		projects.RegisterProjectRoutes(baseMux, globalTemplates, userService, db, pdbService)
 	} else {
 		// Handle project routes gracefully if services are nil
 		log.Println("Project routes disabled: required services (db, userService, pdbService) not available")

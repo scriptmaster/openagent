@@ -24,7 +24,7 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 		// Check for maintenance mode first
 		if IsMaintenanceMode() && !strings.HasPrefix(r.URL.Path, "/maintenance") {
 			// Allow access only to maintenance routes
-			admin.HandleMaintenance(w, r, templates, auth.IsMaintenanceAuthenticated) // Assuming templates is accessible
+			admin.HandleMaintenance(w, r, globalTemplates, auth.IsMaintenanceAuthenticated) // Assuming templates is accessible
 			return
 		}
 
@@ -36,7 +36,20 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			}
 		}
 
-		host := r.Host // e.g., "localhost:8800", "myproject.com"
+		host := r.Host // Default to the Host header from the request (e.g., "localhost:8800", "myproject.com")
+
+		// Check if the request is likely coming from behind a proxy (e.g., Nginx)
+		// by looking for the X-Forwarded-For header.
+		if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+			// If X-Forwarded-For is present, it indicates a proxy.
+			// In such cases, the original host requested by the client is typically found in X-Forwarded-Host.
+			if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+				host = forwardedHost
+			}
+			// If X-Forwarded-Host is not present, but X-Forwarded-For is,
+			// we stick with the initial r.Host. X-Forwarded-For itself contains client IP, not the host domain.
+			// The presence of X-Forwarded-For serves as the check for being behind a proxy.
+		}
 		// Clean the host? Remove port? Depends on how domains are stored. Assuming stored without port for now.
 		host = strings.Split(host, ":")[0]
 
@@ -62,7 +75,7 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			next.ServeHTTP(w, r.WithContext(ctx))
 		} else {
 			// Project not found for this host, serve/redirect to config page
-			log.Printf("No project found for host '%s', serving config page.", host)
+			log.Printf("\t → \t → No project found for host '%s', serving config page.", host)
 			// Add user info if logged in, for display on config page
 			// Use GetUserFromContext now
 			user := auth.GetUserFromContext(r.Context())
@@ -70,7 +83,7 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			if user != nil {
 				ctx = auth.SetUserContext(ctx, user) // SetUserContext is likely still in auth package
 			}
-			log.Printf("\t → \t → \t → 6.X.HPM: HandleConfigPage:")
+			// log.Printf("\t → \t → \t → 6.X.HPM: HandleConfigPage:")
 			HandleConfigPage(w, r.WithContext(ctx))
 		}
 	})

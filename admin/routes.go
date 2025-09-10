@@ -8,7 +8,7 @@ import (
 )
 
 // RegisterAdminRoutes registers all admin-related routes
-func RegisterAdminRoutes(mux *http.ServeMux, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error, updateMigrationStart func(migrationNum int) error, initDB func() (*sql.DB, error), sessionSalt string) {
+func RegisterAdminRoutes(mux *http.ServeMux, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error, initDB func() (*sql.DB, error), sessionSalt string) {
 	// Admin dashboard
 	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		HandleAdmin(w, r, templates)
@@ -28,11 +28,11 @@ func RegisterAdminRoutes(mux *http.ServeMux, templates *template.Template, isMai
 	})
 
 	mux.HandleFunc("/maintenance/configure", func(w http.ResponseWriter, r *http.Request) {
-		HandleMaintenanceConfigure(w, r, templates, isMaintenanceAuthenticated, updateDatabaseConfig, updateMigrationStart)
+		HandleMaintenanceConfigure(w, r, templates, isMaintenanceAuthenticated, updateDatabaseConfig)
 	})
 
 	mux.HandleFunc("/maintenance/initialize-schema", func(w http.ResponseWriter, r *http.Request) {
-		HandleInitializeSchema(w, r, isMaintenanceAuthenticated, updateMigrationStart, initDB)
+		HandleInitializeSchema(w, r, isMaintenanceAuthenticated, initDB)
 	})
 }
 

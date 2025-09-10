@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	templates   *template.Template
-	appVersion  string
-	sessionSalt string
+	globalTemplates *template.Template
+	appVersion      string
+	sessionSalt     string
 )
 
 // StartServer initializes and starts the web server.

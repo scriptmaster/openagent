@@ -54,12 +54,20 @@ test:
 	@echo "Running tests..."
 	go test -v ./...
 	@echo "Testing local build..."
-	go run . & \
-	PID=$$! && \
-	sleep 5 && \
-	curl -s http://localhost:8800/ > /dev/null && \
-	echo "Test successful, server is responding!" || echo "Test failed, server not responding"; \
-	kill -9 $$PID 2>/dev/null || true
+	# Start a background process to check the server after a delay
+	( \
+		echo "Background server health check initiated. Waiting 5 seconds..."; \
+		sleep 5; \
+		if curl -s http://localhost:8800/ > /dev/null; then \
+			echo "Background check: Server is responding!"; \
+		else \
+			echo "Background check: Server not responding."; \
+		fi \
+	) & \
+	# Run the application in the foreground, allowing Ctrl+C
+	echo "Starting application in foreground. Press Ctrl+C to stop."; \
+	go run . ; \
+	echo "Application stopped."
 	@echo "Test completed"
 
 # Clean build files

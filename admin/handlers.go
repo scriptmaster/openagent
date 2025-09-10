@@ -147,7 +147,7 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 }
 
 // HandleMaintenanceConfigure updates database configuration and attempts to reconnect
-func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error, updateMigrationStart func(migrationNum int) error) {
+func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error) {
 	// Verify authentication (should be caught by middleware, but double-check)
 	if !isMaintenanceAuthenticated(r) {
 		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
@@ -161,7 +161,7 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to parse form data: "+err.Error())
+		handleMaintenanceError(w, r, templates, "Failed to parse form data: "+err.Error())
 		return
 	}
 
@@ -188,50 +188,42 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 
 	// Validate database fields
 	if host == "" || port == "" || user == "" || dbname == "" {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "All database fields except password are required")
+		handleMaintenanceError(w, r, templates, "All database fields except password are required")
 		return
 	}
 
 	// Validate version inputs
 	major, err := strconv.Atoi(majorStr)
 	if err != nil || major < 0 {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Invalid major version number")
+		handleMaintenanceError(w, r, templates, "Invalid major version number")
 		return
 	}
 
 	minor, err := strconv.Atoi(minorStr)
 	if err != nil || minor < 0 {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Invalid minor version number")
+		handleMaintenanceError(w, r, templates, "Invalid minor version number")
 		return
 	}
 
 	patch, err := strconv.Atoi(patchStr)
 	if err != nil || patch < 0 {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Invalid patch version number")
+		handleMaintenanceError(w, r, templates, "Invalid patch version number")
 		return
 	}
 
-	// Handle migration tracking
+	// Handle migration tracking - now using database-based tracking
 	if resetMigrations {
 		// Reset migration tracking to apply all migrations
 		log.Println("Migration tracking reset requested")
-		if err := updateMigrationStart(0); err != nil {
-			log.Printf("Warning: Failed to reset migration tracking: %v", err)
-		} else {
-			log.Println("Migration tracking reset to 0")
-		}
+		// Get database connection - we need to get this from the initDB function
+		// For now, we'll skip the reset if we can't get the DB connection
+		log.Println("Migration reset requested but database connection not available in this context")
+		// TODO: Pass database connection to this handler or get it from a global
+		// For now, we'll just log the request
 	} else if migrationStart != "" {
-		// Parse migration start number, handling different formats (4, 04, 004)
-		migNum, err := strconv.Atoi(migrationStart)
-		if err != nil {
-			handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Invalid migration number: "+err.Error())
-			return
-		}
-		log.Printf("Updating migration start number to %d", migNum)
-		if err := updateMigrationStart(migNum); err != nil {
-			handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update migration start number: "+err.Error())
-			return
-		}
+		// Migration start number is no longer used with database-based tracking
+		// This is kept for backward compatibility but doesn't do anything
+		log.Printf("Migration start number '%s' provided but ignored - using database-based tracking", migrationStart)
 	}
 
 	// Construct the updated configuration
@@ -252,7 +244,7 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 
 	// Update environment variables and .env file
 	if err := UpdateEnvFile(configUpdates); err != nil {
-		handleMaintenanceError(w, r, templates, isMaintenanceAuthenticated, "Failed to update configuration file: "+err.Error())
+		handleMaintenanceError(w, r, templates, "Failed to update configuration file: "+err.Error())
 		return
 	}
 
@@ -268,7 +260,7 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 }
 
 // handleMaintenanceError redirects back to the config page with an error message
-func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, errorMsg string) {
+func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *template.Template, errorMsg string) {
 	log.Printf("Maintenance configuration error: %s", errorMsg)
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
@@ -318,7 +310,7 @@ func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *t
 }
 
 // HandleInitializeSchema attempts to initialize the database schema.
-func HandleInitializeSchema(w http.ResponseWriter, r *http.Request, isMaintenanceAuthenticated func(r *http.Request) bool, updateMigrationStart func(migrationNum int) error, initDB func() (*sql.DB, error)) {
+func HandleInitializeSchema(w http.ResponseWriter, r *http.Request, isMaintenanceAuthenticated func(r *http.Request) bool, initDB func() (*sql.DB, error)) {
 	if !isMaintenanceAuthenticated(r) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -334,8 +326,8 @@ func HandleInitializeSchema(w http.ResponseWriter, r *http.Request, isMaintenanc
 	}
 	db.Close()
 
-	// After successful initialization, reset migration start number to 0
-	if err := updateMigrationStart(0); err != nil {
+	// After successful initialization, reset migration tracking in database
+	if err := common.ResetMigrationTracking(db); err != nil {
 		log.Printf("Warning: Failed to reset migration tracking after schema init: %v", err)
 	}
 

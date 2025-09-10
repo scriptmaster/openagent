@@ -26,11 +26,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var (
-	db     *sql.DB
-	dbOnce sync.Once
-)
-
 // Global database instance and mutex
 var dbInstance *sql.DB
 var dbMutex sync.Mutex
@@ -38,30 +33,23 @@ var dbMutex sync.Mutex
 type User = auth.User
 
 // applySchema runs the SQL in migrations directory to initialize the database
-// based on MIGRATION_START environment variable.
+// based on ai.migrations table tracking.
 func applySchema(db *sql.DB) error {
-	// First check if the ai schema exists - if not, reset migration tracking
+	// First check if the ai schema exists - if not, create it
 	var schemaExists bool
-	// Use MustGetSQL or define the query here if common loader isn't used by this function
 	checkSchemaQuery := common.MustGetSQL("CheckSchemaExists")
 	err := db.QueryRow(checkSchemaQuery).Scan(&schemaExists)
 	if err != nil {
 		// If the ai schema doesn't exist, the query might fail depending on permissions
 		// Let's try creating it explicitly.
-		// log.Println("Attempting to create AI schema...")
 		if _, createErr := db.Exec("CREATE SCHEMA IF NOT EXISTS ai"); createErr != nil {
-			return fmt.Errorf("failed to create schema 'ai': %v", createErr) // Return the creation error
+			return fmt.Errorf("failed to create schema 'ai': %v", createErr)
 		}
-		log.Println("AI schema created or verified. Resetting migration tracking.") // Consolidated message
-		schemaExists = true                                                         // Assume it exists now
-		// Reset migration tracking since schema was just potentially created
-		if err := UpdateMigrationStart(0); err != nil {
-			log.Printf("Warning: Failed to reset MIGRATION_START in .env: %v", err)
-			return err
-		}
+		log.Println("AI schema created or verified.")
+		schemaExists = true
 	}
 
-	log.Printf("\t → \t → Schemea 'ai' exists: %v", schemaExists)
+	log.Printf("\t → \t → Schema 'ai' exists: %v", schemaExists)
 
 	// Read and execute migration files in order
 	files, err := os.ReadDir("migrations")
@@ -87,17 +75,14 @@ func applySchema(db *sql.DB) error {
 		return nil // Not necessarily an error
 	}
 
-	// Check for last applied migration number from env
-	lastApplied := 0
-	if migStart := os.Getenv("MIGRATION_START"); migStart != "" {
-		lastApplied, err = strconv.Atoi(migStart)
-		if err != nil {
-			log.Printf("Warning: Invalid MIGRATION_START value '%s', applying all migrations.", migStart)
-			lastApplied = 0
-		}
+	// Get last applied migration number from ai.migrations table
+	lastApplied, err := common.GetLastAppliedMigration(db)
+	if err != nil {
+		// If the migrations table doesn't exist yet, start from 0
+		// This will happen on first run before 001_schema.sql creates the table
+		log.Printf("Warning: Could not get last applied migration, starting from 0: %v", err)
+		lastApplied = 0
 	}
-
-	highestAppliedThisRun := lastApplied // Track the highest number applied in this execution
 
 	// Execute migrations higher than lastApplied
 	log.Printf("\t → \t → Applying migrations starting after %d...", lastApplied)
@@ -115,27 +100,22 @@ func applySchema(db *sql.DB) error {
 			}
 
 			// Execute migration using Exec
-			// Split script into statements if needed, though Exec often handles multiple simple statements
 			if _, execErr := db.Exec(string(migrationBytes)); execErr != nil {
 				return fmt.Errorf("failed to apply migration %s: %w", fileName, execErr)
 			}
-			migrationsApplied++
-			if num > highestAppliedThisRun {
-				highestAppliedThisRun = num
+
+			// Record the migration in ai.migrations table
+			insertMigrationQuery := common.MustGetSQL("InsertMigration")
+			if _, insertErr := db.Exec(insertMigrationQuery, fileName); insertErr != nil {
+				log.Printf("Warning: Failed to record migration %s in ai.migrations table: %v", fileName, insertErr)
 			}
+
+			migrationsApplied++
 		}
 	}
 
 	if migrationsApplied > 0 {
 		log.Printf("%d migration(s) applied successfully.", migrationsApplied)
-		// Update MIGRATION_START in .env file if new migrations were applied
-		if highestAppliedThisRun > lastApplied {
-			if err := UpdateMigrationStart(highestAppliedThisRun); err != nil {
-				log.Printf("Warning: Failed to update MIGRATION_START in .env: %v", err)
-			} else {
-				log.Printf("Updated MIGRATION_START to %d", highestAppliedThisRun)
-			}
-		}
 	} else {
 		log.Printf("\t → \t → No new migrations applied (Last migration: %d).", lastApplied)
 	}
@@ -143,7 +123,8 @@ func applySchema(db *sql.DB) error {
 	return nil
 }
 
-// updateMigrationStart updates the MIGRATION_START value in the .env file (local helper)
+// DEPRECATED: updateMigrationStartInEnvFile is deprecated. Use database-based migration tracking instead.
+// This function is kept for backward compatibility but should not be used in new code.
 func updateMigrationStartInEnvFile(migrationNum int) error {
 	// Format migration number with leading zeros for consistent display
 	formattedNum := fmt.Sprintf("%03d", migrationNum)
@@ -196,7 +177,8 @@ func updateMigrationStartInEnvFile(migrationNum int) error {
 	return os.WriteFile(".env", []byte(finalContent), 0644)
 }
 
-// UpdateMigrationStart updates the MIGRATION_START value in the .env file (exported version)
+// DEPRECATED: UpdateMigrationStart is deprecated. Use database-based migration tracking instead.
+// This function is kept for backward compatibility but should not be used in new code.
 func UpdateMigrationStart(migrationNum int) error {
 	// Update the environment variable in the current process for consistency
 	os.Setenv("MIGRATION_START", fmt.Sprintf("%03d", migrationNum))

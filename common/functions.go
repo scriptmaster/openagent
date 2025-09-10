@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -161,4 +162,78 @@ func GetReturningClause(db *sql.DB) string {
 		log.Printf("Warning: Unknown database driver %s, using empty RETURNING clause", driverName)
 		return ""
 	}
+}
+
+// GetLastAppliedMigration returns the highest migration number that has been applied
+func GetLastAppliedMigration(db *sql.DB) (int, error) {
+	// First, check if the ai.migrations table exists.
+	// This is crucial because the first migration (001_schema.sql) creates this table.
+	var tableExists bool
+	checkTableQuery := MustGetSQL("CheckMigrationsTableExists")
+	err := db.QueryRow(checkTableQuery).Scan(&tableExists)
+	if err != nil {
+		// If there's an error checking table existence (e.g., database connection issue,
+		// permissions problem), it's a critical error that should be propagated.
+		return 0, fmt.Errorf("failed to check if migrations table exists: %w", err)
+	}
+
+	if !tableExists {
+		// If the ai.migrations table does not exist, it implies that no migrations
+		// have been applied yet. The system is in its initial state.
+		return 0, nil
+	}
+
+	// If the table exists, proceed to query for the highest applied migration number.
+	var lastApplied int
+	getLastMigrationQuery := MustGetSQL("GetLastAppliedMigration")
+	err = db.QueryRow(getLastMigrationQuery).Scan(&lastApplied)
+	if err != nil {
+		// The 'GetLastAppliedMigration' SQL query uses COALESCE(MAX(...), 0),
+		// so it should return 0 if the table is empty, rather than sql.ErrNoRows.
+		// Any error here would indicate a more serious issue (e.g., malformed query,
+		// database connection problem after initial check).
+		return 0, fmt.Errorf("failed to get last applied migration from existing table: %w", err)
+	}
+	return lastApplied, nil
+}
+
+// GetAppliedMigrations returns a list of all applied migrations
+func GetAppliedMigrations(db *sql.DB) ([]struct {
+	Filename  string
+	AppliedAt time.Time
+}, error) {
+	getAppliedMigrationsQuery := MustGetSQL("GetAppliedMigrations")
+	rows, err := db.Query(getAppliedMigrationsQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get applied migrations: %w", err)
+	}
+	defer rows.Close()
+
+	var migrations []struct {
+		Filename  string
+		AppliedAt time.Time
+	}
+
+	for rows.Next() {
+		var migration struct {
+			Filename  string
+			AppliedAt time.Time
+		}
+		if err := rows.Scan(&migration.Filename, &migration.AppliedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan migration row: %w", err)
+		}
+		migrations = append(migrations, migration)
+	}
+
+	return migrations, rows.Err()
+}
+
+// ResetMigrationTracking removes all migration records from ai.migrations table
+// This should be used with caution as it will cause all migrations to be re-applied
+func ResetMigrationTracking(db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM ai.migrations WHERE filename ~ '^\\d+_.*\\.sql$'")
+	if err != nil {
+		return fmt.Errorf("failed to reset migration tracking: %w", err)
+	}
+	return nil
 }
