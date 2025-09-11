@@ -1,5 +1,6 @@
 export default function Admin({page}: {page: Page}) {
     return (
+<>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{page.AppName} - Admin Dashboard</title>
@@ -136,6 +137,8 @@ export default function Admin({page}: {page: Page}) {
         </footer>
     </div>
 </div>
+<script src="/tsx/js/_common.js"></script>
 <script src="/tsx/js/admin.js"></script>
+</>
     );
 }

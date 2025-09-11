@@ -1,5 +1,6 @@
 export default function MaintenanceLogin({page}: {page: Page}) {
     return (
+<>
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
@@ -13,7 +14,7 @@ export default function MaintenanceLogin({page}: {page: Page}) {
     
     <link rel="stylesheet" href="/tsx/css/maintenance-login.css" />
 </head>
-<body x-data="{ showAuth: false }">
+<body data-x-data="{ showAuth: false }">
     <div className="page page-center">
         <div className="container container-tight py-2">
             <div className="text-center mb-3">
@@ -40,7 +41,7 @@ export default function MaintenanceLogin({page}: {page: Page}) {
                     </div>
                     
                     {/* Authentication Form - Hidden Initially */}
-                    <div x-show="showAuth" x-transition>
+                    <div data-x-show="showAuth" x-transition>
                         {page.Error && (
                         <div className="alert alert-danger" role="alert">
                             <i className="ti ti-alert-circle me-2"></i> {page.Error}
@@ -70,14 +71,16 @@ export default function MaintenanceLogin({page}: {page: Page}) {
             
             <div className="text-center text-muted mt-3">
                 <p>Need help? Contact your <a href="mailto:{page.AdminEmail}">system administrator</a>.</p>
-                <p className="restricted-link" @click="showAuth = true">Restricted: Maintenance Administration</p>
+                <p className="restricted-link" data-click="showAuth = true">Restricted: Maintenance Administration</p>
                 <p className="text-muted small">Version {page.AppVersion}</p>
             </div>
         </div>
     </div>
     
+<script src="/tsx/js/_common.js"></script>
+<script src="/tsx/js/maintenance-login.js"></script>
 </body>
 </html>
-<script src="/tsx/js/maintenance-login.js"></script>
+</>
     );
 }

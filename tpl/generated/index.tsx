@@ -1,5 +1,8 @@
 export default function Index({page}: {page: Page}) {
     return (
+<>
+<html lang="en">
+<head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{page.PageTitle}</title>
@@ -7,6 +10,9 @@ export default function Index({page}: {page: Page}) {
 <link rel="stylesheet" href="/static/css/tabler.min.css" />
 {/* Tabler Icons */}
 <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
+    <link rel="stylesheet" href="/tsx/css/index.css" />
+</head>
+<body>
 <div className="hero-section">
     <div className="hero-content">
         <h1 className="hero-title">
@@ -22,6 +28,10 @@ export default function Index({page}: {page: Page}) {
     </div>
 </div>
 {/* Alpine.js */}
+<script src="/tsx/js/_common.js"></script>
 <script src="/tsx/js/index.js"></script>
+</body>
+</html>
+</>
     );
 }

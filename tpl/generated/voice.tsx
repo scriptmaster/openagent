@@ -1,5 +1,6 @@
 export default function Voice({page}: {page: Page}) {
     return (
+<>
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
@@ -29,8 +30,10 @@ export default function Voice({page}: {page: Page}) {
             <div id="status">Loading...</div>
         </div>
     </div>
+<script src="/tsx/js/_common.js"></script>
+<script src="/tsx/js/voice.js"></script>
 </body>
 </html>
-<script src="/tsx/js/voice.js"></script>
+</>
     );
 }

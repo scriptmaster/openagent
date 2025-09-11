@@ -1,0 +1,248 @@
+import Layout from '../layouts/layout_pages';
+
+export default function Maintenance({page}: {page: Page}) {
+    return (
+        <Layout page={page} linkTags={`<link rel="stylesheet" href="/tsx/css/maintenance.css" />`} scriptTags={`<script src="/tsx/js/_common.js"></script>
+<script src="/tsx/js/maintenance.js"></script>`}>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Database Configuration - Maintenance Mode</title>
+<link rel="stylesheet" href="/static/css/tabler.min.css" />
+<link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
+</head>
+<body>
+    <div className="page">
+        <div className="container container-tight py-4">
+            <div className="header-container text-center">
+                <a href="/" className="navbar-brand navbar-brand-autodark">
+                    <img src="/static/img/logo.svg" height="36" alt="OpenAgent"/>
+                </a>
+                <h2 className="h3 text-muted">OpenAgent</h2>
+                <div className="col-12 text-center">
+                  <p className="text-muted">System Maintenance</p>
+                </div>
+            </div>
+            <div className="card card-md">
+                <div className="card-body">
+                    <div className="alert alert-warning mb-3">
+                        <i className="ti ti-alert-triangle me-2"></i> Server is in maintenance mode. PostgreSQL connection is required.
+                    </div>
+                    
+                    {page.Error && (
+                        <div className="alert alert-danger" role="alert">
+                            <i className="ti ti-alert-circle me-2"></i> {page.Error}
+                        </div>
+                    )}
+                    {page.Success && (
+                        <div className="alert alert-success" role="alert">
+                            <i className="ti ti-check me-2"></i> {page.Success}
+                        </div>
+                    )}
+                    <form action="/maintenance/configure" method="post">
+                        <h2 className="card-title text-center mb-4">Configuration & Version</h2>
+                        
+                        {/* Database Configuration Section */}
+                        <h4 className="mt-4 mb-3">PostgreSQL Configuration</h4>
+                        <div className="mb-3">
+                            <label className="form-label">PostgreSQL Host</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-server"></i>
+                                </span>
+                                <input type="text" className="form-control" name="db_host" value="{page.DBHost}" placeholder="localhost" required/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">PostgreSQL Port</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-network"></i>
+                                </span>
+                                <input type="text" className="form-control" name="db_port" value="{page.DBPort}" placeholder="5432" required/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">PostgreSQL User</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-user"></i>
+                                </span>
+                                <input type="text" className="form-control" name="db_user" value="{page.DBUser}" placeholder="postgres" required/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">PostgreSQL Password</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-key"></i>
+                                </span>
+                                <input type="password" className="form-control" name="db_password" value="{page.DBPassword}" placeholder="Enter password"/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">Database Name</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-database"></i>
+                                </span>
+                                <input type="text" className="form-control" name="db_name" value="{page.DBName}" placeholder="postgres" required/>
+                            </div>
+                        </div>
+                        
+                        <hr className="my-4"/>
+                        
+                        {/* SMTP Configuration Section */}
+                        <h4 className="mt-4 mb-3">Email (SMTP) Configuration</h4>
+                        <div className="mb-3">
+                            <label className="form-label">SMTP Host</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-mail"></i>
+                                </span>
+                                <input type="text" className="form-control" name="smtp_host" value="{page.SMTPHost}" placeholder="smtp.example.com"/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">SMTP Port</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-network"></i>
+                                </span>
+                                <input type="text" className="form-control" name="smtp_port" value="{page.SMTPPort}" placeholder="587"/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">SMTP Username</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-user"></i>
+                                </span>
+                                <input type="text" className="form-control" name="smtp_user" value="{page.SMTPUser}" placeholder="username"/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">SMTP Password</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-key"></i>
+                                </span>
+                                <input type="password" className="form-control" name="smtp_password" value="{page.SMTPPassword}" placeholder="password"/>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">From Email</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-mail-forward"></i>
+                                </span>
+                                <input type="email" className="form-control" name="smtp_from" value="{page.SMTPFrom}" placeholder="noreply@example.com"/>
+                            </div>
+                        </div>
+                        
+                        <hr className="my-4"/>
+                        
+                        {/* App Version Section */}
+                        <h4 className="mt-4 mb-3">App Version</h4>
+                        <div className="row mb-3">
+                            <div className="col">
+                                <label className="form-label">Major</label>
+                                <div className="input-group input-group-flat">
+                                    <span className="input-group-text">
+                                        <i className="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" className="form-control" name="version_major" value="{page.VersionMajor}" required/>
+                                </div>
+                            </div>
+                            <div className="col">
+                                <label className="form-label">Minor</label>
+                                <div className="input-group input-group-flat">
+                                    <span className="input-group-text">
+                                        <i className="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" className="form-control" name="version_minor" value="{page.VersionMinor}" required/>
+                                </div>
+                            </div>
+                            <div className="col">
+                                <label className="form-label">Patch</label>
+                                <div className="input-group input-group-flat">
+                                    <span className="input-group-text">
+                                        <i className="ti ti-versions"></i>
+                                    </span>
+                                    <input type="number" min="0" className="form-control" name="version_patch" value="{page.VersionPatch}" required/>
+                                </div>
+                            </div>
+                            <div className="col">
+                                <label className="form-label">Build (Auto)</label>
+                                <div className="input-group input-group-flat">
+                                    <span className="input-group-text">
+                                        <i className="ti ti-refresh"></i>
+                                    </span>
+                                    <input type="number" className="form-control bg-light" value="{page.VersionBuild}" readonly/>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="text-muted small mb-3">
+                            <i className="ti ti-info-circle me-1"></i> The build number is automatically incremented on each server restart.
+                        </div>
+                        
+                        {/* Database Tools Section */}
+                        <hr className="my-4"/>
+                        <h4 className="mt-4 mb-3">Database Tools</h4>
+                        
+                        <div className="mb-3">
+                            <label className="form-label">Current Migration Number</label>
+                            <div className="input-group input-group-flat">
+                                <span className="input-group-text">
+                                    <i className="ti ti-database-import"></i>
+                                </span>
+                                <input type="text" className="form-control" name="migration_start" id="migration_start" value="{page.MigrationStart}" placeholder="e.g. 007"/>
+                            </div>
+                            <div className="form-text text-muted small">
+                                <i className="ti ti-info-circle me-1"></i> The last applied migration number (format: 001-999). Will apply migrations after this number.
+                            </div>
+                        </div>
+                        
+                        <div className="mb-3 form-check">
+                            <input type="checkbox" className="form-check-input" id="reset_migrations" name="reset_migrations" value="1" onchange="toggleMigrationStart()"/>
+                            <label className="form-check-label" for="reset_migrations">
+                                Reset migration tracking (apply all migrations from beginning)
+                            </label>
+                            <div className="form-text text-muted small">
+                                <i className="ti ti-info-circle me-1"></i> Use this if you've deleted or recreated the database.
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        <div className="form-text text-muted mb-3">
+                            <i className="ti ti-tool me-1"></i> The "Initialize Database Schema" option will be automatically run if needed after saving configuration.
+                        </div>
+                        
+                        {/* Submit Button */}
+                        <div className="form-footer">
+                            <button type="submit" className="btn btn-primary w-100">
+                                <i className="ti ti-device-floppy me-1"></i> Save Configuration & Restart
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div className="text-center text-muted mt-3">
+                <p>Need help? Contact your system administrator.</p>
+                <p className="text-muted small">Version {page.VersionMajor}.{page.VersionMinor}.{page.VersionPatch}.{page.VersionBuild}</p>
+            </div>
+        </div>
+    </div>
+        </Layout>
+    );
+}

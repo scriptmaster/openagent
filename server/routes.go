@@ -61,12 +61,12 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 			http.NotFound(w, r)
 			return
 		}
-		
+
 		// Serve from generated/css directory
 		filePath := fmt.Sprintf("./tpl/generated/css/%s", filename)
 		http.ServeFile(w, r, filePath)
 	})
-	
+
 	router.HandleFunc("/tsx/js/", func(w http.ResponseWriter, r *http.Request) {
 		// Extract filename from path
 		filename := strings.TrimPrefix(r.URL.Path, "/tsx/js/")
@@ -74,7 +74,13 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 			http.NotFound(w, r)
 			return
 		}
-		
+
+		// Handle _common.js specially
+		if filename == "_common.js" {
+			http.ServeFile(w, r, "./tpl/generated/js/_common.js")
+			return
+		}
+
 		// Serve from generated/js directory
 		filePath := fmt.Sprintf("./tpl/generated/js/%s", filename)
 		http.ServeFile(w, r, filePath)

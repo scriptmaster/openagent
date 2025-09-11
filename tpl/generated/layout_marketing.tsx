@@ -1,5 +1,6 @@
 export default function LayoutMarketing({page}: {page: Page}) {
     return (
+<>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{page.PageTitle || page.AppName}</title>
@@ -22,6 +23,8 @@ export default function LayoutMarketing({page}: {page: Page}) {
         </div>
     </div>
 </div>
+<script src="/tsx/js/_common.js"></script>
 <script src="/tsx/js/layout_marketing.js"></script>
+</>
     );
 }

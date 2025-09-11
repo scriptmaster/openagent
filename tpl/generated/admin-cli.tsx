@@ -1,5 +1,6 @@
 export default function AdminCli({page}: {page: Page}) {
     return (
+<>
 <html lang="en"><head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,7 +10,7 @@ export default function AdminCli({page}: {page: Page}) {
     
 </head>
 <body>
-    <div className="page" x-data="adminCLI()">
+    <div className="page" data-x-data="adminCLI()">
         
         <header className="navbar navbar-expand-md navbar-light d-print-none">
             <div className="container-xl">
@@ -138,15 +139,15 @@ export default function AdminCli({page}: {page: Page}) {
                             </div>
                             <div className="card-body p-0">
                                 <div className="list-group list-group-flush" style="max-height: 600px; overflow-y: auto;">
-                                    <template x-for="(queries, paramCount) in queryGroups" :key="paramCount">
+                                    <template data-x-for="(queries, paramCount) in queryGroups" data-key="paramCount">
                                         <div>
                                             <div className="list-group-item bg-light fw-bold">
-                                                <span x-text="paramCount == 0 ? '0 parameters' : paramCount + ' parameters'">
+                                                <span data-x-text="paramCount == 0 ? '0 parameters' : paramCount + ' parameters'">
                                             </div>
-                                            <template x-for="query in queries" :key="query.name">
-                                                <a href="#" className="list-group-item list-group-item-action" :className="{ 'active': selectedQuery && selectedQuery.name === query.name }" @click="selectQuery(query)">
-                                                    <div className="fw-bold" x-text="query.name">
-                                                    <div className="text-muted small" x-text="query.paramDetails || 'No parameters'">
+                                            <template data-x-for="query in queries" data-key="query.name">
+                                                <a href="#" className="list-group-item list-group-item-action" data-className="{ 'active': selectedQuery && selectedQuery.name === query.name }" data-click="selectQuery(query)">
+                                                    <div className="fw-bold" data-x-text="query.name">
+                                                    <div className="text-muted small" data-x-text="query.paramDetails || 'No parameters'">
                                                 </a>
                                             </template>
                                         </div>
@@ -165,65 +166,65 @@ export default function AdminCli({page}: {page: Page}) {
                             </div>
                             <div className="card-body">
                                 
-                                <div x-show="selectedQuery" className="mb-4">
+                                <div data-x-show="selectedQuery" className="mb-4">
                                     <label className="form-label">Selected Query:</label>
-                                    <div className="form-control-plaintext bg-light p-3 rounded" style="font-family: monospace; font-size: 0.9em; white-space: pre-wrap;" x-text="selectedQuery ? selectedQuery.query : ''">
+                                    <div className="form-control-plaintext bg-light p-3 rounded" style="font-family: monospace; font-size: 0.9em; white-space: pre-wrap;" data-x-text="selectedQuery ? selectedQuery.query : ''">
                                 </div>
                                 
-                                <div x-show="selectedQuery && selectedQuery.paramCount > 0" className="mb-4">
+                                <div data-x-show="selectedQuery && selectedQuery.paramCount > 0" className="mb-4">
                                     <label className="form-label">Parameters:</label>
-                                    <template x-for="(param, index) in selectedQuery.paramDetails.split(', ')" :key="index">
+                                    <template data-x-for="(param, index) in selectedQuery.paramDetails.split(', ')" data-key="index">
                                         <div className="mb-3">
-                                            <label className="form-label" x-text="param">
-                                            <input type="text" className="form-control" :placeholder="'Enter ' + param" x-model="queryParams[index]"/>
+                                            <label className="form-label" data-x-text="param">
+                                            <input type="text" className="form-control" data-placeholder="'Enter ' + param" data-x-model="queryParams[index]"/>
                                         </div>
                                     </template>
                                 </div>
                                 
                                 <div className="mb-4">
-                                    <button type="button" className="btn btn-primary" :disabled="!selectedQuery || loading" @click="executeQuery">
-                                        <span x-show="!loading">
+                                    <button type="button" className="btn btn-primary" data-disabled="!selectedQuery || loading" data-click="executeQuery">
+                                        <span data-x-show="!loading">
                                             <i className="ti ti-play me-2">Run Query
                                         </span>
-                                        <span x-show="loading">
+                                        <span data-x-show="loading">
                                             <span className="spinner-border spinner-border-sm me-2" role="status">
                                             Executing...
                                         </span>
                                     </button>
                                 </div>
                                 
-                                <div x-show="result" className="mt-4">
-                                    <div className="alert" :className="result.success ? 'alert-success' : 'alert-danger'">
+                                <div data-x-show="result" className="mt-4">
+                                    <div className="alert" data-className="result.success ? 'alert-success' : 'alert-danger'">
                                         <div className="d-flex align-items-center">
-                                            <i className="ti" :className="result.success ? 'ti-check' : 'ti-alert-circle'" me-2="">
+                                            <i className="ti" data-className="result.success ? 'ti-check' : 'ti-alert-circle'" me-2="">
                                             <div>
-                                                <div x-show="result.success">
+                                                <div data-x-show="result.success">
                                                     <strong>Query executed successfully!</strong>
                                                     <div className="text-muted small">
-                                                        <span x-text="result.rowCount"> rows returned in <span x-text="result.duration">
+                                                        <span data-x-text="result.rowCount"> rows returned in <span data-x-text="result.duration">
                                                     </div>
                                                 </div>
-                                                <div x-show="!result.success">
-                                                    <strong>Error:</strong> <span x-text="result.error">
+                                                <div data-x-show="!result.success">
+                                                    <strong>Error:</strong> <span data-x-text="result.error">
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div x-show="result.success && result.columns && result.columns.length > 0" className="table-responsive">
+                                    <div data-x-show="result.success && result.columns && result.columns.length > 0" className="table-responsive">
                                         <table className="table table-striped table-hover">
                                             <thead>
                                                 <tr>
-                                                    <template x-for="column in result.columns" :key="column">
-                                                        <th x-text="column">
+                                                    <template data-x-for="column in result.columns" data-key="column">
+                                                        <th data-x-text="column">
                                                     </template>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <template x-for="(row, rowIndex) in result.rows" :key="rowIndex">
+                                                <template data-x-for="(row, rowIndex) in result.rows" data-key="rowIndex">
                                                     <tr>
-                                                        <template x-for="(cell, cellIndex) in row" :key="cellIndex">
-                                                            <td x-text="cell === null ? 'NULL' : cell">
+                                                        <template data-x-for="(cell, cellIndex) in row" data-key="cellIndex">
+                                                            <td data-x-text="cell === null ? 'NULL' : cell">
                                                         </template>
                                                     </tr>
                                                 </template>
@@ -239,7 +240,9 @@ export default function AdminCli({page}: {page: Page}) {
         </div>
     </div>
     
-</body></html>
+<script src="/tsx/js/_common.js"></script>
 <script src="/tsx/js/admin-cli.js"></script>
+</body></html>
+</>
     );
 }

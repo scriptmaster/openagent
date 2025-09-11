@@ -1,5 +1,6 @@
 export default function Error404({page}: {page: Page}) {
     return (
+<>
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
@@ -16,7 +17,9 @@ export default function Error404({page}: {page: Page}) {
         <p>The requested page could not be found.</p>
         <a href="/" className="back-link">Return to Home</a>
     </div>
+<script src="/tsx/js/_common.js"></script>
 </body>
 </html>
+</>
     );
 }
