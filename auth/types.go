@@ -24,14 +24,10 @@ type UserServicer interface {
 	MakeUserAdmin(ctx context.Context, userID int) error
 
 	// --- Profile Methods ---
-	// UpdateUserName updates the user's display name.
-	UpdateUserName(ctx context.Context, userID int, newName string) error
 	// UpdatePasswordHash updates the user's password hash after verification.
 	UpdatePasswordHash(ctx context.Context, userID int, newHash string) error
-	// UpdateUserProfileIcon updates the user's profile icon URL.
-	UpdateUserProfileIcon(ctx context.Context, userID int, iconURL string) error
 
-	// TODO: Add methods for profile updates (Name, Password, Icon)
+	// TODO: Add methods for profile updates (Name, Password, Icon) when database schema supports them
 }
 
 // User represents a user in the system
@@ -39,8 +35,6 @@ type User struct {
 	ID           int       `json:"id"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"` // Store the hashed password, exclude from JSON
-	Name         string    `json:"name" db:"name"`
-	ProfileIcon  string    `json:"profile_icon" db:"profile_icon"`
 	IsAdmin      bool      `json:"is_admin" db:"is_admin"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	LastLoggedIn time.Time `json:"last_logged_in" db:"last_logged_in"`

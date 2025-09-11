@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -14,7 +13,7 @@ import (
 )
 
 var (
-	globalTemplates *template.Template
+	globalTemplates *TemplateEngine
 	appVersion      string
 	sessionSalt     string
 )
@@ -87,18 +86,18 @@ func StartServer() error {
 	}
 
 	// Create a new ServeMux
-	mux := http.NewServeMux()
+	router := http.NewServeMux()
 
 	log.Printf("\t → 6. Registering Routes")
 	// Register all routes (uses RegisterRoutes from the server package)
 	// Pass the initialized userService and salt.
 	// Other services (db, templates, projectService, etc.) will be initialized *within* RegisterRoutes.
-	RegisterRoutes(mux, userService, salt)
+	RegisterRoutes(router, userService, salt)
 
 	startAddress := ":" + common.GetEnvOrDefault("PORT", "8800")
 	log.Println("Server starting on " + startAddress)
 
-	if err := http.ListenAndServe(startAddress, mux); err != nil {
+	if err := http.ListenAndServe(startAddress, router); err != nil {
 		return err
 	}
 

@@ -1,0 +1,10 @@
+export default function Test({page}: {page: Page}) {
+    return (
+<div className="container">
+    <h1>{page.PageTitle}</h1>
+    <p>This is a test page to verify the template system is working.</p>
+    <p>App: {page.AppName}</p>
+    <p>Version: {page.AppVersion}</p>
+</div>
+    );
+}

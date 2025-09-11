@@ -2,26 +2,37 @@ package admin
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
+	"github.com/scriptmaster/openagent/projects"
+	"github.com/scriptmaster/openagent/types"
 )
 
 // HandleAdmin displays the admin dashboard
-func HandleAdmin(w http.ResponseWriter, r *http.Request, templates *template.Template) {
+func HandleAdmin(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface) {
+	// Get user from context (set by auth middleware)
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	data := models.PageData{
 		AppName:    "OpenAgent",
 		PageTitle:  "Admin Dashboard - OpenAgent",
+		User:       user,
 		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
 		AppVersion: common.GetEnv("APP_VERSION"),
+		Stats:      &models.AdminStats{}, // Will be populated by the route handler
 	}
 
 	if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
@@ -30,7 +41,7 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request, templates *template.Tem
 }
 
 // HandleMaintenance displays the maintenance login page
-func HandleMaintenance(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool) {
+func HandleMaintenance(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, isMaintenanceAuthenticated func(r *http.Request) bool) {
 	// If already authenticated, redirect to config page
 	if isMaintenanceAuthenticated(r) {
 		http.Redirect(w, r, "/maintenance/config", http.StatusSeeOther)
@@ -72,22 +83,14 @@ func HandleMaintenanceAuth(w http.ResponseWriter, r *http.Request, sessionSalt s
 	}
 
 	// Set authentication cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "maintenance_auth",
-		Value:    "authenticated_" + sessionSalt[:8], // Add partial version salt to invalidate on restart
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		MaxAge:   int(1 * time.Hour.Seconds()),
-		SameSite: http.SameSiteLaxMode,
-	})
+	auth.SetMaintenanceCookie(w, sessionSalt)
 
 	// Redirect to configuration page
 	http.Redirect(w, r, "/maintenance/config", http.StatusSeeOther)
 }
 
 // HandleMaintenanceConfig displays the maintenance configuration page
-func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool) {
+func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, isMaintenanceAuthenticated func(r *http.Request) bool) {
 	// Verify authentication (MaintenanceHandler should handle this, but double-check)
 	if !isMaintenanceAuthenticated(r) {
 		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
@@ -147,7 +150,7 @@ func HandleMaintenanceConfig(w http.ResponseWriter, r *http.Request, templates *
 }
 
 // HandleMaintenanceConfigure updates database configuration and attempts to reconnect
-func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, templates *template.Template, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error) {
+func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error) {
 	// Verify authentication (should be caught by middleware, but double-check)
 	if !isMaintenanceAuthenticated(r) {
 		http.Redirect(w, r, "/maintenance", http.StatusSeeOther)
@@ -260,7 +263,7 @@ func HandleMaintenanceConfigure(w http.ResponseWriter, r *http.Request, template
 }
 
 // handleMaintenanceError redirects back to the config page with an error message
-func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates *template.Template, errorMsg string) {
+func handleMaintenanceError(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, errorMsg string) {
 	log.Printf("Maintenance configuration error: %s", errorMsg)
 	// Parse current version
 	versionParts := []string{"1", "0", "0", "0"} // Default
@@ -333,4 +336,253 @@ func HandleInitializeSchema(w http.ResponseWriter, r *http.Request, isMaintenanc
 
 	log.Println("Database schema initialized successfully.")
 	http.Redirect(w, r, "/maintenance/config?success="+url.QueryEscape("Database schema initialized successfully."), http.StatusSeeOther)
+}
+
+// Use shared types from common package
+
+// HandleAdminCLI displays the admin CLI interface
+func HandleAdminCLI(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Admin CLI - OpenAgent",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "admin-cli.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleCLIQueriesAPI returns the list of available queries grouped by parameter count
+func HandleCLIQueriesAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Use shared function to get available queries
+	queryGroups, err := common.GetAvailableQueries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(queryGroups)
+}
+
+// HandleCLIExecuteAPI executes a query and returns the results
+func HandleCLIExecuteAPI(w http.ResponseWriter, r *http.Request, getDB func() *sql.DB) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req common.ExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Use shared function to execute query
+	response := common.ExecuteQuery(req, getDB())
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleAdminConnections handles the admin connections page
+func HandleAdminConnections(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Database Connections - Admin",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "admin-connections.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleAdminTables handles the admin tables page
+func HandleAdminTables(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Database Tables - Admin",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "admin-tables.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleAdminSettings handles the admin settings page
+func HandleAdminSettings(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Admin Settings",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "admin-settings.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// // HandleUsers handles the users management page
+// func HandleUsers(w http.ResponseWriter, r *http.Request, templates *template.Template, getDB func() *sql.DB) {
+// 	user := auth.GetUserFromContext(r.Context())
+// 	if user == nil {
+// 		http.Error(w, "User not found in context", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	data := models.PageData{
+// 		AppName:    "OpenAgent",
+// 		PageTitle:  "User Management",
+// 		User:       user,
+// 		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+// 		AppVersion: common.GetEnv("APP_VERSION"),
+// 	}
+
+// 	if err := templates.ExecuteTemplate(w, "users.html", data); err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 	}
+// }
+
+// HandleConnections handles the connections page for regular users
+func HandleConnections(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Database Connections",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "connections.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleTables handles the tables page for regular users
+func HandleTables(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, getDB func() *sql.DB) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Database Tables",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "tables.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleProfile handles the user profile page
+func HandleProfile(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "User Profile",
+		User:       user,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	if err := templates.ExecuteTemplate(w, "profile.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// Handle404 serves a custom 404 page with context information
+func Handle404(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface) {
+	user := auth.GetUserFromContext(r.Context())
+	project := projects.GetProjectFromContext(r.Context())
+
+	// Get host information
+	host := r.Host
+	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		}
+	}
+	host = strings.Split(host, ":")[0]
+
+	// Prepare 404 data
+	data := struct {
+		AppName    string
+		PageTitle  string
+		User       *auth.User
+		Project    *projects.Project
+		Host       string
+		AdminEmail string
+		AppVersion string
+	}{
+		AppName:    "OpenAgent",
+		PageTitle:  "404 - Page Not Found",
+		User:       user,
+		Project:    project,
+		Host:       host,
+		AdminEmail: common.GetEnv("SYSADMIN_EMAIL"),
+		AppVersion: common.GetEnv("APP_VERSION"),
+	}
+
+	w.WriteHeader(http.StatusNotFound)
+	if err := templates.ExecuteTemplate(w, "404.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

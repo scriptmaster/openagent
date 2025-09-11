@@ -42,7 +42,7 @@ func HandleDashboard(w http.ResponseWriter, r *http.Request, projectService proj
 			},
 			ProjectCount: 0,
 		}
-		if err := globalTemplates.ExecuteTemplate(w, "layout.html", data); err != nil {
+		if err := globalTemplates.ExecuteTemplate(w, "dashboard.html", data); err != nil {
 			log.Printf("Error executing layout template for dashboard: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -68,9 +68,9 @@ func HandleDashboard(w http.ResponseWriter, r *http.Request, projectService proj
 		ProjectCount: len(projectList),
 	}
 
-	// Execute the layout template using the globally parsed set
-	if err := globalTemplates.ExecuteTemplate(w, "layout.html", data); err != nil {
-		log.Printf("Error executing layout template for dashboard: %v", err)
+	// Execute the dashboard template (which will use the logged-in layout)
+	if err := globalTemplates.ExecuteTemplate(w, "dashboard.html", data); err != nil {
+		log.Printf("Error executing dashboard template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -93,6 +93,44 @@ func HandleVoicePage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleAgentPage serves the agent page
+func HandleAgentPage(w http.ResponseWriter, r *http.Request) {
+	// Ensure templates are initialized (assuming 'templates' is the global var)
+	if globalTemplates == nil {
+		http.Error(w, "Templates not initialized", http.StatusInternalServerError)
+		log.Println("Error: HandleAgentPage called before templates were initialized")
+		return
+	}
+
+	// Execute the agent template
+	// You might want to pass data similar to other pages if needed (e.g., AppName, User)
+	err := globalTemplates.ExecuteTemplate(w, "agent.html", nil) // Passing nil data for now
+	if err != nil {
+		log.Printf("Error executing agent template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// HandleTestPage serves a test page to verify template system
+func HandleTestPage(w http.ResponseWriter, r *http.Request) {
+	if globalTemplates == nil {
+		http.Error(w, "Templates not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	data := models.PageData{
+		AppName:    "OpenAgent",
+		PageTitle:  "Test Page",
+		AppVersion: "1.0.0.0",
+	}
+
+	err := globalTemplates.ExecuteTemplate(w, "test.html", data)
+	if err != nil {
+		log.Printf("Error executing test template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
 // HandleConfigPage serves the initial configuration page
 func HandleConfigPage(w http.ResponseWriter, r *http.Request) {
 	// Get user from context if available (might be nil)
@@ -107,16 +145,16 @@ func HandleConfigPage(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare data for the template
 	data := models.PageData{ // Using generic PageData, adapt if needed
-		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
+		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "System Configuration",
 		User:       user, // Pass user info if available
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.GetEnv("APP_VERSION"),
 		// Add any specific flags or data needed for config page
 		// e.g., pass the current host?
 		CurrentHost: strings.Split(r.Host, ":")[0],
 	}
 
-	// Execute the config template
+	// Execute the config page template
 	err := globalTemplates.ExecuteTemplate(w, "config.html", data)
 	if err != nil {
 		log.Printf("Error executing config template: %v", err)

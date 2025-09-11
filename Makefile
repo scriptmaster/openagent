@@ -17,7 +17,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query
 
 all: test build
 
@@ -177,17 +177,61 @@ fix-remote:
 
 # Stop all running openagent processes
 stop:
-	@echo "Stopping all openagent.exe processes..."
-	@while true; do \
-		PID=$$(tasklist /NH /FI "IMAGENAME eq openagent.exe" 2>nul | awk '{print $$2}' | head -n 1); \
-		if [ -z "$$PID" ] || [ "$$PID" = "No" ]; then \
-			echo "All openagent.exe processes stopped."; \
-			break; \
-		fi; \
-		echo "Stopping PID: $$PID"; \
-		taskkill /PID $$PID /F /T >nul 2>&1 || true; \
-		sleep 1; \
-	done
+	@echo "Stopping all $(BINARY_NAME) processes..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		echo "Detected Windows. Stopping $(BINARY_NAME).exe processes..."; \
+		while true; do \
+			PID=$$(tasklist /NH /FI "IMAGENAME eq $(BINARY_NAME).exe" 2>nul | awk '{print $$2}' | head -n 1); \
+			if [ -z "$$PID" ] || [ "$$PID" = "No" ]; then \
+				echo "All $(BINARY_NAME).exe processes stopped."; \
+				break; \
+			fi; \
+			echo "Stopping PID: $$PID"; \
+			taskkill /PID $$PID /F /T >nul 2>&1 || true; \
+			sleep 1; \
+		done; \
+	else \
+		killall "$(BINARY_NAME)" || true; \
+	fi
+
+# CLI commands
+cli-build:
+	@echo "Building CLI tool..."
+	go build -o openagent-cli ./cmd/cli
+
+generate-hash: cli-build
+	@echo "Usage: make generate-hash PASSWORD=yourpassword"
+	@if [ -z "$(PASSWORD)" ]; then \
+		echo "Error: PASSWORD variable is required"; \
+		echo "Example: make generate-hash PASSWORD=mypassword123"; \
+		exit 1; \
+	fi
+	./openagent-cli generate-hash $(PASSWORD)
+
+reset-password: cli-build
+	@echo "Usage: make reset-password EMAIL=user@example.com PASSWORD=newpassword"
+	@if [ -z "$(EMAIL)" ] || [ -z "$(PASSWORD)" ]; then \
+		echo "Error: EMAIL and PASSWORD variables are required"; \
+		echo "Example: make reset-password EMAIL=user@example.com PASSWORD=newpassword123"; \
+		exit 1; \
+	fi
+	./openagent-cli reset-password $(EMAIL) $(PASSWORD)
+
+list-users: cli-build
+	@echo "Listing all users..."
+	./openagent-cli list-users
+
+query: cli-build
+	@echo "Usage: make query [query-name] [param1] [param2] ..."
+	@echo "Examples:"
+	@echo "  make query auth/count_users"
+	@echo "  make query auth/get_user_by_email user@example.com"
+	@echo "  make query (lists all available queries)"
+	@if [ -z "$(ARGS)" ]; then \
+		./openagent-cli query; \
+	else \
+		./openagent-cli query $(ARGS); \
+	fi
 
 help:
 	@echo "Available commands:"
@@ -206,3 +250,9 @@ help:
 	@echo "  make help       - Show this help"
 	@echo "  make update-deps - Update dependencies"
 	@echo "  make stop       - Stop all running openagent processes"
+	@echo ""
+	@echo "CLI Commands:"
+	@echo "  make generate-hash PASSWORD=yourpassword - Generate bcrypt hash for password"
+	@echo "  make reset-password EMAIL=user@example.com PASSWORD=newpassword - Reset user password"
+	@echo "  make list-users - List all users in database"
+	@echo "  make query [query-name] [param1] [param2] - Execute SQL query from data/sql/postgres"

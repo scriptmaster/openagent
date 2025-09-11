@@ -2,20 +2,20 @@ package auth
 
 import (
 	"encoding/json"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/scriptmaster/openagent/common" // Updated import path
+	"github.com/scriptmaster/openagent/types"
 )
 
 // Global template variable for auth handlers
-var authTemplates *template.Template
+var authTemplates types.TemplateEngineInterface
 
 // InitAuthTemplates initializes the template variable for this package
-func InitAuthTemplates(t *template.Template) {
+func InitAuthTemplates(t types.TemplateEngineInterface) {
 	authTemplates = t
 }
 
@@ -27,6 +27,20 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error: HandleLogin called before InitAuthTemplates")
 		return
 	}
+	// Convert error codes to user-friendly messages
+	errorCode := r.URL.Query().Get("error")
+	var errorMessage string
+	switch errorCode {
+	case "please_login":
+		errorMessage = "Please login before to proceed."
+	case "session_expired":
+		errorMessage = "Your session has expired. Please login again."
+	case "unauthorized":
+		errorMessage = "Please login before to proceed."
+	default:
+		errorMessage = errorCode // Keep original if not a known code
+	}
+
 	data := struct {
 		AppName    string
 		PageTitle  string
@@ -39,7 +53,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		PageTitle:  "Login - " + common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
 		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
-		Error:      r.URL.Query().Get("error"),
+		Error:      errorMessage,
 		User:       nil,
 	}
 	if err := authTemplates.ExecuteTemplate(w, "login.html", data); err != nil {
@@ -49,19 +63,8 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 // HandleLogout clears session cookies and redirects to login
 func HandleLogout(w http.ResponseWriter, r *http.Request) {
-	cookieName := GetSessionCookieName()
-
 	// Clear the versioned JWT session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,              // Expire immediately
-		Expires:  time.Unix(0, 0), // Set explicit expiry in the past
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
-	})
+	ClearSessionCookie(w)
 
 	// No need to clear the old "session" cookie anymore if unused
 
@@ -190,7 +193,7 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService UserSer
 	}
 
 	// Create session JWT
-	jwtString, err := CreateSession(user) // Returns JWT string
+	jwtString, err := CreateSession(user, r.Host) // Returns JWT string
 	if err != nil {
 		log.Printf("Failed to create session JWT: %v", err)
 		SendJSONResponse(w, false, "Failed to create session", nil, "")
@@ -198,17 +201,8 @@ func HandleVerifyOTP(w http.ResponseWriter, r *http.Request, userService UserSer
 	}
 
 	// Set session cookie with JWT
-	cookieName := GetSessionCookieName()
 	expiryDuration := 168 * time.Hour // Match JWT expiry (7 days)
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    jwtString,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   int(expiryDuration.Seconds()),
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
-	})
+	SetSessionCookie(w, jwtString, expiryDuration)
 	// No need for backward compatible "session" cookie with JWT
 
 	// Determine redirect based on admin status
@@ -263,7 +257,7 @@ func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService Use
 	}
 
 	// Create session JWT
-	jwtString, err := CreateSession(user)
+	jwtString, err := CreateSession(user, r.Host)
 	if err != nil {
 		log.Printf("Failed to create session JWT: %v", err)
 		SendJSONResponse(w, false, "Failed to create session", nil, "")
@@ -271,17 +265,8 @@ func HandlePasswordLogin(w http.ResponseWriter, r *http.Request, userService Use
 	}
 
 	// Set session cookie with JWT
-	cookieName := GetSessionCookieName()
 	expiryDuration := 168 * time.Hour // Match JWT expiry (7 days)
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    jwtString,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   int(expiryDuration.Seconds()),
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil, // Add Secure flag if using HTTPS
-	})
+	SetSessionCookie(w, jwtString, expiryDuration)
 	// No need for backward compatible "session" cookie with JWT
 
 	// Determine redirect based on admin status

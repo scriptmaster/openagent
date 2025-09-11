@@ -1,0 +1,6 @@
+/* Custom Styles for OpenAgent */
+
+/* Tabler Icons Font Size Override */
+.ti {
+    font-size: 20px !important;
+}

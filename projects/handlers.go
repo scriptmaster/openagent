@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
+	"github.com/scriptmaster/openagent/types"
 )
 
 // --- Interfaces (to avoid import cycles) ---
@@ -104,7 +104,7 @@ func HandleProjectAPI(w http.ResponseWriter, r *http.Request, service ProjectSer
 }
 
 // HandleProjects handles the projects page
-func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.Template, service ProjectService) {
+func HandleProjects(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, service ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
@@ -137,7 +137,7 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates *template.
 }
 
 // HandleIndex handles the root route
-func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Template, service ProjectService) {
+func HandleIndex(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, service ProjectService) {
 	// Get user from context
 	user := auth.GetUserFromContext(r.Context())
 
@@ -172,7 +172,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates *template.Tem
 }
 
 // HandleProjectsRoute handles the /projects route with authentication
-func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
+func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -182,7 +182,7 @@ func HandleProjectsRoute(w http.ResponseWriter, r *http.Request, templates *temp
 }
 
 // HandleIndexRoute handles the root route with optional authentication
-func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
+func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		log.Println("No user context found for HandleIndexRoute")
@@ -191,7 +191,7 @@ func HandleIndexRoute(w http.ResponseWriter, r *http.Request, templates *templat
 }
 
 // HandleProjectPageRoute handles project-specific pages based on domain and path
-func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates *template.Template, projectService ProjectService, userService auth.UserServicer) {
+func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface, projectService ProjectService, userService auth.UserServicer) {
 	user := auth.GetUserFromContext(r.Context())
 	project := GetProjectFromContext(r.Context())
 

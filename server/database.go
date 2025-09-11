@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -14,8 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
+	"github.com/scriptmaster/openagent/models"
 	"github.com/scriptmaster/openagent/projects"
 
 	// PostgreSQL driver
@@ -447,8 +450,8 @@ func NewUserService(db *sql.DB, pdbService common.ProjectDBService, dataService 
 }
 
 // getDBForUserOp determines the correct database connection (*sql.DB) to use for a user operation.
-// It checks the context for a project. If found, it gets the default ProjectDB connection for that project.
-// Otherwise, it returns the default application database connection.
+// For authentication operations, it always uses the main application database.
+// For other user operations, it checks the context for a project and uses the project's default database if available.
 func (s *UserService) getDBForUserOp(ctx context.Context) (*sql.DB, error) {
 	project := projects.GetProjectFromContext(ctx)
 	if project == nil {
@@ -459,9 +462,8 @@ func (s *UserService) getDBForUserOp(ctx context.Context) (*sql.DB, error) {
 	projectDBs, err := s.pdbService.GetProjectDBs(int(project.ID))
 	if err != nil {
 		log.Printf("Error getting project DBs for project %d: %v", project.ID, err)
-		// Fallback to default DB? Or return error?
-		// Returning error seems safer, as the expectation is to use the project DB.
-		return nil, fmt.Errorf("could not retrieve database configurations for project %d", project.ID)
+		// Fallback to default DB for non-auth operations
+		return s.db, nil
 	}
 
 	var defaultProjectDBID int = 0
@@ -473,20 +475,25 @@ func (s *UserService) getDBForUserOp(ctx context.Context) (*sql.DB, error) {
 	}
 
 	if defaultProjectDBID == 0 {
-		log.Printf("No default database configured for project %d", project.ID)
-		// Fallback to default DB? Or return error?
-		// Returning error seems safer.
-		return nil, fmt.Errorf("no default database configured for project %d", project.ID)
+		log.Printf("No default database configured for project %d, using main application database", project.ID)
+		// Fallback to default DB
+		return s.db, nil
 	}
 
 	// Get the connection using DataAccessService
 	conn, err := s.dataService.getConnection(ctx, defaultProjectDBID)
 	if err != nil {
-		log.Printf("Error getting connection for project %d DB %d: %v", project.ID, defaultProjectDBID, err)
-		return nil, fmt.Errorf("could not connect to database for project %d", project.ID)
+		log.Printf("Error getting connection for project %d DB %d: %v, falling back to main database", project.ID, defaultProjectDBID, err)
+		// Fallback to default DB
+		return s.db, nil
 	}
 
 	return conn, nil
+}
+
+// getDBForAuthOp always returns the main application database for authentication operations
+func (s *UserService) getDBForAuthOp(ctx context.Context) (*sql.DB, error) {
+	return s.db, nil
 }
 
 // GetUserByEmail retrieves a user by email from the appropriate database (default or project).
@@ -597,8 +604,7 @@ func (s *UserService) UpdateUserLastLogin(ctx context.Context, userID int) error
 		return nil
 	}
 
-	// TODO: Adjust table name if needed
-	query := `UPDATE ai.users SET last_logged_in = NOW() WHERE id = $1`
+	query := common.MustGetSQL("auth/update_last_login")
 	_, err = dbConn.ExecContext(ctx, query, userID)
 	if err != nil {
 		log.Printf("Error updating last login for user %d: %v", userID, err)
@@ -609,10 +615,34 @@ func (s *UserService) UpdateUserLastLogin(ctx context.Context, userID int) error
 }
 
 // VerifyPassword finds a user by email and verifies their password hash.
+// This always uses the main application database for authentication.
 func (s *UserService) VerifyPassword(ctx context.Context, email, password string) (*auth.User, error) {
-	user, err := s.GetUserByEmail(ctx, email) // This already uses the correct DB context
+	// Always use main application database for authentication
+	dbConn, err := s.getDBForAuthOp(ctx)
 	if err != nil {
-		return nil, err // User not found or DB error
+		return nil, err
+	}
+
+	// Query user from main application database using SQL file
+	var user auth.User
+	var lastLoggedIn sql.NullTime
+	query := common.MustGetSQL("auth/verify_password")
+	err = dbConn.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
+		&user.IsAdmin,
+		&user.CreatedAt,
+		&lastLoggedIn,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("user not found")
+		}
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+	if lastLoggedIn.Valid {
+		user.LastLoggedIn = lastLoggedIn.Time
 	}
 
 	if user.PasswordHash == "" {
@@ -626,7 +656,7 @@ func (s *UserService) VerifyPassword(ctx context.Context, email, password string
 		return nil, errors.New("invalid credentials")
 	}
 
-	return user, nil // Password matches
+	return &user, nil // Password matches
 }
 
 // CheckIfAdminExists checks if any user with is_admin = true exists in the *default* database.
@@ -635,36 +665,13 @@ func (s *UserService) CheckIfAdminExists(ctx context.Context) (bool, error) {
 	// This check should ALWAYS run against the default application database,
 	// regardless of project context, as it determines the global first admin.
 	var exists bool
-	query := `SELECT EXISTS(SELECT 1 FROM ai.users WHERE is_admin = true)`
+	query := common.MustGetSQL("auth/check_admin_exists")
 	err := s.db.QueryRowContext(ctx, query).Scan(&exists)
 	if err != nil {
 		log.Printf("Error checking for existing admin users: %v", err)
 		return false, fmt.Errorf("database error checking admin status: %w", err)
 	}
 	return exists, nil
-}
-
-// UpdateUserName updates the user's display name in the appropriate database.
-func (s *UserService) UpdateUserName(ctx context.Context, userID int, newName string) error {
-	dbConn, err := s.getDBForUserOp(ctx)
-	if err != nil {
-		log.Printf("Error getting DB for UpdateUserName (userID: %d): %v", userID, err)
-		return err
-	}
-
-	// TODO: Adjust table name if needed
-	query := `UPDATE ai.users SET name = $1 WHERE id = $2`
-	result, err := dbConn.ExecContext(ctx, query, newName, userID)
-	if err != nil {
-		log.Printf("Error updating name for user %d: %v", userID, err)
-		return fmt.Errorf("database error updating name: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("user with ID %d not found", userID)
-	}
-	return nil
 }
 
 // UpdatePasswordHash updates the user's password hash in the appropriate database.
@@ -679,35 +686,11 @@ func (s *UserService) UpdatePasswordHash(ctx context.Context, userID int, newHas
 		return errors.New("cannot update password to an empty hash")
 	}
 
-	// TODO: Adjust table name if needed
-	query := `UPDATE ai.users SET password_hash = $1 WHERE id = $2`
+	query := common.MustGetSQL("auth/update_password_hash")
 	result, err := dbConn.ExecContext(ctx, query, newHash, userID)
 	if err != nil {
 		log.Printf("Error updating password hash for user %d: %v", userID, err)
 		return fmt.Errorf("database error updating password: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("user with ID %d not found", userID)
-	}
-	return nil
-}
-
-// UpdateUserProfileIcon updates the user's profile icon URL in the appropriate database.
-func (s *UserService) UpdateUserProfileIcon(ctx context.Context, userID int, iconURL string) error {
-	dbConn, err := s.getDBForUserOp(ctx)
-	if err != nil {
-		log.Printf("Error getting DB for UpdateUserProfileIcon (userID: %d): %v", userID, err)
-		return err
-	}
-
-	// TODO: Adjust table name if needed
-	query := `UPDATE ai.users SET profile_icon = $1 WHERE id = $2`
-	result, err := dbConn.ExecContext(ctx, query, iconURL, userID)
-	if err != nil {
-		log.Printf("Error updating profile icon for user %d: %v", userID, err)
-		return fmt.Errorf("database error updating profile icon: %w", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
@@ -1654,12 +1637,56 @@ func (s *dbService) DecodeConnectionString(encoded string) (string, error) {
 }
 
 // CheckOrCreateAdminToken checks for an admin token for today and creates one if it doesn't exist.
-// Placeholder implementation.
+// Token format: UUID-ADMIN-TOKEN-SHA1-HASHED-TIMESTAMP
 func CheckOrCreateAdminToken(db *sql.DB) (string, error) {
-	// TODO: Implement proper admin token generation and checking logic.
-	//       This might involve checking a settings table or a dedicated token table.
-	log.Println("Placeholder CheckOrCreateAdminToken called. Needs implementation.")
-	return "dummy-admin-token", nil
+	today := time.Now().UTC().Format("2006-01-02")
+
+	// First, check if a token already exists for today
+	existingToken, err := GetAdminTokenForDate(db, today)
+	if err != nil {
+		return "", fmt.Errorf("failed to check existing admin token: %w", err)
+	}
+
+	if existingToken != "" {
+		log.Printf("Admin token for today (%s): %s", today, existingToken)
+		return existingToken, nil
+	}
+
+	// No token exists for today, create a new one
+	newToken, err := generateAdminToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate admin token: %w", err)
+	}
+
+	// Store the new token in the database
+	insertQuery := common.MustGetSQL("InsertAdminToken")
+	_, err = db.Exec(insertQuery, newToken, today)
+	if err != nil {
+		return "", fmt.Errorf("failed to store admin token: %w", err)
+	}
+
+	log.Printf("Generated new admin token for today (%s): %s", today, newToken)
+	return newToken, nil
+}
+
+// generateAdminToken creates a new admin token with the format: UUID-ADMIN-TOKEN-SHA1-HASHED-TIMESTAMP
+func generateAdminToken() (string, error) {
+	// Generate a UUID
+	tokenUUID := uuid.New().String()
+
+	// Get current timestamp
+	timestamp := time.Now().UTC().Unix()
+
+	// Create the timestamp string and hash it with SHA1
+	timestampStr := fmt.Sprintf("%d", timestamp)
+	hasher := sha1.New()
+	hasher.Write([]byte(timestampStr))
+	hashedTimestamp := fmt.Sprintf("%x", hasher.Sum(nil))
+
+	// Construct the token: UUID-ADMIN-TOKEN-SHA1-HASHED-TIMESTAMP
+	token := fmt.Sprintf("%s-ADMIN-TOKEN-%s", tokenUUID, hashedTimestamp)
+
+	return token, nil
 }
 
 func (s *dbService) UpdateProjectDB(id int, name, description, dbType, connectionString, schemaName string, isDefault bool) error {
@@ -1695,11 +1722,69 @@ func (s *dbService) TestConnection(projectDB common.ProjectDB) error {
 }
 
 // GetAdminTokenForDate retrieves the admin token for a specific date.
-// Placeholder implementation.
 func GetAdminTokenForDate(db *sql.DB, dateStr string) (string, error) {
-	// TODO: Implement logic to query the token based on date.
-	log.Printf("Placeholder GetAdminTokenForDate called for date: %s. Needs implementation.", dateStr)
-	return "dummy-admin-token-for-date", nil
+	// Validate date format
+	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
+		return "", fmt.Errorf("invalid date format, expected YYYY-MM-DD: %w", err)
+	}
+
+	// Query the database for the token
+	getTokenQuery := common.MustGetSQL("GetAdminTokenForDateCheck")
+	var token string
+	err := db.QueryRow(getTokenQuery, dateStr).Scan(&token)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No token found for this date
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to query admin token for date %s: %w", dateStr, err)
+	}
+
+	return token, nil
+}
+
+// GetAdminStats fetches statistics for the admin dashboard
+func GetAdminStats(db *sql.DB) (*models.AdminStats, error) {
+	stats := &models.AdminStats{}
+
+	// Get project count
+	var projectCount int
+	err := db.QueryRow("SELECT COUNT(*) FROM ai.projects").Scan(&projectCount)
+	if err != nil {
+		log.Printf("Error counting projects: %v", err)
+		projectCount = 0
+	}
+	stats.ProjectCount = projectCount
+
+	// Get connection count (project databases)
+	var connectionCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM ai.project_dbs").Scan(&connectionCount)
+	if err != nil {
+		log.Printf("Error counting connections: %v", err)
+		connectionCount = 0
+	}
+	stats.ConnectionCount = connectionCount
+
+	// Get table count (managed tables)
+	var tableCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM ai.managed_tables").Scan(&tableCount)
+	if err != nil {
+		log.Printf("Error counting tables: %v", err)
+		tableCount = 0
+	}
+	stats.TableCount = tableCount
+
+	// Get user count
+	var userCount int
+	query := common.MustGetSQL("auth/count_users")
+	err = db.QueryRow(query).Scan(&userCount)
+	if err != nil {
+		log.Printf("Error counting users: %v", err)
+		userCount = 0
+	}
+	stats.UserCount = userCount
+
+	return stats, nil
 }
 
 // MakeUserAdmin grants admin privileges to a user.
@@ -1712,7 +1797,7 @@ func (s *UserService) MakeUserAdmin(ctx context.Context, userID int) error {
 		return err
 	}
 
-	query := `UPDATE ai.users SET is_admin = true WHERE id = $1`
+	query := common.MustGetSQL("auth/make_admin")
 	result, err := dbConn.ExecContext(ctx, query, userID)
 	if err != nil {
 		log.Printf("Error making user %d admin: %v", userID, err)

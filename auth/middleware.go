@@ -10,22 +10,14 @@ import (
 // AuthMiddleware checks for a valid session cookie and adds user info to context
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Initialize JWT secret if not already done (important for middleware)
-		if jwtSecret == nil {
-			if err := InitializeJWT(); err != nil {
-				log.Printf("CRITICAL: JWT not initialized in middleware: %v", err)
-				// Handle this potentially by redirecting to an error page or login
-				http.Error(w, "Server configuration error", http.StatusInternalServerError)
-				return
-			}
-		}
+		InitializeJWTSecret(r.Host)
 
 		cookieName := GetSessionCookieName()
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
 			// No cookie found, treat as not logged in
 			log.Printf("No session cookie '%s' found, redirecting to login.", cookieName)
-			http.Redirect(w, r, "/login?error=unauthorized", http.StatusSeeOther)
+			http.Redirect(w, r, "/login?error=please_login", http.StatusSeeOther)
 			return
 		}
 
@@ -35,13 +27,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			// Invalid or expired token
 			log.Printf("Invalid JWT found: %v, redirecting to login.", err)
 			// Clear the invalid cookie
-			http.SetCookie(w, &http.Cookie{
-				Name:   cookieName,
-				Value:  "",
-				Path:   "/",
-				MaxAge: -1,
-			})
-			http.Redirect(w, r, "/login?error=session_expired", http.StatusSeeOther)
+			ClearSessionCookie(w)
+			http.Redirect(w, r, "/login?error=please_login", http.StatusSeeOther)
 			return
 		}
 

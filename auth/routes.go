@@ -1,31 +1,33 @@
 package auth
 
 import (
-	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/scriptmaster/openagent/types"
 )
 
 // RegisterAuthRoutes registers all authentication-related routes using named handlers
-func RegisterAuthRoutes(mux *http.ServeMux, templates *template.Template, userService UserServicer) {
+func RegisterAuthRoutes(router *http.ServeMux, templates types.TemplateEngineInterface, userService UserServicer) {
 	// Initialize templates for auth handlers
 	InitAuthTemplates(templates)
 
-	log.Printf("\t → \t → 6.X Registering Auth Routes /auth/*, /login, /logout, POST /password-login")
+	log.Printf("\t → \t → 6.X Registering Auth Routes /auth/*, /login, /logout")
+
+	// Login/Logout page handlers
+	router.HandleFunc("/login", HandleLogin)
+	router.HandleFunc("/logout", HandleLogout)
+
 	// Auth API endpoints
-	mux.HandleFunc("/auth/request-otp", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/auth/request-otp", func(w http.ResponseWriter, r *http.Request) {
 		HandleRequestOTP(w, r, userService)
 	})
-	mux.HandleFunc("/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
 		HandleVerifyOTP(w, r, userService)
 	})
 
-	// Login/Logout page handlers
-	mux.HandleFunc("/login", HandleLogin)
-	mux.HandleFunc("/logout", HandleLogout)
-
 	// Password Login
-	mux.HandleFunc("/password-login", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/auth/password-login", func(w http.ResponseWriter, r *http.Request) {
 		HandlePasswordLogin(w, r, userService)
 	})
 }

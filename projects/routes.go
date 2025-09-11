@@ -2,17 +2,17 @@ package projects
 
 import (
 	"database/sql"
-	"html/template"
 	"net/http"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
+	"github.com/scriptmaster/openagent/types"
 )
 
 // RegisterProjectRoutes registers HTML and API routes for projects
-func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, userService auth.UserServicer, db *sql.DB, projectDBService common.ProjectDBService) {
+func RegisterProjectRoutes(router *http.ServeMux, templates types.TemplateEngineInterface, userService auth.UserServicer, db *sql.DB, projectDBService common.ProjectDBService) {
 	// Initialize project repository and service
 	sqlxDB := sqlx.NewDb(db, "postgres") // Or the appropriate driver
 	projectRepo := NewProjectRepository(sqlxDB)
@@ -20,13 +20,15 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 
 	// --- HTML Page Routes ---
 	// Handle the main /projects page (renders HTML)
-	// Removed duplicate registration: mux.Handle("/projects", ...)
+	router.Handle("/projects", auth.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		HandleProjectsRoute(w, r, templates, projectService, userService)
+	})))
 
 	// Handle root index page (might list projects)
 	// TODO: Decide if this registration is needed here or only in server/routes.go
 	// Commenting out for now as server/routes.go seems to handle root routing.
 	/*
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			HandleIndexRoute(w, r, templates, projectService, userService)
 		})
 	*/
@@ -83,7 +85,7 @@ func RegisterProjectRoutes(mux *http.ServeMux, templates *template.Template, use
 
 	// Register the API handler under /api/projects/, ensuring auth
 	// NOTE: The internal routing in apiProjectHandler now handles /dbconfig explicitly
-	mux.Handle("/api/projects/", auth.AuthMiddleware(http.HandlerFunc(apiProjectHandler)))
+	router.Handle("/api/projects/", auth.AuthMiddleware(http.HandlerFunc(apiProjectHandler)))
 }
 
 // Removed placeholder for HandleProjectsRoute

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -85,15 +86,43 @@ func GetDefaultFallback(key string) string {
 	}
 }
 
-// GetEnv looks up an environment variable or returns a fallback.
+var (
+	// envCache stores environment variables after their first lookup for faster access.
+	envCache = make(map[string]string)
+	// envCacheMutex protects envCache from concurrent access.
+	envCacheMutex = &sync.RWMutex{}
+)
+
+// GetEnv looks up an environment variable, first checking a local cache, then os.LookupEnv,
+// and finally falling back to a default. The result is cached for subsequent calls.
 func GetEnv(key string) string {
-	if value, ok := os.LookupEnv(key); ok {
+	// Try to get from cache first (read lock)
+	envCacheMutex.RLock()
+	if value, ok := envCache[key]; ok {
+		envCacheMutex.RUnlock()
+		return value
+	}
+	envCacheMutex.RUnlock()
+
+	// Not in cache, acquire write lock to fetch and store
+	envCacheMutex.Lock()
+	defer envCacheMutex.Unlock()
+
+	// Double-check cache in case another goroutine populated it while we were waiting for the write lock
+	if value, ok := envCache[key]; ok {
 		return value
 	}
 
-	fallback := GetDefaultFallback(key)
+	// Look up from environment
+	if value, ok := os.LookupEnv(key); ok {
+		envCache[key] = value
+		return value
+	}
 
+	// If not found in environment, use fallback
+	fallback := GetDefaultFallback(key)
 	log.Printf("Using default for env var %s: %s", key, fallback)
+	envCache[key] = fallback
 	return fallback
 }
 

@@ -1,12 +1,13 @@
 package common
 
 import (
-	"html/template"
 	"net/http"
+
+	"github.com/scriptmaster/openagent/types"
 )
 
 // Handle404 handles requests for unconfigured domains or non-existent routes
-func Handle404(w http.ResponseWriter, r *http.Request, templates *template.Template) {
+func Handle404(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface) {
 	w.WriteHeader(http.StatusNotFound)
 	data := map[string]interface{}{
 		"AppName":    "OpenAgent",

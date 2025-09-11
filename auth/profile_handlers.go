@@ -22,7 +22,7 @@ type ProfilePageData struct {
 func HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 	user := GetUserFromContext(r.Context())
 	if user == nil {
-		http.Redirect(w, r, "/login?error=unauthorized", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=please_login", http.StatusSeeOther)
 		return
 	}
 
@@ -69,27 +69,11 @@ func HandleUpdateProfileAPI(w http.ResponseWriter, r *http.Request, userService 
 	}
 
 	updated := false
-	// Update Name if provided
-	if req.Name != nil {
-		if err := userService.UpdateUserName(r.Context(), user.ID, *req.Name); err != nil {
-			log.Printf("Error updating name for user %d: %v", user.ID, err)
-			common.JSONError(w, "Failed to update name", http.StatusInternalServerError)
-			return
-		}
-		user.Name = *req.Name // Update user in context for immediate reflection (if needed)
-		updated = true
-	}
-
-	// Update Profile Icon if provided
-	if req.ProfileIcon != nil {
-		// TODO: Add validation for URL format?
-		if err := userService.UpdateUserProfileIcon(r.Context(), user.ID, *req.ProfileIcon); err != nil {
-			log.Printf("Error updating profile icon for user %d: %v", user.ID, err)
-			common.JSONError(w, "Failed to update profile icon", http.StatusInternalServerError)
-			return
-		}
-		user.ProfileIcon = *req.ProfileIcon // Update user in context
-		updated = true
+	// Note: Name and ProfileIcon updates are not supported in the current database schema
+	// These fields don't exist in the ai.users table
+	if req.Name != nil || req.ProfileIcon != nil {
+		common.JSONError(w, "Name and ProfileIcon updates are not currently supported", http.StatusNotImplemented)
+		return
 	}
 
 	if !updated {

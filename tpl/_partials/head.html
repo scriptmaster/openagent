@@ -1,0 +1,21 @@
+{{define "_partials/head.html"}}
+<!-- Favicon -->
+<link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="icon" type="image/svg+xml" href="/static/img/icon.svg">
+<link rel="icon" href="/static/favicon.ico">
+
+<!-- Tabler CSS -->
+<link rel="stylesheet" href="/static/css/tabler.min.css">
+<!-- Tabler Icons -->
+<link rel="stylesheet" href="/static/css/tabler-icons.min.css">
+<!-- Custom Styles -->
+<link rel="stylesheet" href="/static/css/custom.css">
+
+<!-- Alpine.js -->
+<script src="/static/js/alpine.min.js" defer></script>
+
+{{block "head" .}}
+<!-- Additional head content goes here -->
+{{end}}
+{{end}}

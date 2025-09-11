@@ -1,7 +1,19 @@
-<svg width="130" height="32" viewBox="0 0 110 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" rx="4" fill="#206BC4"/>
-  <path d="M9 10L16 7L23 10V18.5C23 19.2957 22.6839 20.0587 22.1213 20.6213C21.5587 21.1839 20.7957 21.5 20 21.5C18.7011 21.5 17.2978 21.2654 16 20.8C14.7022 21.2654 13.2989 21.5 12 21.5C11.2043 21.5 10.4413 21.1839 9.87868 20.6213C9.31607 20.0587 9 19.2957 9 18.5V10Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M9 10C9 8.67 9.428 7.43 10.1 6.4L16 12L21.9 6.4C22.572 7.43 23 8.67 23 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg width="130" height="32" viewBox="0 0 130 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circle with 2px border -->
+  <circle cx="16" cy="16" r="14" fill="none" stroke="#333" stroke-width="2"/>
   
-  <text x="38" y="21" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#206BC4">OpenAgent</text>
+  <!-- Left semicircle (black background) -->
+  <path d="M 16 2 A 14 14 0 0 0 16 30" fill="#333"/>
+  
+  <!-- Right semicircle (white background) -->
+  <path d="M 16 2 A 14 14 0 0 1 16 30" fill="white"/>
+  
+  <!-- O text (white on black semicircle) -->
+  <text x="9" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">O</text>
+  
+  <!-- A text (black on white semicircle) -->
+  <text x="23" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333" text-anchor="middle">A</text>
+  
+  <!-- OpenAgent text -->
+  <text x="38" y="21" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#333">OpenAgent</text>
 </svg>
