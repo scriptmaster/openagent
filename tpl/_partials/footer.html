@@ -11,13 +11,13 @@
             <div class="col-12 col-lg-auto mt-3 mt-lg-0">
                 <ul class="list-inline list-inline-dots mb-0">
                     <li class="list-inline-item">
-                        Copyright © {{CurrentYear}}
-                        <a href="/" class="link-secondary">{{.AppName}}</a>.
+                        Copyright © {new Date().getFullYear()}
+                        <a href="/" class="link-secondary">{page.AppName}</a>.
                         All rights reserved.
                     </li>
                     <li class="list-inline-item">
                         <a href="#" class="link-secondary" rel="noopener">
-                            Version {{.AppVersion}}
+                            Version {page.AppVersion}
                         </a>
                     </li>
                 </ul>

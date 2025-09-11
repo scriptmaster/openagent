@@ -3,6 +3,8 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /build
 
+# No build dependencies needed with CGO disabled
+
 # Copy module files first for caching
 COPY go.mod go.sum ./
 RUN go mod tidy
@@ -10,8 +12,14 @@ RUN go mod tidy
 # Copy all source code from root and subdirectories
 COPY . .
 
+# Set build constraints to avoid problematic dependencies
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
 # Build the Go binary for package main, including all its files
-RUN go build -ldflags="-s -w" -o /app/server .
+# Use build tags to exclude problematic tree-sitter dependencies
+RUN go build -tags="!cgo" -ldflags="-s -w" -o /app/server .
 
 # Stage 2: Create the runtime image
 FROM alpine:latest

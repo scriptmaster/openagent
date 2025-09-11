@@ -5,6 +5,8 @@ declare interface Page {
     AppVersion: string;
 
     User: AuthUser;
+
+    Error: string;
 }
 
 declare interface AuthUser {

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,6 +18,8 @@ var (
 	removeScriptPattern     *regexp.Regexp
 	commentPattern          *regexp.Regexp
 	hyphenUnderscorePattern *regexp.Regexp
+	includePattern          *regexp.Regexp
+	htmlIncludePattern      *regexp.Regexp
 
 	// Self-closing tags map for efficient lookup
 	selfClosingTags map[string]*regexp.Regexp
@@ -32,6 +35,8 @@ func init() {
 	removeScriptPattern = regexp.MustCompile(`(?s)<script[^>]*>.*?</script>`)
 	commentPattern = regexp.MustCompile(`<!--(.*?)-->`)
 	hyphenUnderscorePattern = regexp.MustCompile(`[-_]`)
+	includePattern = regexp.MustCompile(`(?m)^\s*//#include\s+"([^"]+)"\s*$`)
+	htmlIncludePattern = regexp.MustCompile(`(?s)<!--\s*#include\s+"([^"]+)"\s*-->`)
 
 	// Initialize self-closing tags map with their patterns
 	selfClosingTags = map[string]*regexp.Regexp{
@@ -137,22 +142,19 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	// Add links to extracted CSS and JS files
 	baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
 
-	// Prepare link and script tags for layout
-	var linkTags, scriptTags string
+	// Prepare link and script paths for layout
+	var linkPaths, scriptPaths string
 
-	// Add _common.js first
-	commonScript := `<script src="/tsx/js/_common.js"></script>`
-
-	// Prepare CSS link tag
+	// Prepare CSS link path
 	if cssContent != "" {
-		linkTags = fmt.Sprintf(`<link rel="stylesheet" href="/tsx/css/%s.css" />`, baseName)
+		linkPaths = fmt.Sprintf("/tsx/css/%s.css", baseName)
 	}
 
-	// Prepare JS script tags
+	// Prepare JS script paths
 	if jsContent != "" {
-		scriptTags = commonScript + "\n" + fmt.Sprintf(`<script src="/tsx/js/%s.js"></script>`, baseName)
+		scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
 	} else {
-		scriptTags = commonScript
+		scriptPaths = "/tsx/js/_common.js"
 	}
 
 	// Convert HTML comments to JSX comments
@@ -161,8 +163,11 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	// Convert Alpine.js attributes to data attributes for JSX compatibility
 	htmlContent = convertAlpineAttributesToData(htmlContent)
 
-	// Sanitize HTML attributes by replacing dots with dashes
+	// Sanitize HTML attributes by replacing dots with dashes A/3
 	htmlContent = sanitizeHtml(htmlContent)
+
+	// // Fix self-closing tags A/3
+	// htmlContent = fixSelfClosingTags(htmlContent)
 
 	// Clean up extra whitespace and empty lines
 	htmlContent = strings.ReplaceAll(htmlContent, "\n\n\n", "\n")
@@ -183,11 +188,10 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		// Check for dot notation pattern (e.g., test.landing_page.html or index.page.landing.html)
 		parts := strings.Split(baseName, ".")
 		if len(parts) >= 2 {
-			// Use the first part as the component name
-			componentName = convertToCamelCase(parts[0])
-
 			if len(parts) >= 3 {
 				// Three-dot notation: component.pageType.layoutName.html
+				// Use the full filename as component name to avoid conflicts
+				componentName = convertToCamelCase(baseName)
 				// Use the second part as the page type
 				pageType = convertToCamelCase(parts[1])
 				// Capitalize the first letter for the page type
@@ -198,6 +202,8 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 				layoutName = "layout_" + parts[2]
 			} else {
 				// Two-dot notation: component.pageType.html
+				// Use the first part as the component name
+				componentName = convertToCamelCase(parts[0])
 				// Use the second part as the page type
 				pageType = convertToCamelCase(parts[1])
 				// Capitalize the first letter for the page type
@@ -233,7 +239,7 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 
 export default function ` + componentName + `({page}: {page: ` + pageType + `}) {
     return (
-        <Layout page={page} linkTags={` + "`" + linkTags + "`" + `} scriptTags={` + "`" + scriptTags + "`" + `}>
+        <Layout page={page} linkPaths={` + "`" + linkPaths + "`" + `} scriptPaths={` + "`" + scriptPaths + "`" + `}>
 ` + htmlContent + `
         </Layout>
     );
@@ -241,20 +247,27 @@ export default function ` + componentName + `({page}: {page: ` + pageType + `}) 
 	} else {
 		// Use fragment for pages with html/head tags - add CSS/JS links directly to HTML
 		// Add CSS link if there's CSS content
-		if linkTags != "" {
+		if linkPaths != "" {
+			cssLink := fmt.Sprintf(`<link rel="stylesheet" href="%s" />`, linkPaths)
 			// If </head> exists, add before it, otherwise prepend as style tag
 			if strings.Contains(htmlContent, "</head>") {
-				htmlContent = strings.Replace(htmlContent, "</head>", "\n    "+linkTags+"\n</head>", 1)
+				htmlContent = strings.Replace(htmlContent, "</head>", "\n    "+cssLink+"\n</head>", 1)
 			} else {
-				htmlContent = linkTags + "\n" + htmlContent
+				htmlContent = cssLink + "\n" + htmlContent
 			}
 		}
 
 		// Add JS scripts if there's JS content
-		if scriptTags != "" {
+		if scriptPaths != "" {
+			// Split scriptPaths and create script tags
+			paths := strings.Split(scriptPaths, ",")
+			var scriptTags string
+			for _, path := range paths {
+				scriptTags += fmt.Sprintf(`<script src="%s"></script>`, strings.TrimSpace(path)) + "\n"
+			}
 			// If </body> exists, add before it, otherwise add at end
 			if strings.Contains(htmlContent, "</body>") {
-				htmlContent = strings.Replace(htmlContent, "</body>", "\n"+scriptTags+"\n</body>", 1)
+				htmlContent = strings.Replace(htmlContent, "</body>", "\n"+scriptTags+"</body>", 1)
 			} else {
 				htmlContent = htmlContent + "\n" + scriptTags
 			}
@@ -294,6 +307,12 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 		log.Printf("Warning: Layout file %s does not contain <body> tag", inputPath)
 	}
 
+	// Process #include directives for partials
+	htmlContent, err = processIncludes(htmlContent, inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to process includes: %w", err)
+	}
+
 	// Remove DOCTYPE declaration - it will be added dynamically
 	htmlContent = strings.ReplaceAll(htmlContent, "<!DOCTYPE html>", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "<!doctype html>", "")
@@ -309,6 +328,9 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	// Replace {children} placeholder with actual children prop
 	htmlContent = strings.ReplaceAll(htmlContent, "{children}", "{children}")
 
+	// Dynamically inject linkTags and scriptTags based on linkPaths and scriptPaths
+	htmlContent = injectDynamicTags(htmlContent)
+
 	// Convert HTML comments to JSX comments
 	htmlContent = convertHtmlCommentsToJsx(htmlContent)
 
@@ -316,7 +338,10 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	htmlContent = convertAlpineAttributesToData(htmlContent)
 
 	// Sanitize HTML attributes by replacing dots with dashes
-	htmlContent = sanitizeHtml(htmlContent)
+	htmlContent = sanitizeHtml(htmlContent) // B/3
+
+	// B/3
+	htmlContent = fixSelfClosingTags(htmlContent)
 
 	// Clean up extra whitespace and empty lines
 	htmlContent = strings.ReplaceAll(htmlContent, "\n\n\n", "\n")
@@ -335,7 +360,7 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	}
 
 	// Write the layout TSX file
-	tsxContent := `export default function ` + componentName + `({page, children, linkTags, scriptTags}: {page: any, children: any, linkTags?: string, scriptTags?: string}) {
+	tsxContent := `export default function ` + componentName + `({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 ` + htmlContent + `
@@ -344,6 +369,23 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 }`
 
 	return os.WriteFile(outputPath, []byte(tsxContent), 0644)
+}
+
+// injectDynamicTags injects dynamic link and script tags based on paths
+func injectDynamicTags(htmlContent string) string {
+	// Inject linkTags before </head>
+	linkTagsCode := `{linkPaths && linkPaths.split(',').map((path, index) => (
+    <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
+))}`
+	htmlContent = strings.Replace(htmlContent, "</head>", "\n    "+linkTagsCode+"\n</head>", 1)
+
+	// Inject scriptTags before </body>
+	scriptTagsCode := `{scriptPaths && scriptPaths.split(',').map((path, index) => (
+    <script key={'gen-script-'+index} src={path.trim()}></script>
+))}`
+	htmlContent = strings.Replace(htmlContent, "</body>", "\n    "+scriptTagsCode+"\n</body>", 1)
+
+	return htmlContent
 }
 
 // transpileAllTemplates finds and transpiles all HTML files from different directories.
@@ -380,8 +422,25 @@ func transpileAllTemplates() error {
 				componentName = parts[0] // Use first part as component name
 			}
 
+			// For three-dot notation files, use the full filename to avoid conflicts
+			// e.g., index.page.landing.html -> index.page.landing.tsx
+			if strings.Count(baseNameWithoutExt, ".") >= 2 {
+				componentName = baseNameWithoutExt
+			}
+
 			tsxFileName := componentName + ".tsx"
 			outputPath := filepath.Join(outputDir, tsxFileName)
+
+			// Check for view override first
+			viewPath := filepath.Join("./tpl/views", strings.TrimPrefix(inputDir, "./tpl/"), tsxFileName)
+			if _, err := os.Stat(viewPath); err == nil {
+				// View override exists, copy it instead of transpiling
+				if err := copyFile(viewPath, outputPath); err != nil {
+					return fmt.Errorf("failed to copy view override %s: %w", viewPath, err)
+				}
+				log.Printf("Copied view override %s to %s", viewPath, outputPath)
+				continue
+			}
 
 			// Check if this is a layout file
 			if strings.Contains(inputDir, "layouts") {
@@ -393,9 +452,219 @@ func transpileAllTemplates() error {
 					return fmt.Errorf("failed to transpile %s: %w", file, err)
 				}
 			}
-			log.Printf("Transpiled %s to %s", file, outputPath)
+			// log.Printf("Transpiled %s to %s", file, outputPath)
 		}
 	}
+
+	// Copy _common.js from views/js to generated/js
+	commonSourcePath := "./tpl/views/js/_common.js"
+	commonDestPath := "./tpl/generated/js/_common.js"
+
+	// Create the generated/js directory if it doesn't exist
+	if err := os.MkdirAll("./tpl/generated/js", 0755); err != nil {
+		return fmt.Errorf("failed to create generated/js directory: %w", err)
+	}
+
+	// Check if _common.js exists in views/js and copy it
+	if _, err := os.Stat(commonSourcePath); err == nil {
+		if err := copyFile(commonSourcePath, commonDestPath); err != nil {
+			return fmt.Errorf("failed to copy _common.js: %w", err)
+		}
+		log.Printf("Copied _common.js from %s to %s", commonSourcePath, commonDestPath)
+	} else {
+		log.Printf("Warning: _common.js not found at %s", commonSourcePath)
+	}
+
+	// Copy _partials directory to generated directory for layout processing
+	partialsSourcePath := "./tpl/_partials"
+	partialsDestPath := "./tpl/generated/_partials"
+
+	// Check if _partials directory exists and copy it
+	if _, err := os.Stat(partialsSourcePath); err == nil {
+		if err := copyDirectory(partialsSourcePath, partialsDestPath); err != nil {
+			return fmt.Errorf("failed to copy _partials directory: %w", err)
+		}
+		log.Printf("Copied _partials directory from %s to %s", partialsSourcePath, partialsDestPath)
+
+		// Retranspile layout files after partials are processed
+		// This ensures layout files include the updated partial content
+		layoutDir := "./tpl/layouts"
+		layoutOutputDir := "./tpl/generated/layouts"
+
+		if files, err := filepath.Glob(filepath.Join(layoutDir, "*.html")); err == nil {
+			for _, file := range files {
+				baseName := filepath.Base(file)
+				baseNameWithoutExt := strings.TrimSuffix(baseName, ".html")
+				tsxFileName := baseNameWithoutExt + ".tsx"
+				outputPath := filepath.Join(layoutOutputDir, tsxFileName)
+
+				// Retranspile the layout file to pick up updated partial content
+				if err := TranspileLayoutToTsx(file, outputPath); err != nil {
+					return fmt.Errorf("failed to retranspile layout %s: %w", file, err)
+				}
+				log.Printf("Retranspiled layout %s to pick up updated partials", file)
+			}
+		}
+	} else {
+		log.Printf("Warning: _partials directory not found at %s", partialsSourcePath)
+	}
+
+	return nil
+}
+
+// copyFile copies a file from src to dst, fixing import paths for generated directory structure
+// and processing #include directives
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Read the entire file content
+	content, err := io.ReadAll(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Process the content
+	contentStr := string(content)
+
+	// Process #include directives
+	contentStr, err = processIncludes(contentStr, src)
+	if err != nil {
+		return fmt.Errorf("failed to process includes: %w", err)
+	}
+
+	// Apply the same transformations as HTML files for consistency
+	// Convert Go template variables to JSX
+	contentStr = strings.ReplaceAll(contentStr, "{{.", "{page.")
+	contentStr = strings.ReplaceAll(contentStr, "}}", "}")
+
+	// Convert class to className
+	contentStr = strings.ReplaceAll(contentStr, "class=", "className=")
+
+	// Convert HTML comments to JSX comments
+	contentStr = convertHtmlCommentsToJsx(contentStr)
+
+	// Convert Alpine.js attributes to data attributes for JSX compatibility
+	contentStr = convertAlpineAttributesToData(contentStr)
+
+	// Sanitize HTML attributes by replacing dots with dashes
+	contentStr = sanitizeHtml(contentStr) // C/3
+
+	// Fix self-closing tags
+	contentStr = fixSelfClosingTags(contentStr) // C/3
+
+	// Fix import paths for generated directory structure
+	// Replace relative imports that go up too many levels
+	contentStr = strings.ReplaceAll(contentStr, "../../layouts/", "../layouts/")
+	contentStr = strings.ReplaceAll(contentStr, "../../generated/", "../")
+
+	// Clean up extra whitespace and empty lines
+	contentStr = strings.ReplaceAll(contentStr, "\n\n\n", "\n")
+	contentStr = strings.ReplaceAll(contentStr, "\n    \n", "\n")
+	contentStr = strings.ReplaceAll(contentStr, "\n\n", "\n")
+	contentStr = strings.TrimSpace(contentStr)
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = destFile.WriteString(contentStr)
+	return err
+}
+
+// processIncludes processes //#include "relative_path" and <!--#include "relative_path" --> directives in the content
+func processIncludes(content, sourceFile string) (string, error) {
+	// Find all JavaScript include directives using the global compiled pattern
+	jsMatches := includePattern.FindAllStringSubmatch(content, -1)
+
+	for _, match := range jsMatches {
+		if len(match) != 2 {
+			continue
+		}
+
+		relativePath := match[1]
+		fullIncludeLine := match[0]
+
+		// Resolve the relative path from the source file's directory
+		sourceDir := filepath.Dir(sourceFile)
+		includePath := filepath.Join(sourceDir, relativePath)
+
+		// Normalize the path
+		includePath = filepath.Clean(includePath)
+
+		// Read the included file
+		includedContent, err := os.ReadFile(includePath)
+		if err == nil {
+			// Replace the include directive with the file content
+			content = strings.Replace(content, fullIncludeLine, string(includedContent), 1)
+		}
+	}
+
+	// Find all HTML comment include directives using the global compiled pattern
+	htmlMatches := htmlIncludePattern.FindAllStringSubmatch(content, -1)
+
+	for _, match := range htmlMatches {
+		if len(match) != 2 {
+			continue
+		}
+
+		relativePath := match[1]
+		fullIncludeLine := match[0]
+
+		// Resolve the relative path from the source file's directory
+		sourceDir := filepath.Dir(sourceFile)
+		includePath := filepath.Join(sourceDir, relativePath)
+
+		// Normalize the path
+		includePath = filepath.Clean(includePath)
+
+		// Read the included file
+		includedContent, err := os.ReadFile(includePath)
+		if err == nil {
+			// Replace the include directive with the file content
+			content = strings.Replace(content, fullIncludeLine, string(includedContent), 1)
+		}
+	}
+
+	return content, nil
+}
+
+// copyDirectory recursively copies a directory and all its contents
+func copyDirectory(src, dst string) error {
+	// Create the destination directory
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+
+	// Read the source directory
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	// Copy each entry
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively copy subdirectories
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			// Copy files
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -409,10 +678,15 @@ func fixSelfClosingTags(htmlContent string) string {
 			if strings.HasSuffix(match, "/>") {
 				return match
 			}
+
 			// Extract attributes and make self-closing
 			submatches := pattern.FindStringSubmatch(match)
 			if len(submatches) > 1 {
 				attrs := submatches[1]
+				// Ensure attributes are properly formatted
+				if attrs != "" && !strings.HasPrefix(attrs, " ") {
+					attrs = " " + attrs
+				}
 				return fmt.Sprintf("<%s%s/>", tag, attrs)
 			}
 			// No attributes case

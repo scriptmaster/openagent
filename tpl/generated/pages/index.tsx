@@ -1,15 +1,20 @@
-import Layout from '../layouts/layout_landing';
+import Layout from '../layouts/layout_pages';
 
 export default function Index({page}: {page: Page}) {
     return (
-        <Layout page={page} linkTags={``} scriptTags={`<script src="/tsx/js/_common.js"></script>`}>
-<div className="container">
-    <h1>{page.LandingTitle}</h1>
-    <p>This is a landing page with specific landing page data.</p>
-    <p>Hero Text: {page.HeroText}</p>
-    <p>CTA Button: {page.CtaButton}</p>
-    <div className="text-center">
-        <button className="btn btn-primary btn-lg">{page.CtaButton}</button>
+        <Layout page={page} linkPaths={`/tsx/css/index.css`} scriptPaths={`/tsx/js/_common.js`}>
+<div className="hero-section">
+    <div className="hero-content">
+        <h1 className="hero-title">
+            <h2>{page.AppName}</h2>
+        </h1>
+        <p className="hero-subtitle">
+            Welcome to OpenAgent - Your AI-powered development platform
+        </p>
+        <div className="cta-buttons">
+            <a href="/login" className="btn-hero btn-primary">Get Started</a>
+            <a href="/config" className="btn-hero btn-outline">Learn More</a>
+        </div>
     </div>
 </div>
         </Layout>

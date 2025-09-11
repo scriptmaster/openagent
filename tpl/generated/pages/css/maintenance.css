@@ -1,19 +1,19 @@
 
-        body {
-            background: #f5f7fb;
-            min-height: 100vh;
-            padding-top: 2rem;
-        }
-        .config-container {
-            max-width: 600px;
-            width: 100%;
-            padding: 2rem;
-        }
-        .card-title {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-        }
-        .header-container {
-            margin-bottom: 2rem;
-        }
-    
+    body {
+        background: #f5f7fb;
+        min-height: 100vh;
+        padding-top: 2rem;
+    }
+    .config-container {
+        max-width: 600px;
+        width: 100%;
+        padding: 2rem;
+    }
+    .card-title {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .header-container {
+        margin-bottom: 2rem;
+    }
+

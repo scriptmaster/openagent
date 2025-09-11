@@ -1,12 +1,15 @@
-export default function LayoutMarketing({page, children, linkTags, scriptTags}: {page: any, children: any, linkTags?: string, scriptTags?: string}) {
+export default function LayoutMarketing({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>{page.Title}</title>
     {page.Head}
+    {linkPaths && linkPaths.split(',').map((path, index) => (
+    <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
+))}
 </head>
 <body>
     <div className="page">
@@ -15,7 +18,7 @@ export default function LayoutMarketing({page, children, linkTags, scriptTags}: 
             <div className="container-xl">
                 <h1 className="navbar-brand navbar-brand-autodark">
                     <a href="/">
-                        <img src="/static/img/logo.svg" width="110" height="32" alt="OpenAgent" className="navbar-brand-image">
+                        <img src="/static/img/logo.svg" width="110" height="32" alt="OpenAgent" className="navbar-brand-image"/>
                     </a>
                 </h1>
                 <div className="navbar-nav flex-row order-md-last">
@@ -54,6 +57,9 @@ export default function LayoutMarketing({page, children, linkTags, scriptTags}: 
             </div>
         </footer>
     </div>
+    {scriptPaths && scriptPaths.split(',').map((path, index) => (
+    <script key={'gen-script-'+index} src={path.trim()}></script>
+))}
 </body>
 </html>
 </>

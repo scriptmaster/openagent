@@ -2,16 +2,8 @@ import Layout from '../layouts/layout_pages';
 
 export default function Maintenance({page}: {page: Page}) {
     return (
-        <Layout page={page} linkTags={`<link rel="stylesheet" href="/tsx/css/maintenance.css" />`} scriptTags={`<script src="/tsx/js/_common.js"></script>
-<script src="/tsx/js/maintenance.js"></script>`}>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Database Configuration - Maintenance Mode</title>
-<link rel="stylesheet" href="/static/css/tabler.min.css" />
-<link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
-</head>
-<body>
-    <div className="page">
+        <Layout page={page} linkPaths={`/tsx/css/maintenance.css`} scriptPaths={`/tsx/js/_common.js,/tsx/js/maintenance.js`}>
+<div className="page">
         <div className="container container-tight py-4">
             <div className="header-container text-center">
                 <a href="/" className="navbar-brand navbar-brand-autodark">

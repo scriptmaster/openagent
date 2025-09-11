@@ -55,7 +55,7 @@ test:
 	go test -v ./...
 	@echo "Testing local build..."
 	# Start a background process to check the server after a delay
-	( \
+	@( \
 		echo "Background server health check initiated. Waiting 5 seconds..."; \
 		sleep 5; \
 		if curl -s http://localhost:8800/ > /dev/null; then \
@@ -64,7 +64,6 @@ test:
 			echo "Background check: Server not responding."; \
 		fi \
 	) & \
-	# Run the application in the foreground, allowing Ctrl+C
 	echo "Starting application in foreground. Press Ctrl+C to stop."; \
 	go run . ; \
 	echo "Application stopped."
