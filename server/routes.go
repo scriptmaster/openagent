@@ -176,23 +176,15 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 	// Test route for template system
 	router.HandleFunc("/test", HandleTestPage)
 
-	// 404 handler - catch all for unmatched routes
+	// Root route handler - serve default index page
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Only handle 404 for non-root requests
-		if r.URL.Path != "/" {
-			admin.Handle404(w, r, globalTemplates)
+		// Only handle root path "/" - serve the default index page
+		if r.URL.Path == "/" {
+			// Always serve the default index page with "Welcome to OpenAgent" message
+			HandleIndexPage(w, r)
 		} else {
-			// Handle root path - redirect to config, admin, or dashboard based on auth
-			user := auth.GetUserFromContext(r.Context())
-			if user != nil {
-				if user.IsAdmin {
-					http.Redirect(w, r, "/admin", http.StatusSeeOther)
-				} else {
-					http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-				}
-			} else {
-				http.Redirect(w, r, "/config", http.StatusSeeOther)
-			}
+			// Handle 404 for non-root requests
+			admin.Handle404(w, r, globalTemplates)
 		}
 	})
 

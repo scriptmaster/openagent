@@ -272,3 +272,21 @@ func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService auth
 
 	common.JSONResponse(w, map[string]string{"message": "Configuration successful! Please log in."})
 }
+
+// HandleIndexPage serves the default index page with "Welcome to OpenAgent" message
+func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
+	// Create default page data
+	pageData := models.PageData{
+		AppName:    "OpenAgent",
+		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		PageTitle:  "Welcome to OpenAgent",
+		User:       nil, // No user context for landing page
+	}
+
+	// Render the index template
+	if err := globalTemplates.ExecuteTemplate(w, "index.html", pageData); err != nil {
+		log.Printf("Error rendering index page: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
