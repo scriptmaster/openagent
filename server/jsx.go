@@ -182,7 +182,7 @@ func convertElementToReactWithCustomComponents(n *html.Node, result *strings.Bui
 	// Check if this is a custom React component
 	var componentName string
 	var isCustomComponent bool
-	
+
 	if customComponents != nil {
 		if originalName, exists := customComponents[n.Data]; exists {
 			componentName = originalName
@@ -195,7 +195,7 @@ func convertElementToReactWithCustomComponents(n *html.Node, result *strings.Bui
 		componentName = n.Data
 		isCustomComponent = isCustomReactComponent(n.Data)
 	}
-	
+
 	// Build props object
 	props := buildPropsObject(n)
 
@@ -256,12 +256,12 @@ func buildPropsObject(n *html.Node) string {
 // extractCustomComponentNames extracts custom component names from JSX content
 func extractCustomComponentNames(jsxContent string) map[string]string {
 	customComponents := make(map[string]string)
-	
+
 	// Find all custom component tags (capitalized first letter)
 	// Pattern: <ComponentName> or <ComponentName />
 	componentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s*/?>`)
 	matches := componentPattern.FindAllStringSubmatch(jsxContent, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			componentName := match[1]
@@ -269,7 +269,7 @@ func extractCustomComponentNames(jsxContent string) map[string]string {
 			customComponents[lowercaseName] = componentName
 		}
 	}
-	
+
 	return customComponents
 }
 
