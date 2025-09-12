@@ -70,7 +70,7 @@ export default function Login({page}: {page: Page}) {
                     end
                     loadingButton .btn-primary false 'Verify'">
                     
-                    <input type="hidden" name="email" _="on load set my.value to #emailForm input[name=email].value" />
+                    <input type="hidden" name="email" _="on load set my.value to #emailForm input[name='email'].value" />
                     
                     <div className="mb-3">
                         <label className="form-label">One-Time Password</label>
