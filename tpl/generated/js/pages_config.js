@@ -1,22 +1,4 @@
 
-// Embedded Component JS
-///////////////////////////////
-
-// Component: simple
-function Simple() {
-    return (
-        React.createElement('div', null, 'Simple Component')
-    );
-}
-
-///////////////////////////////
-
-// Component prototype methods
-
-
-///////////////////////////////
-
-// Main Page JS
 
 // Main Component JS (converted to JS from TSX)
 function Config({page}) {

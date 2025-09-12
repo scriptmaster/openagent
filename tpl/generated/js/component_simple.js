@@ -7,3 +7,10 @@ function Simple() {
 ///////////////////////////////
 
 // Component prototype methods
+
+    Object.assign({}, Simple.prototype, {
+        hey() {
+            alert('hey');
+        }
+    });
+

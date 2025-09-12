@@ -269,24 +269,43 @@ func findComponentJSFiles(htmlContent string) []string {
 	return componentFiles
 }
 
-// embedComponentJS embeds all component JS content into the main JS file
+// embedComponentJS embeds only the component JS content that is referenced in the main JS file
 func embedComponentJS(mainJSContent string) string {
-	// Find all component JS files
-	componentFiles, err := filepath.Glob("tpl/generated/js/component_*.js")
-	if err != nil {
+	// Find components that are actually referenced in the main JS content
+	// Look for React.createElement(ComponentName, {}) patterns
+	componentRefPattern := regexp.MustCompile(`React\.createElement\((\w+),\s*\{\}\)`)
+	matches := componentRefPattern.FindAllStringSubmatch(mainJSContent, -1)
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: embedComponentJS found %d component references in main JS\n", len(matches))
+	}
+
+	if len(matches) == 0 {
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: Error finding component files: %v\n", err)
+			fmt.Printf("DEBUG: No component references found, returning mainJSContent as-is\n")
 		}
 		return mainJSContent
 	}
 
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: embedComponentJS found %d component files: %v\n", len(componentFiles), componentFiles)
+	// Extract unique component names
+	referencedComponents := make(map[string]bool)
+	for _, match := range matches {
+		if len(match) > 1 {
+			componentName := match[1]
+			// Skip built-in React components and common HTML elements
+			if !isBuiltInComponent(componentName) {
+				referencedComponents[componentName] = true
+			}
+		}
 	}
 
-	if len(componentFiles) == 0 {
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: Referenced components: %v\n", referencedComponents)
+	}
+
+	if len(referencedComponents) == 0 {
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: No component files found, returning mainJSContent as-is\n")
+			fmt.Printf("DEBUG: No custom components referenced, returning mainJSContent as-is\n")
 		}
 		return mainJSContent
 	}
@@ -295,7 +314,10 @@ func embedComponentJS(mainJSContent string) string {
 	embeddedComponents.WriteString("// Embedded Component JS\n")
 	embeddedComponents.WriteString("///////////////////////////////\n\n")
 
-	for _, componentFile := range componentFiles {
+	// Only embed components that are actually referenced
+	for componentName := range referencedComponents {
+		componentFile := fmt.Sprintf("tpl/generated/js/component_%s.js", strings.ToLower(componentName))
+
 		componentJS, err := os.ReadFile(componentFile)
 		if err != nil {
 			if isDebugTranspile() {
@@ -304,15 +326,11 @@ func embedComponentJS(mainJSContent string) string {
 			continue
 		}
 
-		componentName := filepath.Base(componentFile)
-		componentName = strings.TrimPrefix(componentName, "component_")
-		componentName = strings.TrimSuffix(componentName, ".js")
-
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: Embedding component %s: %d bytes\n", componentName, len(componentJS))
+			fmt.Printf("DEBUG: Embedding referenced component %s: %d bytes\n", componentName, len(componentJS))
 		}
 
-		embeddedComponents.WriteString(fmt.Sprintf("// Component: %s\n", componentName))
+		embeddedComponents.WriteString(fmt.Sprintf("// Component: %s\n", strings.ToLower(componentName)))
 		embeddedComponents.WriteString(string(componentJS))
 		embeddedComponents.WriteString("\n\n")
 	}
@@ -322,4 +340,17 @@ func embedComponentJS(mainJSContent string) string {
 	embeddedComponents.WriteString(mainJSContent)
 
 	return embeddedComponents.String()
+}
+
+// isBuiltInComponent checks if a component name is a built-in React component or HTML element
+func isBuiltInComponent(componentName string) bool {
+	builtInComponents := map[string]bool{
+		"div": true, "span": true, "p": true, "h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
+		"button": true, "input": true, "form": true, "label": true, "select": true, "textarea": true,
+		"ul": true, "ol": true, "li": true, "a": true, "img": true, "br": true, "hr": true,
+		"table": true, "tr": true, "td": true, "th": true, "thead": true, "tbody": true,
+		"header": true, "footer": true, "nav": true, "main": true, "section": true, "article": true,
+		"React": true, "Fragment": true,
+	}
+	return builtInComponents[componentName]
 }

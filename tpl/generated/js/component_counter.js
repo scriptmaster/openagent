@@ -1,13 +1,20 @@
-<div className="mb-3">
-    <span className="badge bg-primary fs-4">Count: {this.counterState.count}</span>
-</div>
-<div className="btn-group" role="group">
+function Counter() {
+    return (
+        React.createElement('div', {className: 'mb-3'}, 
+    React.createElement('span', {className: 'badge bg-primary fs-4'}, 'Count: ', this.counterState.count)
+)
+React.createElement('div', {className: 'btn-group', role: 'group'}, 
     <button className="btn btn-outline-danger" onClick={decrementCounter}>-</button>
     <button className="btn btn-outline-success" onClick={incrementCounter}>+</button>
     <button className="btn btn-outline-secondary" onClick={resetCounter}>Reset</button>
-</div>
+)
+    );
+}
 
-<script>
+///////////////////////////////
+
+// Component prototype methods
+
     // Counter component prototype methods
     Object.assign(Counter.prototype, {
         counterState: { count: 0 },
@@ -24,4 +31,4 @@
             this.forceUpdate();
         }
     });
-</script>
+
