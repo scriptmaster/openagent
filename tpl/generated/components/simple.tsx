@@ -1,6 +1,9 @@
 export default function Simple() {
     return (
-        <div>Simple Component</div>
+        <div>
+    <span>Simple Component 2: </span>
+    <button>Hey!</button>
+</div>
 
 
 

@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// Global variable to store imported components for TSX generation
+var globalImportedComponents map[string]bool
+
 // Component JS files are now stored as separate files and read when needed
 
 // processComponentImports processes component divs and imports component files
@@ -24,21 +27,25 @@ func processComponentImports(htmlContent, inputPath string) (string, error) {
 		fmt.Printf("DEBUG: Found %d component matches: %v\n", len(matches), matches)
 	}
 
-	return componentPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
+	// Track which components we're importing for later use
+	importedComponents := make(map[string]bool)
+
+	result := componentPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
 		// Extract component name from the match
 		submatches := componentPattern.FindStringSubmatch(match)
 		if len(submatches) < 2 {
 			return match // Return original if no match
 		}
 
-		componentName := submatches[1] // e.g., "counter"
+		componentName := submatches[1]                   // e.g., "counter"
+		componentNameCapitalized := Title(componentName) // e.g., "Counter"
 
 		if isDebugTranspile() {
 			fmt.Printf("DEBUG: Processing component: %s\n", componentName)
 		}
 
 		// Import and transpile the component
-		componentHTML, err := importAndTranspileComponent(componentName, inputPath)
+		_, err := importAndTranspileComponent(componentName, inputPath)
 		if err != nil {
 			if isDebugTranspile() {
 				fmt.Printf("DEBUG: Failed to import component %s: %v\n", componentName, err)
@@ -50,13 +57,20 @@ func processComponentImports(htmlContent, inputPath string) (string, error) {
 			fmt.Printf("DEBUG: Successfully imported component %s\n", componentName)
 		}
 
-		// Preserve the original id attribute by adding it to the component HTML
-		// Replace the first opening tag in componentHTML with the original id
-		originalId := fmt.Sprintf("component-%s", componentName)
-		componentHTML = strings.Replace(componentHTML, "<div>", fmt.Sprintf(`<div id="%s">`, originalId), 1)
+		// Track this component for import statements
+		importedComponents[componentNameCapitalized] = true
 
-		return componentHTML
-	}), nil
+		// Replace the div with the component directly
+		return fmt.Sprintf(`<%s />`, componentNameCapitalized)
+	})
+
+	// Store the imported components in a global variable for later use
+	if len(importedComponents) > 0 {
+		// Store in a global variable that can be accessed during TSX generation
+		globalImportedComponents = importedComponents
+	}
+
+	return result, nil
 }
 
 // importAndTranspileComponent imports a component file and transpiles it
@@ -129,9 +143,10 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 		fmt.Printf("DEBUG: Component JS content: %s\n", componentJS[:min(200, len(componentJS))])
 	}
 
-	// Add the script content (prototype methods)
-	componentJS += "\n\n///////////////////////////////\n\n"
-	componentJS += "// Component prototype methods\n"
+	// Add the script content (prototype methods) with ASCII art
+	componentJS += "\n\n// ╔══════════════════════════════════════════════════════════════════════════════\n"
+	componentJS += "// ║                        🔧 COMPONENT PROTOTYPE METHODS 🔧                        \n"
+	componentJS += "// ╚══════════════════════════════════════════════════════════════════════════════\n\n"
 	componentJS += jsContent
 
 	// Write component JS to file for later embedding
@@ -187,20 +202,8 @@ func convertCounterJSXToReact(tsxContent string, componentName string) string {
 
 	jsxContent := matches[1]
 
-	// Convert the JSX to React.createElement calls
-	// Handle simple div with text content first
-	result := strings.ReplaceAll(jsxContent, `<div>Simple Component</div>`, `React.createElement('div', null, 'Simple Component')`)
-
-	// Handle Counter component specific JSX
-	result = strings.ReplaceAll(result, `<div className="mb-3">`, `React.createElement('div', {className: 'mb-3'}, `)
-	result = strings.ReplaceAll(result, `<span className="badge bg-primary fs-4">Count: {this.counterState.count}</span>`, `React.createElement('span', {className: 'badge bg-primary fs-4'}, 'Count: ', this.counterState.count)`)
-	result = strings.ReplaceAll(result, `</div>`, `)`)
-
-	// Second div with buttons
-	result = strings.ReplaceAll(result, `<div className="btn-group" role="group">`, `React.createElement('div', {className: 'btn-group', role: 'group'}, `)
-	result = strings.ReplaceAll(result, `<button className="btn btn-outline-danger" onClick={() => this.decrementCounter()}>-</button>`, `React.createElement('button', {className: 'btn btn-outline-danger', onClick: () => this.decrementCounter()}, '-')`)
-	result = strings.ReplaceAll(result, `<button className="btn btn-outline-success" onClick={() => this.incrementCounter()}>+</button>`, `React.createElement('button', {className: 'btn btn-outline-success', onClick: () => this.incrementCounter()}, '+')`)
-	result = strings.ReplaceAll(result, `<button className="btn btn-outline-secondary" onClick={() => this.resetCounter()}>Reset</button>`, `React.createElement('button', {className: 'btn btn-outline-secondary', onClick: () => this.resetCounter()}, 'Reset')`)
+	// Convert the JSX to React.createElement calls using HTML parser
+	result := parseJSXWithHTMLParser(jsxContent)
 
 	// Create the final function with proper React.createElement syntax
 	finalResult := fmt.Sprintf("function %s() {\n    return (\n        %s\n    );\n}", Title(componentName), result)
@@ -272,8 +275,8 @@ func findComponentJSFiles(htmlContent string) []string {
 // embedComponentJS embeds only the component JS content that is referenced in the main JS file
 func embedComponentJS(mainJSContent string) string {
 	// Find components that are actually referenced in the main JS content
-	// Look for React.createElement(ComponentName, {}) patterns
-	componentRefPattern := regexp.MustCompile(`React\.createElement\((\w+),\s*\{\}\)`)
+	// Look for React.createElement(ComponentName, {}) or React.createElement(ComponentName, null) patterns
+	componentRefPattern := regexp.MustCompile(`React\.createElement\((\w+),\s*(?:\{\}|null)\)`)
 	matches := componentRefPattern.FindAllStringSubmatch(mainJSContent, -1)
 
 	if isDebugTranspile() {
@@ -311,8 +314,9 @@ func embedComponentJS(mainJSContent string) string {
 	}
 
 	var embeddedComponents strings.Builder
-	embeddedComponents.WriteString("// Embedded Component JS\n")
-	embeddedComponents.WriteString("///////////////////////////////\n\n")
+	embeddedComponents.WriteString("// ╔═════════════════════════════════════════════════════════════════════════════\n")
+	embeddedComponents.WriteString("// ║                           🧩 EMBEDDED COMPONENT JS 🧩                        \n")
+	embeddedComponents.WriteString("// ╚═════════════════════════════════════════════════════════════════════════════\n\n")
 
 	// Only embed components that are actually referenced
 	for componentName := range referencedComponents {
@@ -330,13 +334,19 @@ func embedComponentJS(mainJSContent string) string {
 			fmt.Printf("DEBUG: Embedding referenced component %s: %d bytes\n", componentName, len(componentJS))
 		}
 
-		embeddedComponents.WriteString(fmt.Sprintf("// Component: %s\n", strings.ToLower(componentName)))
+		// ASCII art for each component
+		componentArt := fmt.Sprintf(`// ┌─────────────────────────────────────────────────────────────────────────────
+// │  🎯 COMPONENT: %-50s
+// └─────────────────────────────────────────────────────────────────────────────
+`, strings.ToUpper(componentName))
+		embeddedComponents.WriteString(componentArt)
 		embeddedComponents.WriteString(string(componentJS))
 		embeddedComponents.WriteString("\n\n")
 	}
 
-	embeddedComponents.WriteString("///////////////////////////////\n\n")
-	embeddedComponents.WriteString("// Main Page JS\n")
+	embeddedComponents.WriteString("// ╔══════════════════════════════════════════════════════════════════════════════\n")
+	embeddedComponents.WriteString("// ║                            ⚛️  MAIN PAGE JS ⚛️                               \n")
+	embeddedComponents.WriteString("// ╚══════════════════════════════════════════════════════════════════════════════\n\n")
 	embeddedComponents.WriteString(mainJSContent)
 
 	return embeddedComponents.String()

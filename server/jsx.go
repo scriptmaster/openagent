@@ -88,6 +88,12 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 	}
 	// fmt.Printf("DEBUG: parseJSXWithHTMLParser called with: %s\n", jsxContent)
 
+	// First, extract custom component names to preserve their case
+	customComponents := extractCustomComponentNames(jsxContent)
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: Found custom components: %v\n", customComponents)
+	}
+
 	// Wrap JSX content in html/body tags for proper parsing
 	// wrappedHTML := "<html><body>" + jsxContent + "</body></html>"
 	wrappedHTML := jsxContent
@@ -104,7 +110,7 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 
 	// Walk through the parsed HTML and convert to React.createElement
 	var result strings.Builder
-	walkHTMLNode(doc, &result)
+	walkHTMLNodeWithCustomComponents(doc, &result, customComponents)
 
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: parseJSXWithHTMLParser result: %s\n", result.String()[:min(100, len(result.String()))])
@@ -127,10 +133,14 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 
 // walkHTMLNode walks through HTML nodes and converts them to React.createElement calls
 func walkHTMLNode(n *html.Node, result *strings.Builder) {
+	walkHTMLNodeWithCustomComponents(n, result, nil)
+}
+
+func walkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, customComponents map[string]string) {
 	switch n.Type {
 	case html.ElementNode:
 		// Convert element to React.createElement
-		convertElementToReact(n, result)
+		convertElementToReactWithCustomComponents(n, result, customComponents)
 	case html.TextNode:
 		// Convert text node
 		text := strings.TrimSpace(n.Data)
@@ -140,7 +150,7 @@ func walkHTMLNode(n *html.Node, result *strings.Builder) {
 	case html.DocumentNode:
 		// Skip document node, process children
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walkHTMLNode(c, result)
+			walkHTMLNodeWithCustomComponents(c, result, customComponents)
 		}
 	case html.DoctypeNode:
 		// Skip doctype
@@ -148,22 +158,44 @@ func walkHTMLNode(n *html.Node, result *strings.Builder) {
 	default:
 		// Process children for other node types
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walkHTMLNode(c, result)
+			walkHTMLNodeWithCustomComponents(c, result, customComponents)
 		}
 	}
 }
 
 // convertElementToReact converts an HTML element to React.createElement
 func convertElementToReact(n *html.Node, result *strings.Builder) {
+	convertElementToReactWithCustomComponents(n, result, nil)
+}
+
+// convertElementToReactWithCustomComponents converts an HTML element to React.createElement
+func convertElementToReactWithCustomComponents(n *html.Node, result *strings.Builder, customComponents map[string]string) {
 	// Skip html, body, and head tags (they're just wrappers)
 	if n.Data == "html" || n.Data == "body" || n.Data == "head" {
 		// Process children
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walkHTMLNode(c, result)
+			walkHTMLNodeWithCustomComponents(c, result, customComponents)
 		}
 		return
 	}
 
+	// Check if this is a custom React component
+	var componentName string
+	var isCustomComponent bool
+	
+	if customComponents != nil {
+		if originalName, exists := customComponents[n.Data]; exists {
+			componentName = originalName
+			isCustomComponent = true
+		} else {
+			componentName = n.Data
+			isCustomComponent = false
+		}
+	} else {
+		componentName = n.Data
+		isCustomComponent = isCustomReactComponent(n.Data)
+	}
+	
 	// Build props object
 	props := buildPropsObject(n)
 
@@ -178,12 +210,18 @@ func convertElementToReact(n *html.Node, result *strings.Builder) {
 		if hasChildren {
 			children.WriteString(", ")
 		}
-		walkHTMLNode(c, &children)
+		walkHTMLNodeWithCustomComponents(c, &children, customComponents)
 		hasChildren = true
 	}
 
 	// Build React.createElement call
-	result.WriteString(fmt.Sprintf("React.createElement('%s', %s", n.Data, props))
+	if isCustomComponent {
+		// Custom React component - use component name directly (no quotes)
+		result.WriteString(fmt.Sprintf("React.createElement(%s, %s", componentName, props))
+	} else {
+		// Standard HTML element - use string name (with quotes)
+		result.WriteString(fmt.Sprintf("React.createElement('%s', %s", componentName, props))
+	}
 
 	if hasChildren {
 		result.WriteString(", ")
@@ -213,6 +251,36 @@ func buildPropsObject(n *html.Node) string {
 	}
 
 	return "{" + strings.Join(props, ", ") + "}"
+}
+
+// extractCustomComponentNames extracts custom component names from JSX content
+func extractCustomComponentNames(jsxContent string) map[string]string {
+	customComponents := make(map[string]string)
+	
+	// Find all custom component tags (capitalized first letter)
+	// Pattern: <ComponentName> or <ComponentName />
+	componentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s*/?>`)
+	matches := componentPattern.FindAllStringSubmatch(jsxContent, -1)
+	
+	for _, match := range matches {
+		if len(match) > 1 {
+			componentName := match[1]
+			lowercaseName := strings.ToLower(componentName)
+			customComponents[lowercaseName] = componentName
+		}
+	}
+	
+	return customComponents
+}
+
+// isCustomReactComponent checks if a tag name is a custom React component
+// Custom React components start with a capital letter
+func isCustomReactComponent(tagName string) bool {
+	if len(tagName) == 0 {
+		return false
+	}
+	firstChar := tagName[0]
+	return firstChar >= 'A' && firstChar <= 'Z'
 }
 
 // parseJSXAttributes parses JSX attributes into a JavaScript object string

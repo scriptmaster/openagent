@@ -1,12 +1,13 @@
 function Simple() {
     return (
-        React.createElement('div', null, 'Simple Component')
+        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'), React.createElement('button', null, 'Hey!'))
     );
 }
 
-///////////////////////////////
+// ╔══════════════════════════════════════════════════════════════════════════════
+// ║                        🔧 COMPONENT PROTOTYPE METHODS 🔧                        
+// ╚══════════════════════════════════════════════════════════════════════════════
 
-// Component prototype methods
 
     Object.assign({}, Simple.prototype, {
         hey() {

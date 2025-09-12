@@ -81,6 +81,9 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	// Convert Go template syntax to JSX
 	htmlContent := string(content)
 
+	// Clear global imported components for this file
+	globalImportedComponents = nil
+
 	// Process component imports (e.g., <div id="component-counter"></div>)
 	htmlContent, err = processComponentImports(htmlContent, inputPath)
 	if err != nil {
@@ -255,11 +258,40 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		}
 	}
 
+	// Generate imports from globalImportedComponents
+	var imports string
+	var mainContent string
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: htmlContent after component processing: %s\n", htmlContent[:min(200, len(htmlContent))])
+	}
+
+	// Check if we have imported components
+	if globalImportedComponents != nil && len(globalImportedComponents) > 0 {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Found %d imported components: %v\n", len(globalImportedComponents), globalImportedComponents)
+		}
+
+		var importsBuilder strings.Builder
+		importsBuilder.WriteString("// Component imports\n")
+		for componentName := range globalImportedComponents {
+			importsBuilder.WriteString(fmt.Sprintf("import %s from '../components/%s';\n", componentName, strings.ToLower(componentName)))
+		}
+		importsBuilder.WriteString("\n")
+		imports = importsBuilder.String()
+
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Generated imports: %s\n", imports)
+		}
+	}
+
+	mainContent = htmlContent
+
 	// Create the main component file (test.tsx) - contains the actual component
-	tsxContent = `export default function ` + componentName + `({page}) {
+	tsxContent = imports + `export default function ` + componentName + `({page}) {
     return (
 <main>
-` + htmlContent + `
+` + mainContent + `
 </main>
     );
 }`
@@ -1021,8 +1053,7 @@ func createReactJSContent(originalJS, componentName string) string {
 	// Convert component TSX to JS
 	componentJS := TSX2JS(string(componentTsxContent))
 
-	// Replace component divs with component function calls
-	componentJS = replaceComponentDivsWithCalls(componentJS)
+	// Component replacement is now handled at TSX level with imports
 
 	actualComponentName := GetActualComponentName(componentJS, componentName)
 
@@ -1032,12 +1063,14 @@ func createReactJSContent(originalJS, componentName string) string {
 
 	// Create the main component JS content first
 	mainComponentJS := fmt.Sprintf(`
-// Main Component JS (converted to JS from TSX)
+// ╔══════════════════════════════════════════════════════════════════════════════
+// ║                    ⚛️  MAIN COMPONENT JS (TSX → JS) ⚛️                      
+// ╚══════════════════════════════════════════════════════════════════════════════
 %s
 
-///////////////////////////////
-
-// Original JS content
+// ╔══════════════════════════════════════════════════════════════════════════════
+// ║                        📜 ORIGINAL JS CONTENT 📜                            
+// ╚══════════════════════════════════════════════════════════════════════════════
 %s`, componentJS, originalJS)
 
 	// Embed component JS content into the main JS file
@@ -1047,7 +1080,9 @@ func createReactJSContent(originalJS, componentName string) string {
 	reactJS := fmt.Sprintf(`
 %s
 
-///////////////////////////////
+// ╔══════════════════════════════════════════════════════════════════════════════
+// ║                        💧 HYDRATION 💧                            
+// ╚══════════════════════════════════════════════════════════════════════════════
 
 // Make component available globally for hydration
 window.%s = %s;
@@ -1079,9 +1114,46 @@ func TSX2JS(tsxStr string) string {
 	tsxStr = removeTypeScriptTypes(tsxStr)
 	// log.Println("removeTypeScriptTypes: ", tsxStr)
 
-	// Convert JSX to React.createElement calls
-	jsxStr := convertJSXToReactCreateElement(tsxStr)
+	// Extract imports and main content
+	var imports string
+	var mainContent string
+
+	if strings.HasPrefix(tsxStr, "// Component imports") {
+		// Find the end of imports (look for the first "export default function")
+		lines := strings.Split(tsxStr, "\n")
+		var importLines []string
+		var mainLines []string
+		inImports := true
+
+		for _, line := range lines {
+			if inImports && strings.HasPrefix(strings.TrimSpace(line), "export default function") {
+				inImports = false
+				mainLines = append(mainLines, line)
+			} else if inImports {
+				importLines = append(importLines, line)
+			} else {
+				mainLines = append(mainLines, line)
+			}
+		}
+
+		if len(importLines) > 0 {
+			imports = strings.Join(importLines, "\n") + "\n\n"
+			mainContent = strings.Join(mainLines, "\n")
+			log.Printf("DEBUG: Extracted imports: %s", imports)
+			log.Printf("DEBUG: Extracted mainContent: %s", mainContent[:min(200, len(mainContent))])
+		} else {
+			mainContent = tsxStr
+		}
+	} else {
+		mainContent = tsxStr
+	}
+
+	// Convert JSX to React.createElement calls (only on main content)
+	jsxStr := convertJSXToReactCreateElement(mainContent)
 	// log.Println("convertJSXToReactCreateElement: ", jsxStr)
+
+	// Combine imports with converted JSX
+	jsxStr = imports + jsxStr
 
 	// Fix className case (HTML parser converts to lowercase)
 	jsxStr = strings.ReplaceAll(jsxStr, "{classname:", "{className:")
