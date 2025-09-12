@@ -147,7 +147,10 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	}
 
 	// Convert HTML comments to JSX comments
-	htmlContent = convertHtmlCommentsToJsx(htmlContent)
+	// Remove all HTML comments to prevent React hydration errors
+	htmlContent = removeHTMLComments(htmlContent)
+	// Convert HTML comments to JSX comments (DISABLED - causes React hydration errors)
+	// htmlContent = convertHtmlCommentsToJsx(htmlContent)
 
 	// Convert Alpine.js attributes to data attributes for JSX compatibility
 	htmlContent = convertAlpineAttributesToData(htmlContent)
@@ -339,7 +342,10 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	htmlContent = injectDynamicTags(htmlContent)
 
 	// Convert HTML comments to JSX comments
-	htmlContent = convertHtmlCommentsToJsx(htmlContent)
+	// Remove all HTML comments to prevent React hydration errors
+	htmlContent = removeHTMLComments(htmlContent)
+	// Convert HTML comments to JSX comments (DISABLED - causes React hydration errors)
+	// htmlContent = convertHtmlCommentsToJsx(htmlContent)
 
 	// Convert Alpine.js attributes to data attributes for JSX compatibility
 	htmlContent = convertAlpineAttributesToData(htmlContent)
@@ -579,8 +585,10 @@ func copyFile(src, dst string) error {
 	// Convert class to className
 	contentStr = strings.ReplaceAll(contentStr, "class=", "className=")
 
-	// Convert HTML comments to JSX comments
-	contentStr = convertHtmlCommentsToJsx(contentStr)
+	// Remove all HTML comments to prevent React hydration errors
+	contentStr = removeHTMLComments(contentStr)
+	// Convert HTML comments to JSX comments (DISABLED - causes React hydration errors)
+	// contentStr = convertHtmlCommentsToJsx(contentStr)
 
 	// Convert Alpine.js attributes to data attributes for JSX compatibility
 	contentStr = convertAlpineAttributesToData(contentStr)
@@ -879,18 +887,17 @@ func convertToCamelCase(str string) string {
 	return result
 }
 
-// convertHtmlCommentsToJsx converts HTML comments to JSX comments
-func convertHtmlCommentsToJsx(htmlContent string) string {
-	// Replace HTML comments with JSX comments
-	htmlContent = commentPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
-		// Extract the comment content (without <!-- and -->)
-		content := commentPattern.FindStringSubmatch(match)[1]
-		// Convert to JSX comment format: {/* ... */}
-		return fmt.Sprintf("{/*%s*/}", content)
-	})
-
-	return htmlContent
-}
+// // convertHtmlCommentsToJsx converts HTML comments to JSX comments
+// func convertHtmlCommentsToJsx(htmlContent string) string {
+// 	// Replace HTML comments with JSX comments
+// 	htmlContent = commentPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
+// 		// Extract the comment content (without <!-- and -->)
+// 		content := commentPattern.FindStringSubmatch(match)[1]
+// 		// Convert to JSX comment format: {/* ... */}
+// 		return fmt.Sprintf("{/*%s*/}", content)
+// 	})
+// 	return htmlContent
+// }
 
 // convertAlpineAttributesToData converts Alpine.js attributes to data attributes for JSX compatibility
 func convertAlpineAttributesToData(htmlContent string) string {
@@ -1059,4 +1066,10 @@ func TSX2JS(tsxStr string) string {
 	// log.Println("FINAL JSX: ", jsxStr)
 
 	return jsxStr
+}
+
+// removeHTMLComments removes all HTML comments from the content
+func removeHTMLComments(content string) string {
+	// Remove HTML comments: <!-- ... -->
+	return commentPattern.ReplaceAllString(content, "")
 }

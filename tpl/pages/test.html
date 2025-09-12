@@ -2,13 +2,83 @@
     <div class="row">
         <div class="col-12">
             <div class="page-header">
-                <h1 class="page-title">React Tests - Interactive Components! (No Imports)</h1>
-                <p class="text-muted">Testing various React functionality</p>
+                <h1 class="page-title">React Tests - Interactive Components! 🚀</h1>
+                <p class="text-muted">Testing various React functionality with JSX transpilation</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h4 class="alert-heading">🎉 React Transpilation Success!</h4>
+                <p>This page demonstrates our custom JSX-to-React transpilation system. All components below are written in JSX and automatically converted to React.createElement calls!</p>
+                <hr>
+                <p class="mb-0">Check the browser console to see the transpiled React code in action.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="h3 mb-3">Part 1: Basic React Demos</h2>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Demo 1: Counter</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Simple counter with increment/decrement buttons</p>
+                    <div id="component-counter"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Demo 2: Toggle</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Toggle button that shows/hides content</p>
+                    <div id="demo2-toggle"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         console.log('please wait...');
+        
+        // Extend Test component prototype with all demo functionality
+        Object.assign(Test.prototype, {
+            // Demo 1: Counter functionality
+            counterState: { count: 0 },
+            incrementCounter() {
+                this.counterState.count++;
+                this.forceUpdate();
+            },
+            decrementCounter() {
+                this.counterState.count--;
+                this.forceUpdate();
+            },
+            resetCounter() {
+                this.counterState.count = 0;
+                this.forceUpdate();
+            },
+            
+            // Demo 2: Toggle functionality
+            toggleState: { isVisible: false },
+            toggleVisibility() {
+                this.toggleState.isVisible = !this.toggleState.isVisible;
+                this.forceUpdate();
+            },
+        });
     </script>
 </div>

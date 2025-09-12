@@ -6,19 +6,14 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
-    {/* Favicon */}
+    
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
 <link rel="icon" type="image/svg+xml" href="/static/img/icon.svg" />
 <link rel="icon" href="/static/favicon.ico" />
-{/* Tabler CSS */}
 <link rel="stylesheet" href="/static/css/tabler.min.css" />
-{/* Tabler Icons */}
 <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
-{/* Custom Styles */}
 <link rel="stylesheet" href="/static/css/custom.css" />
-{/* <script src="/static/js/alpine.min.js" defer></script> */}
-{/* <script src="/static/js/hyperscript.min.js"></script> */}
     {linkPaths && linkPaths.split(',').map((path, index) => (
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
@@ -67,7 +62,7 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
                 </>
             )}
         </div>
-        {/* Navigation Menu (Left Side) */}
+        
         <div className="collapse navbar-collapse" id="navbar-menu">
             <div className="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
                 <ul className="navbar-nav">
@@ -91,7 +86,7 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
                             </span>
                         </a>
                     </li>
-                    {/* Add other nav items here */}
+                    
                 </ul>
             </div>
         </div>

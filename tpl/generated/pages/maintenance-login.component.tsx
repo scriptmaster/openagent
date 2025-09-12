@@ -16,7 +16,7 @@ export default function MaintenanceLogin({page}) {
         </div>
         <div className="card card-md">
             <div className="card-body">
-                {/* Trending GIF */}
+                
                 <div className="text-center mb-3">
                     <img src="https://media.tenor.com/images/36788ddef89ef20a91ebebc14c2454ad/tenor.gif" className="trending-gif" alt="Funny Tech GIF"/>
                 </div>
@@ -26,7 +26,7 @@ export default function MaintenanceLogin({page}) {
                     <p className="mt-2 mb-0">We're working to improve the system and will be back online shortly.</p>
                 </div>
                 
-                {/* Authentication Form - Hidden Initially */}
+                
                 <div data-x-show="showAuth" x-transition>
                     {page.Error && (
                     <div className="alert alert-danger" role="alert">

@@ -13,7 +13,7 @@ export default function LayoutMarketing({page, children, linkPaths, scriptPaths}
 </head>
 <body className="theme-pista">
     <div className="page">
-        {/* Marketing Header */}
+        
         <header className="navbar navbar-expand-md navbar-light">
             <div className="container-xl">
                 <h1 className="navbar-brand navbar-brand-autodark">
@@ -28,7 +28,7 @@ export default function LayoutMarketing({page, children, linkPaths, scriptPaths}
                 </div>
             </div>
         </header>
-        {/* Main Content */}
+        
         <div className="page-wrapper">
             <div className="page-body">
                 <div className="container-xl">
@@ -36,7 +36,7 @@ export default function LayoutMarketing({page, children, linkPaths, scriptPaths}
                 </div>
             </div>
         </div>
-        {/* Marketing Footer */}
+        
         <footer className="footer footer-transparent d-print-none">
             <div className="container-xl">
                 <div className="row text-center align-items-center flex-row-reverse">

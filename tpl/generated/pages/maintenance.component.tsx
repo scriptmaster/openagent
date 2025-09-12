@@ -31,7 +31,7 @@ export default function Maintenance({page}) {
                     <form action="/maintenance/configure" method="post">
                         <h2 className="card-title text-center mb-4">Configuration & Version</h2>
                         
-                        {/* Database Configuration Section */}
+                        
                         <h4 className="mt-4 mb-3">PostgreSQL Configuration</h4>
                         <div className="mb-3">
                             <label className="form-label">PostgreSQL Host</label>
@@ -85,7 +85,7 @@ export default function Maintenance({page}) {
                         
                         <hr className="my-4"/>
                         
-                        {/* SMTP Configuration Section */}
+                        
                         <h4 className="mt-4 mb-3">Email (SMTP) Configuration</h4>
                         <div className="mb-3">
                             <label className="form-label">SMTP Host</label>
@@ -139,7 +139,7 @@ export default function Maintenance({page}) {
                         
                         <hr className="my-4"/>
                         
-                        {/* App Version Section */}
+                        
                         <h4 className="mt-4 mb-3">App Version</h4>
                         <div className="row mb-3">
                             <div className="col">
@@ -184,7 +184,7 @@ export default function Maintenance({page}) {
                             <i className="ti ti-info-circle me-1"></i> The build number is automatically incremented on each server restart.
                         </div>
                         
-                        {/* Database Tools Section */}
+                        
                         <hr className="my-4"/>
                         <h4 className="mt-4 mb-3">Database Tools</h4>
                         
@@ -217,7 +217,7 @@ export default function Maintenance({page}) {
                             <i className="ti ti-tool me-1"></i> The "Initialize Database Schema" option will be automatically run if needed after saving configuration.
                         </div>
                         
-                        {/* Submit Button */}
+                        
                         <div className="form-footer">
                             <button type="submit" className="btn btn-primary w-100">
                                 <i className="ti ti-device-floppy me-1"></i> Save Configuration & Restart

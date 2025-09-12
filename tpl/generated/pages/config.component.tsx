@@ -29,7 +29,7 @@ export default function Config({page}) {
                         <input type="text" className="form-control" data-x-model="formData.primary_host" placeholder="e.g., myapp.com or localhost" required/>
                         <small className="form-hint">The main domain name for this project (without http:// or port).</small>
                     </div>
-                    {/* Dynamic Host Inputs */}
+                    
                     <div className="mb-3">
                         <label className="form-label">Redirect Hosts</label>
                         <small className="form-hint d-block mb-2">Requests to these hosts will be redirected to the Primary Host.</small>
