@@ -1,5 +1,24 @@
 
-// Component JS (converted to JS from TSX)
+// Embedded Component JS
+///////////////////////////////
+
+// Component: simple
+function Simple() {
+    return (
+        React.createElement('div', null, 'Simple Component')
+    );
+}
+
+///////////////////////////////
+
+// Component prototype methods
+
+
+///////////////////////////////
+
+// Main Page JS
+
+// Main Component JS (converted to JS from TSX)
 function Config({page}) {
     return (
 React.createElement('div', {className: 'page'}, React.createElement('div', {className: 'container container-tight py-4'}, React.createElement('h1', {className: 'text-center mb-4'}, 'System Configuration'), React.createElement('div', {className: 'card card-md', data-x-data: 'configForm()'}, React.createElement('div', {className: 'card-body'}, React.createElement('div', {data-x-show: 'message', data-className: 'isError ? 'alert alert-danger' : 'alert alert-success'', data-x-text: 'message'}), React.createElement('form', {data-submit-prevent: 'submitConfig'}, React.createElement('h3', {className: 'mb-3'}, 'Admin Setup Token'), React.createElement('p', {className: 'text-muted'}, 'Enter the setup token displayed in the server console for today.'), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label required'}, 'Today's Admin Token'), React.createElement('input', {type: 'text', className: 'form-control', data-x-model: 'formData.admin_token', required: ''})), React.createElement('hr', {className: 'my-4'}), React.createElement('h3', {className: 'mb-3'}, 'Initial Project'), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label required'}, 'Project Name'), React.createElement('input', {type: 'text', className: 'form-control', data-x-model: 'formData.project_name', required: ''})), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label'}, 'Project Description'), React.createElement('textarea', {className: 'form-control', data-x-model: 'formData.project_desc', rows: '3'})), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label required'}, 'Primary Host'), React.createElement('input', {type: 'text', className: 'form-control', data-x-model: 'formData.primary_host', placeholder: 'e.g., myapp.com or localhost', required: ''}), React.createElement('small', {className: 'form-hint'}, 'The main domain name for this project (without http:// or port).')), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label'}, 'Redirect Hosts'), React.createElement('small', {className: 'form-hint d-block mb-2'}, 'Requests to these hosts will be redirected to the Primary Host.'), React.createElement('ul', {className: 'host-input-list'}, React.createElement('template', {data-x-for: '(host, index) in formData.redirect_hosts', data-key: 'index'}, React.createElement('li', null, React.createElement('input', {type: 'text', className: 'form-control form-control-sm', data-x-model: 'formData.redirect_hosts[index]', placeholder: 'e.g., www.myapp.com'}), React.createElement('button', {type: 'button', className: 'btn btn-sm btn-icon btn-outline-danger', data-click: 'removeHost('redirect', index)', aria-label: 'Remove host'}, React.createElement('i', {className: 'ti ti-x'}))))), React.createElement('button', {type: 'button', className: 'btn btn-sm btn-outline-secondary mt-2', data-click: 'addHost('redirect')', data-x-show: 'formData.redirect_hosts.length < 20'}, React.createElement('i', {className: 'ti ti-plus me-1'}), 'Add Redirect Host')), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label'}, 'Alias Hosts'), React.createElement('small', {className: 'form-hint d-block mb-2'}, 'Requests to these hosts will serve the same content as the Primary Host.'), React.createElement('ul', {className: 'host-input-list'}, React.createElement('template', {data-x-for: '(host, index) in formData.alias_hosts', data-key: 'index'}, React.createElement('li', null, React.createElement('input', {type: 'text', className: 'form-control form-control-sm', data-x-model: 'formData.alias_hosts[index]', placeholder: 'e.g., oldapp.com'}), React.createElement('button', {type: 'button', className: 'btn btn-sm btn-icon btn-outline-danger', data-click: 'removeHost('alias', index)', aria-label: 'Remove host'}, React.createElement('i', {className: 'ti ti-x'}))))), React.createElement('button', {type: 'button', className: 'btn btn-sm btn-outline-secondary mt-2', data-click: 'addHost('alias')', data-x-show: 'formData.alias_hosts.length < 20'}, React.createElement('i', {className: 'ti ti-plus me-1'}), 'Add Alias Host')), React.createElement('hr', {className: 'my-4'}), React.createElement('h3', {className: 'mb-3'}, 'Initial Admin User'), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label required'}, 'Admin Email'), React.createElement('input', {type: 'email', className: 'form-control', data-x-model: 'formData.admin_email', required: ''})), React.createElement('div', {className: 'mb-3'}, React.createElement('label', {className: 'form-label required'}, 'Admin Password'), React.createElement('input', {type: 'password', className: 'form-control', data-x-model: 'formData.admin_password', required: ''})), React.createElement('div', {className: 'form-footer mt-4'}, React.createElement('button', {type: 'submit', className: 'btn btn-primary w-100', data-disabled: 'loading'}, React.createElement('span', {data-x-show: 'loading', className: 'spinner-border spinner-border-sm me-2', role: 'status'}), React.createElement('span', {data-x-text: 'loading ? 'Configuring...' : 'Complete Setup''}))))))))
@@ -91,6 +110,9 @@ React.createElement('div', {className: 'page'}, React.createElement('div', {clas
 
 
 ///////////////////////////////
+
+// Make component available globally for hydration
+window.Config = Config;
 
 // React hydration using common utilities
 try {

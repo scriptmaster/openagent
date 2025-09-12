@@ -1,5 +1,24 @@
 
-// Component JS (converted to JS from TSX)
+// Embedded Component JS
+///////////////////////////////
+
+// Component: simple
+function Simple() {
+    return (
+        React.createElement('div', null, 'Simple Component')
+    );
+}
+
+///////////////////////////////
+
+// Component prototype methods
+
+
+///////////////////////////////
+
+// Main Page JS
+
+// Main Component JS (converted to JS from TSX)
 function Maintenance({page}) {
     return (
 React.createElement('div', {className: 'page'}, React.createElement('div', {className: 'container container-tight py-4'}, React.createElement('div', {className: 'header-container text-center'}, React.createElement('a', {href: '/', className: 'navbar-brand navbar-brand-autodark'}, React.createElement('img', {src: '/static/img/logo.svg', height: '36', alt: 'OpenAgent'})), React.createElement('h2', {className: 'h3 text-muted'}, 'OpenAgent'), React.createElement('div', {className: 'col-12 text-center'}, React.createElement('p', {className: 'text-muted'}, 'System Maintenance'))), React.createElement('div', {className: 'card card-md'}, React.createElement('div', {className: 'card-body'}, React.createElement('div', {className: 'alert alert-warning mb-3'}, React.createElement('i', {className: 'ti ti-alert-triangle me-2'}), 'Server is in maintenance mode. PostgreSQL connection is required.'), '{page.Error && (', React.createElement('div', {className: 'alert alert-danger', role: 'alert'}, React.createElement('i', {className: 'ti ti-alert-circle me-2'}), '{page.Error}'), ')}
@@ -27,6 +46,9 @@ React.createElement('div', {className: 'page'}, React.createElement('div', {clas
 
 
 ///////////////////////////////
+
+// Make component available globally for hydration
+window.Maintenance = Maintenance;
 
 // React hydration using common utilities
 try {

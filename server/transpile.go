@@ -81,6 +81,12 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	// Convert Go template syntax to JSX
 	htmlContent := string(content)
 
+	// Process component imports (e.g., <div id="component-counter"></div>)
+	htmlContent, err = processComponentImports(htmlContent, inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to process component imports: %v", err)
+	}
+
 	// Remove DOCTYPE declaration - it will be added dynamically
 	htmlContent = strings.ReplaceAll(htmlContent, "<!DOCTYPE html>", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "<!doctype html>", "")
@@ -145,6 +151,9 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	} else {
 		scriptPaths = "/tsx/js/_common.js"
 	}
+
+	// Component JS files will be embedded directly into the main JS file
+	// No need to add them to script paths
 
 	// Convert HTML comments to JSX comments
 	// Remove all HTML comments to prevent React hydration errors
@@ -808,7 +817,7 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: jsContent.Len() = %d\n", jsContent.Len())
 	}
-	if jsContent.Len() > 0 {
+	if jsContent.Len() > 0 && outputPath != "" {
 		// Always write to generated/js directory
 		jsDir := "tpl/generated/js"
 		if err := os.MkdirAll(jsDir, 0755); err != nil {
@@ -1012,19 +1021,36 @@ func createReactJSContent(originalJS, componentName string) string {
 	// Convert component TSX to JS
 	componentJS := TSX2JS(string(componentTsxContent))
 
+	// Replace component divs with component function calls
+	componentJS = replaceComponentDivsWithCalls(componentJS)
+
 	actualComponentName := GetActualComponentName(componentJS, componentName)
 
-	// Create the React-enhanced JS content with dynamic component inclusion
-	reactJS := fmt.Sprintf(`
-// Component JS (converted to JS from TSX)
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: actualComponentName = '%s'\n", actualComponentName)
+	}
+
+	// Create the main component JS content first
+	mainComponentJS := fmt.Sprintf(`
+// Main Component JS (converted to JS from TSX)
 %s
 
 ///////////////////////////////
 
 // Original JS content
+%s`, componentJS, originalJS)
+
+	// Embed component JS content into the main JS file
+	embeddedJS := embedComponentJS(mainComponentJS)
+
+	// Create the React-enhanced JS content with embedded components
+	reactJS := fmt.Sprintf(`
 %s
 
 ///////////////////////////////
+
+// Make component available globally for hydration
+window.%s = %s;
 
 // React hydration using common utilities
 try {
@@ -1036,7 +1062,12 @@ try {
     });
 } catch(e) {
     console.error('React hydration error:', e);
-}`, componentJS, originalJS, actualComponentName)
+}`, embeddedJS, actualComponentName, actualComponentName, actualComponentName)
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: actualComponentName = '%s'\n", actualComponentName)
+		fmt.Printf("DEBUG: Final reactJS content (first 500 chars): %s\n", reactJS[:min(500, len(reactJS))])
+	}
 
 	return reactJS
 }

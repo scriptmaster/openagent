@@ -49,9 +49,11 @@ func parseJSXWithWalker(jsx string) string {
 
 	if len(matches) == 0 {
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: No <main> tags found\n")
+			fmt.Printf("DEBUG: No <main> tags found, trying to parse entire content as JSX\n")
 		}
-		return jsx
+		// If no <main> tags found, try to parse the entire content as JSX
+		// This is for component TSX files that don't have <main> tags
+		return parseJSXWithHTMLParser(jsx)
 	}
 
 	// Take the first match (main content)
@@ -288,7 +290,7 @@ func GetActualComponentName(componentJS string, componentName string) string {
 
 	// Fallback: capitalize the provided componentName
 	if componentName != "" {
-		capitalized := strings.Title(strings.ToLower(componentName))
+		capitalized := Title(strings.ToLower(componentName))
 		if isDebugTranspile() {
 			fmt.Printf("DEBUG: GetActualComponentName fallback capitalized: %s\n", capitalized)
 		}

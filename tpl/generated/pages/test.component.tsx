@@ -33,7 +33,8 @@ export default function Test({page}) {
                 </div>
                 <div className="card-body">
                     <p className="card-text">Simple counter with increment/decrement buttons</p>
-                    <div id="component-counter"></div>
+                    <div id="component-simple">Simple Component</div>
+                    <div id="component-test-component"></div>
                 </div>
             </div>
         </div>
