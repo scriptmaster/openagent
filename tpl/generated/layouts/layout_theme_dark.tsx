@@ -1,4 +1,4 @@
-export default function LayoutThemeA({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
+export default function LayoutThemeDark({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 <html>
@@ -12,7 +12,7 @@ export default function LayoutThemeA({page, children, linkPaths, scriptPaths}: {
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body className="theme-pista">
+<body className="theme-dark">
 <div className="page">
     <div className="page-wrapper">
         <div className="navbar navbar-expand-md navbar-light d-print-none">

@@ -69,6 +69,9 @@ test:
 	echo "Application stopped."
 	@echo "Test completed"
 
+stop-port:
+	lsof -ti:8800 | xargs kill -9
+
 # Clean build files
 clean:
 	@echo "Cleaning build files..."

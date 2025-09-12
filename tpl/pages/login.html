@@ -3,84 +3,109 @@
         <p></p>
     </div>
 
-    <div class="card card-md" data-alpine="loginApp()">
+    <div class="card card-md">
         <div class="card-body">
-            {/* Wizard Step Indicator */}
-            <div class="wizard-steps mb-4">
-                <div class="row">
-                    <div class="col-6">
-                        <div class="step-indicator" data-class="currentStep >= 1 ? 'active' : ''">
-                            <div class="step-number">1</div>
-                            <div class="step-label">Email</div>
+            <h2 class="card-title text-center mb-4">Login</h2>
+            
+            <form id="emailForm" _="on submit
+                        halt the event
+                        loadingButton .btn-primary true 'Processing...'
+                        post me to '/auth/request-otp'
+                        then if it.ok
+                            show .alert-success on me
+                            show .otp-section on me
+                            hide .email-section on me
+                        else
+                            show .alert-danger on me
+                            set .alert-danger .message.textContent to 'Failed to send OTP' on me
+                        end
+                        loadingButton .btn-primary false 'Send OTP'">
+                
+                <div class="email-section">
+                    <div class="mb-3">
+                        <label class="form-label">Email address</label>
+                        <div class="input-group input-group-flat">
+                            <span class="input-group-text">
+                                <i class="ti ti-mail"></i>
+                            </span>
+                            <input type="email" name="email" class="form-control" placeholder="your@email.com" autocomplete="off" required />
                         </div>
                     </div>
-                    <div class="col-6">
-                        <div class="step-indicator" data-class="currentStep >= 2 ? 'active' : ''">
-                            <div class="step-number">2</div>
-                            <div class="step-label">Verify</div>
-                        </div>
+                    
+                    <div class="alert alert-danger" style="display: none;">
+                        <i class="ti ti-alert-circle me-2"></i>
+                        <span class="message"></span>
+                    </div>
+                    
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                            <span class="btn-text">Send OTP</span>
+                        </button>
                     </div>
                 </div>
+                
+            </form>
+            
+            <div class="alert alert-success" style="display: none;">
+                <i class="ti ti-check me-2"></i> A one-time password has been sent to your email.
             </div>
             
-            <div class="step" data-show="currentStep === 1">
-                <h2 class="card-title text-center mb-4">Login</h2>
-                <form data-submit-prevent="currentAction === 'otp' ? requestOtp() : passwordLogin()">
+            <div class="otp-section" style="display: none;">
+                <form id="otpForm" _="on submit
+                    halt the event
+                    loadingButton .btn-primary true 'Verifying...'
+                    post me to '/auth/verify-otp'
+                    then if result.ok
+                        set .alert-success.textContent to 'Login successful! Redirecting...' on me
+                        wait 1s
+                        go to /dashboard
+                    else
+                        show .alert-danger on me
+                        set .alert-danger .message.textContent to 'Invalid OTP' on me
+                    end
+                    loadingButton .btn-primary false 'Verify'">
+                    
+                    <input type="hidden" name="email" _="on load set my.value to #emailForm input[name=email].value" />
+                    
                     <div class="mb-3">
-                        <label className="form-label">Email address</label>
-                        <div className="input-group input-group-flat">
-                            <span className="input-group-text">
-                                <i className="ti ti-mail"></i>
+                        <label class="form-label">One-Time Password</label>
+                        <div class="input-group input-group-flat">
+                            <span class="input-group-text">
+                                <i class="ti ti-key"></i>
                             </span>
-                            <input type="email" className="form-control" data-model="email" placeholder="your@email.com" autocomplete="off" required />
+                            <input type="text" name="otp" class="form-control" placeholder="Enter your OTP" autocomplete="off" required />
                         </div>
                     </div>
-
-                    <div className="form-group" data-show="currentAction === 'password'">
-                        <label htmlFor="password">Password</label>
-                        <input type="password" id="password" name="password" data-model="password" data-required="currentAction === 'password'" />
-                    </div>
-
-                    <div className="form-message" data-text="message" data-class="{ 'error': error, 'success': success }"></div>
-
-                    <div className="form-footer">
-                        <button type="submit" className="btn btn-primary w-100" data-disabled="loading">
-                            <span data-show="loading" className="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <span data-text="loading ? 'Processing...' : buttonText"></span>
+                    
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                            <span class="btn-text">Verify</span>
                         </button>
                     </div>
                 </form>
-            </div>
-
-            <div className="step" data-show="currentStep === 2">
-                <h2 className="card-title text-center mb-4">Verify OTP</h2>
-                <div className="alert alert-success mb-3">
-                    <i className="ti ti-check me-2"></i> A one-time password has been sent to your email.
+                
+                <div class="text-center mt-3">
+                    <form id="resendForm" _="on submit
+                        halt the event
+                        loadingButton .btn-link true 'Sending...'
+                        post #emailForm to '/auth/request-otp'
+                        then if result.ok
+                            set .alert-success.textContent to 'A new OTP has been sent to your email.' on me
+                        else
+                            show .alert-danger on me
+                            set .alert-danger .message.textContent to 'Failed to resend OTP' on me
+                        end
+                        loadingButton .btn-link false 'Resend OTP'">
+                        
+                        <button type="submit" class="btn btn-link">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" style="display: none;"></span>
+                            <i class="ti ti-rotate me-1"></i>
+                            <span class="btn-text">Resend OTP</span>
+                        </button>
+                    </form>
                 </div>
-                <form data-submit-prevent="verifyOtp">
-                    <div className="mb-3">
-                        <label className="form-label">One-Time Password</label>
-                        <div className="input-group input-group-flat">
-                            <span className="input-group-text">
-                                <i className="ti ti-key"></i>
-                            </span>
-                            <input id="otp-step2-input" type="text" className="form-control" data-model="otp" placeholder="Enter your OTP" autocomplete="off" required />
-                        </div>
-                    </div>
-                    <div className="form-footer">
-                        <button type="submit" className="btn btn-primary w-100" data-disabled="loading">
-                            <span data-show="loading" className="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <span data-text="loading ? 'Verifying...' : 'Verify'"></span>
-                        </button>
-                    </div>
-                    <div className="text-center mt-3">
-                        <button type="button" className="btn btn-link" data-click="resendOtp" data-disabled="loading">
-                            <span data-show="resendLoading" className="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <i className="ti ti-rotate me-1" data-show="!resendLoading"></i>
-                            <span data-text="resendLoading ? 'Sending...' : 'Resend OTP'"></span>
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -113,287 +138,6 @@
     .step.active {
         display: block;
     }
-    
-    /* Wizard Step Indicator Styles */
-    .wizard-steps {
-        margin-bottom: 2rem;
-    }
-    
-    .step-indicator {
-        text-align: center;
-        padding: 1rem;
-        border-radius: 8px;
-        background: #f8f9fa;
-        border: 2px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-    
-    .step-indicator.active {
-        background: #206bc4;
-        border-color: #206bc4;
-        color: white;
-    }
-    
-    .step-number {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: #6c757d;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        margin: 0 auto 0.5rem;
-        font-size: 14px;
-    }
-    
-    .step-indicator.active .step-number {
-        background: white;
-        color: #206bc4;
-    }
-    
-    .step-label {
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .step-indicator.active .step-label {
-        color: white;
-    }
+
 </style>
 
-<script>
-setTimeout(() => {
-console.log('🚀 Login app script loading...');
-Alpine.data('loginApp', () => {
-    console.log('🚀 loginApp function called, creating component...');
-    return {
-            currentStep: 1,
-            email: '',
-            otp: '',
-            password: '',
-            otpSent: false,
-            loading: false,
-            resendLoading: false,
-            message: '',
-            error: false,
-            success: false,
-            adminEmail: 'admin@example.com',
-            currentAction: 'otp',
-            notification: {
-                visible: false,
-                type: 'success',
-                title: '',
-                message: '',
-                timeout: null
-            },
-        
-        get buttonText() {
-            if (this.loading) return 'Processing...';
-            if (this.currentAction === 'otp') {
-                return this.otpSent ? 'Verify OTP' : 'Send OTP';
-            }
-            return 'Login with Password';
-        },
-        
-        init() {
-            console.log('🚀 loginApp component initialized!');
-            console.log('🚀 Current step:', this.currentStep);
-            console.log('🚀 Current action:', this.currentAction);
-            console.log('🚀 Email:', this.email);
-            console.log('🚀 Message:', this.message);
-            
-            // Debug: Check what elements are found
-            const step1Elements = document.querySelectorAll('[data-show="currentStep === 1"]');
-            const step2Elements = document.querySelectorAll('[data-show="currentStep === 2"]');
-            const stepIndicators = document.querySelectorAll('.step-indicator');
-            
-            console.log('🔍 Found step 1 elements:', step1Elements.length, step1Elements);
-            console.log('🔍 Found step 2 elements:', step2Elements.length, step2Elements);
-            console.log('🔍 Found step indicators:', stepIndicators.length, stepIndicators);
-            
-            // Debug: Check current display states
-            step1Elements.forEach((el, index) => {
-                console.log(`🔍 Step 1 element ${index} display:`, el.style.display, 'computed:', window.getComputedStyle(el).display);
-            });
-            step2Elements.forEach((el, index) => {
-                console.log(`🔍 Step 2 element ${index} display:`, el.style.display, 'computed:', window.getComputedStyle(el).display);
-            });
-        },
-        
-        async requestOtp() {
-            if (!this.email) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/request-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email: this.email }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.otpSent = true;
-                    this.success = true;
-                    this.currentStep = 2;
-                    this.$nextTick(() => {
-                        document.getElementById('otp-step2-input')?.focus();
-                    });
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Failed to send OTP. Please try again.';
-                    if (data.data && data.data.otp_error) {
-                        this.currentAction = 'password';
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        async verifyOtp() {
-            if (!this.otp) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/verify-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        email: this.email,
-                        otp: this.otp 
-                    }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.success = true;
-                    this.message = data.message || 'OTP verified successfully.';
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    } else {
-                        window.location.href = '/';
-                    }
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Invalid OTP. Please try again.';
-                    this.otp = '';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred during OTP verification. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        async resendOtp() {
-            if (!this.email) return;
-            
-            this.resendLoading = true;
-            try {
-                const response = await fetch('/auth/request-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email: this.email }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.showNotification('success', 'Success', 'A new OTP has been sent to your email.');
-                } else {
-                    this.showNotification('danger', 'Error', data.message || 'Failed to resend OTP. Please try again.');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.showNotification('danger', 'Error', 'An error occurred. Please try again.');
-            } finally {
-                this.resendLoading = false;
-            }
-        },
-        
-        async passwordLogin() {
-            if (!this.email || !this.password) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/password-login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        email: this.email,
-                        password: this.password 
-                    }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.success = true;
-                    this.message = data.message || 'Login successful.';
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    } else {
-                        window.location.href = '/';
-                    }
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Invalid email or password. Please try again.';
-                    this.password = '';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred during password login. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        showNotification(type, title, message) {
-            this.notification.type = type;
-            this.notification.title = title;
-            this.notification.message = message;
-            this.notification.visible = true;
-            
-            if (this.notification.timeout) {
-                clearTimeout(this.notification.timeout);
-            }
-            
-            this.notification.timeout = setTimeout(() => {
-                this.closeNotification();
-            }, 5000);
-        },
-        
-        closeNotification() {
-            this.notification.visible = false;
-        }
-    };
-});
-}, 100);
-</script>

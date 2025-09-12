@@ -12,7 +12,7 @@ export default function Layout({page, children, linkPaths, scriptPaths}: {page: 
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body>
+<body className="theme-pista">
 <div className="page">
     <div className="page-wrapper">
         <div className="page-header d-print-none">

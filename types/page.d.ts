@@ -3,10 +3,12 @@ declare interface Page {
     Content: string;
     AppName: string;
     AppVersion: string;
+    AdminEmail: string;
 
     User: AuthUser;
 
     Error: string;
+
 }
 
 declare interface AuthUser {

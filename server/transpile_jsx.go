@@ -35,7 +35,7 @@ func init() {
 	removeScriptPattern = regexp.MustCompile(`(?s)<script[^>]*>.*?</script>`)
 	commentPattern = regexp.MustCompile(`<!--(.*?)-->`)
 	hyphenUnderscorePattern = regexp.MustCompile(`[-_]`)
-	includePattern = regexp.MustCompile(`(?m)^\s*//#include\s+"([^"]+)"\s*$`)
+	includePattern = regexp.MustCompile(`(?m)^\s*//#include\s+(?:"([^"]+)"|([^\s]+))\s*$`)
 	htmlIncludePattern = regexp.MustCompile(`(?s)<!--\s*#include\s+"([^"]+)"\s*-->`)
 
 	// Initialize self-closing tags map with their patterns
@@ -103,33 +103,18 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	htmlContent = strings.ReplaceAll(htmlContent, "header.html", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "footer.html", "")
 
-	// Convert Go template variables to JSX
-	htmlContent = strings.ReplaceAll(htmlContent, "{{.", "{page.")
+	// Convert Go template variables to JSX (more specific pattern)
+	htmlContent = regexp.MustCompile(`\{\{\.(\w+)\}\}`).ReplaceAllString(htmlContent, "{page.$1}")
 	htmlContent = strings.ReplaceAll(htmlContent, "}}", "}")
 
-	// Also convert Go template variables in the extracted JS content
+	// JavaScript content should be output as-is without any Go template conversion
 	if jsContent != "" {
-		originalJSContent := jsContent
-		jsContent = strings.ReplaceAll(jsContent, "{{.", "{page.")
-		jsContent = strings.ReplaceAll(jsContent, "}}", "}")
-
-		// Convert JSX-style variables in JavaScript to proper JavaScript syntax
-		// Replace {page.Variable} with page.Variable (remove curly braces for JS)
-		jsContent = strings.ReplaceAll(jsContent, "{page.", "page.")
-		// Remove closing braces that are part of JSX variables (but not all closing braces)
-		// Use regex to be more specific about which braces to remove
-		jsContent = strings.ReplaceAll(jsContent, "page.CurrentHost}", "page.CurrentHost")
-
-		// Debug: check if conversion happened
-		if originalJSContent != jsContent {
-			fmt.Printf("DEBUG: JS content converted for %s\n", inputPath)
-		}
-
-		// Write the updated JS content back to the file
+		// No conversion needed for JavaScript content - output as-is
+		// Write the JS content to the file
 		baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
 		jsPath := filepath.Join(filepath.Dir(outputPath), "js", baseName+".js")
 		if err := os.WriteFile(jsPath, []byte(jsContent), 0644); err != nil {
-			return fmt.Errorf("failed to update JS file with converted variables: %v", err)
+			return fmt.Errorf("failed to write JS file: %v", err)
 		}
 	}
 
@@ -152,7 +137,13 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 
 	// Prepare JS script paths
 	if jsContent != "" {
-		scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
+		// Determine the correct JS path based on the output directory
+		outputDir := filepath.Dir(outputPath)
+		if strings.Contains(outputDir, "pages") {
+			scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
+		} else {
+			scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
+		}
 	} else {
 		scriptPaths = "/tsx/js/_common.js"
 	}
@@ -318,8 +309,8 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	htmlContent = strings.ReplaceAll(htmlContent, "<!doctype html>", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "<!Doctype html>", "")
 
-	// Convert Go template variables to JSX
-	htmlContent = strings.ReplaceAll(htmlContent, "{{.", "{page.")
+	// Convert Go template variables to JSX (more specific pattern)
+	htmlContent = regexp.MustCompile(`\{\{\.(\w+)\}\}`).ReplaceAllString(htmlContent, "{page.$1}")
 	htmlContent = strings.ReplaceAll(htmlContent, "}}", "}")
 
 	// Convert class to className
@@ -467,10 +458,23 @@ func transpileAllTemplates() error {
 		return fmt.Errorf("failed to create generated/js directory: %w", err)
 	}
 
-	// Check if _common.js exists in views/js and copy it
+	// Check if _common.js exists in views/js and copy it with include processing
 	if _, err := os.Stat(commonSourcePath); err == nil {
-		if err := copyFile(commonSourcePath, commonDestPath); err != nil {
-			return fmt.Errorf("failed to copy _common.js: %w", err)
+		// Read the source file
+		content, err := os.ReadFile(commonSourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to read _common.js: %w", err)
+		}
+
+		// Process includes in the JavaScript content
+		processedContent, err := processIncludes(string(content), commonSourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to process includes in _common.js: %w", err)
+		}
+
+		// Write the processed content to the destination
+		if err := os.WriteFile(commonDestPath, []byte(processedContent), 0644); err != nil {
+			return fmt.Errorf("failed to write processed _common.js: %w", err)
 		}
 		log.Printf("Copied _common.js from %s to %s", commonSourcePath, commonDestPath)
 	} else {
@@ -539,8 +543,8 @@ func copyFile(src, dst string) error {
 	}
 
 	// Apply the same transformations as HTML files for consistency
-	// Convert Go template variables to JSX
-	contentStr = strings.ReplaceAll(contentStr, "{{.", "{page.")
+	// Convert Go template variables to JSX (more specific pattern)
+	contentStr = regexp.MustCompile(`\{\{\.(\w+)\}\}`).ReplaceAllString(contentStr, "{page.$1}")
 	contentStr = strings.ReplaceAll(contentStr, "}}", "}")
 
 	// Convert class to className
@@ -585,16 +589,29 @@ func processIncludes(content, sourceFile string) (string, error) {
 	jsMatches := includePattern.FindAllStringSubmatch(content, -1)
 
 	for _, match := range jsMatches {
-		if len(match) != 2 {
+		if len(match) != 3 {
 			continue
 		}
 
-		relativePath := match[1]
+		// Handle both quoted and unquoted paths
+		var relativePath string
+		if match[1] != "" {
+			relativePath = match[1] // Quoted path
+		} else {
+			relativePath = match[2] // Unquoted path
+		}
 		fullIncludeLine := match[0]
 
-		// Resolve the relative path from the source file's directory
-		sourceDir := filepath.Dir(sourceFile)
-		includePath := filepath.Join(sourceDir, relativePath)
+		// Handle absolute paths (starting with /) vs relative paths
+		var includePath string
+		if strings.HasPrefix(relativePath, "/") {
+			// Absolute path - treat as relative to project root
+			includePath = filepath.Join(".", relativePath)
+		} else {
+			// Relative path - resolve from the source file's directory
+			sourceDir := filepath.Dir(sourceFile)
+			includePath = filepath.Join(sourceDir, relativePath)
+		}
 
 		// Normalize the path
 		includePath = filepath.Clean(includePath)
@@ -618,9 +635,16 @@ func processIncludes(content, sourceFile string) (string, error) {
 		relativePath := match[1]
 		fullIncludeLine := match[0]
 
-		// Resolve the relative path from the source file's directory
-		sourceDir := filepath.Dir(sourceFile)
-		includePath := filepath.Join(sourceDir, relativePath)
+		// Handle absolute paths (starting with /) vs relative paths
+		var includePath string
+		if strings.HasPrefix(relativePath, "/") {
+			// Absolute path - treat as relative to project root
+			includePath = filepath.Join(".", relativePath)
+		} else {
+			// Relative path - resolve from the source file's directory
+			sourceDir := filepath.Dir(sourceFile)
+			includePath = filepath.Join(sourceDir, relativePath)
+		}
 
 		// Normalize the path
 		includePath = filepath.Clean(includePath)
@@ -741,7 +765,8 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 
 	// Write JS file if there's content
 	if jsContent.Len() > 0 {
-		jsDir := filepath.Join(filepath.Dir(outputPath), "js")
+		// Always write JS files to the main generated/js directory
+		jsDir := "tpl/generated/js"
 		if err := os.MkdirAll(jsDir, 0755); err != nil {
 			return "", "", fmt.Errorf("failed to create JS directory: %v", err)
 		}

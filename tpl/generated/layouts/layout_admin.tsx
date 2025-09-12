@@ -13,7 +13,7 @@ export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {p
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body>
+<body className="theme-pista">
 <div className="page">
     <div className="page-wrapper">
         <div className="navbar navbar-expand-md navbar-light d-print-none">

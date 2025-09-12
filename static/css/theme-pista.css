@@ -1,0 +1,404 @@
+/* Pistachio Theme Color Variables */
+.theme-pista {
+    /* Primary Colors */
+    --pista-bg-primary: #f8fffe;       /* Main background - very light green/white */
+    --pista-bg-secondary: #ffffff;     /* Card/component background - pure white */
+    --pista-bg-tertiary: #f0f8f5;     /* Input/table header background - light pistachio */
+    
+    /* Border Colors */
+    --pista-border-primary: #d4e6d8;  /* Primary borders - soft green */
+    --pista-border-secondary: #c8dccb; /* Secondary borders - medium green */
+    
+    /* Text Colors */
+    --pista-text-primary: #2d4a3a;    /* Primary text - dark green */
+    --pista-text-secondary: #5a7a6b;  /* Secondary text - medium green */
+    --pista-text-white: #ffffff;      /* White text for emphasis */
+    
+    /* Accent Colors */
+    --pista-accent-primary: #93c5a3;  /* Primary pistachio accent */
+    --pista-accent-primary-hover: #7fb392; /* Primary pistachio hover */
+    --pista-accent-success: #4a9d5c;  /* Success green */
+    --pista-accent-danger: #e74c3c;   /* Danger red */
+    
+    /* Alert Colors */
+    --pista-alert-success-bg: #e8f5e8; /* Success alert background */
+    --pista-alert-success-border: #c3e6c3; /* Success alert border */
+    --pista-alert-success-text: #2d5a3d; /* Success alert text */
+    
+    --pista-alert-danger-bg: #fdeaea; /* Danger alert background */
+    --pista-alert-danger-border: #f5c6c6; /* Danger alert border */
+    --pista-alert-danger-text: #721c24; /* Danger alert text */
+    
+    --pista-alert-info-bg: #e8f4f8;   /* Info alert background */
+    --pista-alert-info-border: #c3e2ea; /* Info alert border */
+    --pista-alert-info-text: #0c5460; /* Info alert text */
+    
+    /* Focus/Shadow Colors */
+    --pista-focus-shadow: rgba(147, 197, 163, 0.25); /* Focus ring shadow */
+}
+
+/* Pistachio Theme Styles */
+.theme-pista {
+    background-color: var(--pista-bg-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .page {
+    background-color: var(--pista-bg-primary) !important;
+}
+
+.theme-pista .page-wrapper {
+    background-color: var(--pista-bg-primary) !important;
+}
+
+.theme-pista .page-body {
+    background-color: var(--pista-bg-primary) !important;
+}
+
+/* Pistachio theme for cards */
+.theme-pista .card {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .card-header {
+    background-color: var(--pista-bg-secondary) !important;
+    border-bottom-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .card-body {
+    background-color: var(--pista-bg-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+/* Pistachio theme for navbar */
+.theme-pista .navbar {
+    background-color: var(--pista-bg-secondary) !important;
+    border-bottom-color: var(--pista-border-primary) !important;
+}
+
+.theme-pista .navbar-brand {
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .navbar-nav .nav-link {
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .navbar-nav .nav-link:hover {
+    color: var(--pista-accent-primary) !important;
+}
+
+/* Pistachio theme for buttons */
+.theme-pista .btn-primary {
+    background-color: var(--pista-accent-primary) !important;
+    border-color: var(--pista-accent-primary) !important;
+    color: var(--pista-text-white) !important;
+}
+
+.theme-pista .btn-primary:hover {
+    background-color: var(--pista-accent-primary-hover) !important;
+    border-color: var(--pista-accent-primary-hover) !important;
+}
+
+.theme-pista .btn-outline-primary {
+    color: var(--pista-accent-primary) !important;
+    border-color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .btn-outline-primary:hover {
+    background-color: var(--pista-accent-primary) !important;
+    border-color: var(--pista-accent-primary) !important;
+    color: var(--pista-text-white) !important;
+}
+
+.theme-pista .btn-link {
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .btn-link:hover {
+    color: var(--pista-accent-primary-hover) !important;
+}
+
+/* Pistachio theme for form elements */
+.theme-pista .form-control {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .form-control:focus {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-color: var(--pista-accent-primary) !important;
+    color: var(--pista-text-primary) !important;
+    box-shadow: 0 0 0 0.2rem var(--pista-focus-shadow) !important;
+}
+
+.theme-pista .form-label {
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .input-group-text {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+/* Pistachio theme for alerts */
+.theme-pista .alert-success {
+    background-color: var(--pista-alert-success-bg) !important;
+    border-color: var(--pista-alert-success-border) !important;
+    color: var(--pista-alert-success-text) !important;
+}
+
+.theme-pista .alert-danger {
+    background-color: var(--pista-alert-danger-bg) !important;
+    border-color: var(--pista-alert-danger-border) !important;
+    color: var(--pista-alert-danger-text) !important;
+}
+
+.theme-pista .alert-info {
+    background-color: var(--pista-alert-info-bg) !important;
+    border-color: var(--pista-alert-info-border) !important;
+    color: var(--pista-alert-info-text) !important;
+}
+
+/* Pistachio theme for text */
+.theme-pista .text-muted {
+    color: var(--pista-text-secondary) !important;
+}
+
+.theme-pista .text-primary {
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .text-success {
+    color: var(--pista-accent-success) !important;
+}
+
+.theme-pista .text-danger {
+    color: var(--pista-accent-danger) !important;
+}
+
+/* Pistachio theme for links */
+.theme-pista a {
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista a:hover {
+    color: var(--pista-accent-primary-hover) !important;
+}
+
+/* Pistachio theme for containers */
+.theme-pista .container,
+.theme-pista .container-fluid,
+.theme-pista .container-xl {
+    background-color: transparent !important;
+}
+
+/* Pistachio theme for rows and columns */
+.theme-pista .row {
+    background-color: transparent !important;
+}
+
+.theme-pista .col,
+.theme-pista [class*="col-"] {
+    background-color: transparent !important;
+}
+
+/* Pistachio theme for footer */
+.theme-pista .footer {
+    background-color: var(--pista-bg-secondary) !important;
+    border-top-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+/* Pistachio theme for tables */
+.theme-pista .table {
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .table th {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .table td {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--pista-bg-tertiary) !important;
+}
+
+/* Pistachio theme for modals */
+.theme-pista .modal-content {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .modal-header {
+    background-color: var(--pista-bg-secondary) !important;
+    border-bottom-color: var(--pista-border-primary) !important;
+}
+
+.theme-pista .modal-footer {
+    background-color: var(--pista-bg-secondary) !important;
+    border-top-color: var(--pista-border-primary) !important;
+}
+
+/* Pistachio theme for dropdowns */
+.theme-pista .dropdown-menu {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+}
+
+.theme-pista .dropdown-item {
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .dropdown-item:hover {
+    background-color: var(--pista-bg-tertiary) !important;
+    color: var(--pista-accent-primary) !important;
+}
+
+/* Pistachio theme for badges */
+.theme-pista .badge {
+    color: var(--pista-text-white) !important;
+}
+
+.theme-pista .badge-primary {
+    background-color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .badge-success {
+    background-color: var(--pista-accent-success) !important;
+}
+
+.theme-pista .badge-danger {
+    background-color: var(--pista-accent-danger) !important;
+}
+
+/* Pistachio theme for progress bars */
+.theme-pista .progress {
+    background-color: var(--pista-bg-tertiary) !important;
+}
+
+.theme-pista .progress-bar {
+    background-color: var(--pista-accent-primary) !important;
+}
+
+/* Pistachio theme for list groups */
+.theme-pista .list-group-item {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .list-group-item:hover {
+    background-color: var(--pista-bg-tertiary) !important;
+}
+
+/* Pistachio theme for breadcrumbs */
+.theme-pista .breadcrumb {
+    background-color: transparent !important;
+}
+
+.theme-pista .breadcrumb-item a {
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .breadcrumb-item.active {
+    color: var(--pista-text-secondary) !important;
+}
+
+/* Pistachio theme for pagination */
+.theme-pista .page-link {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .page-link:hover {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .page-item.active .page-link {
+    background-color: var(--pista-accent-primary) !important;
+    border-color: var(--pista-accent-primary) !important;
+    color: var(--pista-text-white) !important;
+}
+
+/* Pistachio theme for spinners */
+.theme-pista .spinner-border {
+    color: var(--pista-accent-primary) !important;
+}
+
+/* Pistachio theme for tooltips */
+.theme-pista .tooltip .tooltip-inner {
+    background-color: var(--pista-bg-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .tooltip .arrow::before {
+    border-top-color: var(--pista-bg-secondary) !important;
+}
+
+/* Pistachio theme for popovers */
+.theme-pista .popover {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .popover-header {
+    background-color: var(--pista-bg-tertiary) !important;
+    border-bottom-color: var(--pista-border-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+/* Pistachio theme for tabs */
+.theme-pista .nav-tabs .nav-link {
+    color: var(--pista-text-primary) !important;
+    border-color: var(--pista-border-primary) !important;
+}
+
+.theme-pista .nav-tabs .nav-link:hover {
+    border-color: var(--pista-border-secondary) !important;
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .nav-tabs .nav-link.active {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) var(--pista-border-primary) var(--pista-bg-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+/* Pistachio theme for accordions */
+.theme-pista .accordion-item {
+    background-color: var(--pista-bg-secondary) !important;
+    border-color: var(--pista-border-primary) !important;
+}
+
+.theme-pista .accordion-header .accordion-button {
+    background-color: var(--pista-bg-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}
+
+.theme-pista .accordion-header .accordion-button:not(.collapsed) {
+    background-color: var(--pista-bg-tertiary) !important;
+    color: var(--pista-accent-primary) !important;
+}
+
+.theme-pista .accordion-body {
+    background-color: var(--pista-bg-secondary) !important;
+    color: var(--pista-text-primary) !important;
+}

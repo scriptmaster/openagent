@@ -12,7 +12,7 @@ export default function LayoutLanding({page, children, linkPaths, scriptPaths}: 
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body className="bg-gradient-primary">
+<body className="theme-pista">
     <div className="page">
         <div className="page-wrapper">
             <div className="page-body">

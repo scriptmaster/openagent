@@ -1,232 +1,215 @@
 
-setTimeout(() => {
-console.log('🚀 Login app script loading...');
-Alpine.data('loginApp', () => {
-    console.log('🚀 loginApp function called, creating component...');
-    return {
-            currentStep: 1,
-            email: '',
-            otp: '',
-            password: '',
-            otpSent: false,
-            loading: false,
-            resendLoading: false,
-            message: '',
-            error: false,
-            success: false,
-            adminEmail: 'admin@example.com',
-            currentAction: 'otp',
-            notification: {
-                visible: false,
-                type: 'success',
-                title: '',
-                message: '',
-                timeout: null
-            },
-        
-        get buttonText() {
-            if (this.loading) return 'Processing...';
-            if (this.currentAction === 'otp') {
-                return this.otpSent ? 'Verify OTP' : 'Send OTP';
-            }
-            return 'Login with Password';
-        },
-        
-        init() {
-            console.log('🚀 loginApp component initialized!');
-            console.log('🚀 Current step:', this.currentStep);
-            console.log('🚀 Current action:', this.currentAction);
-            console.log('🚀 Email:', this.email);
-            console.log('🚀 Message:', this.message);
-            
-            // Debug: Check what elements are found
-            const step1Elements = document.querySelectorAll('[data-show="currentStep === 1"]');
-            const step2Elements = document.querySelectorAll('[data-show="currentStep === 2"]');
-            const stepIndicators = document.querySelectorAll('.step-indicator');
-            
-            console.log('🔍 Found step 1 elements:', step1Elements.length, step1Elements);
-            console.log('🔍 Found step 2 elements:', step2Elements.length, step2Elements);
-            console.log('🔍 Found step indicators:', stepIndicators.length, stepIndicators);
-            
-            // Debug: Check current display states
-            step1Elements.forEach((el, index) => {
-                console.log(`🔍 Step 1 element ${index} display:`, el.style.display, 'computed:', window.getComputedStyle(el).display);
-            });
-            step2Elements.forEach((el, index) => {
-                console.log(`🔍 Step 2 element ${index} display:`, el.style.display, 'computed:', window.getComputedStyle(el).display);
-            });
-        },
-        
-        async requestOtp() {
-            if (!this.email) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/request-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email: this.email }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.otpSent = true;
-                    this.success = true;
-                    this.currentStep = 2;
-                    this.$nextTick(() => {
-                        document.getElementById('otp-step2-input')?.focus();
-                    });
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Failed to send OTP. Please try again.';
-                    if (data.data && data.data.otp_error) {
-                        this.currentAction = 'password';
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        async verifyOtp() {
-            if (!this.otp) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/verify-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        email: this.email,
-                        otp: this.otp 
-                    }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.success = true;
-                    this.message = data.message || 'OTP verified successfully.';
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    } else {
-                        window.location.href = '/';
-                    }
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Invalid OTP. Please try again.';
-                    this.otp = '';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred during OTP verification. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        async resendOtp() {
-            if (!this.email) return;
-            
-            this.resendLoading = true;
-            try {
-                const response = await fetch('/auth/request-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email: this.email }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.showNotification('success', 'Success', 'A new OTP has been sent to your email.');
-                } else {
-                    this.showNotification('danger', 'Error', data.message || 'Failed to resend OTP. Please try again.');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.showNotification('danger', 'Error', 'An error occurred. Please try again.');
-            } finally {
-                this.resendLoading = false;
-            }
-        },
-        
-        async passwordLogin() {
-            if (!this.email || !this.password) return;
-            
-            this.loading = true;
-            this.message = '';
-            this.error = false;
-            this.success = false;
-            try {
-                const response = await fetch('/auth/password-login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        email: this.email,
-                        password: this.password 
-                    }),
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    this.success = true;
-                    this.message = data.message || 'Login successful.';
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    } else {
-                        window.location.href = '/';
-                    }
-                } else {
-                    this.error = true;
-                    this.message = data.message || 'Invalid email or password. Please try again.';
-                    this.password = '';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                this.error = true;
-                this.message = 'An error occurred during password login. Please try again.';
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        showNotification(type, title, message) {
-            this.notification.type = type;
-            this.notification.title = title;
-            this.notification.message = message;
-            this.notification.visible = true;
-            
-            if (this.notification.timeout) {
-                clearTimeout(this.notification.timeout);
-            }
-            
-            this.notification.timeout = setTimeout(() => {
-                this.closeNotification();
-            }, 5000);
-        },
-        
-        closeNotification() {
-            this.notification.visible = false;
+// Hyperscript login functionality
+console.log('🚀 Hyperscript login app loading...');
+
+// Initialize login state
+let loginState = {
+    currentStep: 1,
+    email: '',
+    otp: '',
+    password: '',
+    otpSent: false,
+    loading: false,
+    resendLoading: false,
+    message: '',
+    error: false,
+    success: false,
+    adminEmail: 'admin@example.com',
+    currentAction: 'otp'
+};
+
+// Helper functions
+function showNotification(type, title, message) {
+    console.log(`📢 ${type.toUpperCase()}: ${title} - ${message}`);
+    // You can add a toast notification here
+}
+
+function updateButtonText() {
+    if (loginState.loading) return 'Processing...';
+    if (loginState.currentAction === 'otp') {
+        return loginState.otpSent ? 'Verify OTP' : 'Send OTP';
+    }
+    return 'Login with Password';
+}
+
+function updateStepDisplay() {
+    const step1Elements = document.querySelectorAll('[data-step="1"]');
+    const step2Elements = document.querySelectorAll('[data-step="2"]');
+    
+    step1Elements.forEach(el => {
+        el.style.display = loginState.currentStep === 1 ? 'block' : 'none';
+    });
+    
+    step2Elements.forEach(el => {
+        el.style.display = loginState.currentStep === 2 ? 'block' : 'none';
+    });
+    
+    // Update step indicators
+    const indicators = document.querySelectorAll('.step-indicator');
+    indicators.forEach((indicator, index) => {
+        if (index + 1 <= loginState.currentStep) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.remove('active');
         }
-    };
+    });
+}
+
+// Login functions
+async function requestOtp() {
+    if (!loginState.email) return;
+    
+    loginState.loading = true;
+    loginState.message = '';
+    loginState.error = false;
+    
+    try {
+        const response = await fetch('/auth/request-otp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: loginState.email })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            loginState.otpSent = true;
+            loginState.currentStep = 2;
+            showNotification('success', 'OTP Sent', 'Please check your email for the one-time password.');
+            updateStepDisplay();
+        } else {
+            loginState.error = true;
+            loginState.message = data.error || 'Failed to send OTP';
+        }
+    } catch (error) {
+        loginState.error = true;
+        loginState.message = 'Network error. Please try again.';
+    } finally {
+        loginState.loading = false;
+        updateStepDisplay();
+    }
+}
+
+async function verifyOtp() {
+    if (!loginState.otp) return;
+    
+    loginState.loading = true;
+    loginState.message = '';
+    loginState.error = false;
+    
+    try {
+        const response = await fetch('/auth/verify-otp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                email: loginState.email, 
+                otp: loginState.otp 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            loginState.success = true;
+            loginState.message = 'Login successful! Redirecting...';
+            showNotification('success', 'Success', 'Login successful! Redirecting...');
+            
+            // Redirect to dashboard or intended page
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1000);
+        } else {
+            loginState.error = true;
+            loginState.message = data.error || 'Invalid OTP';
+        }
+    } catch (error) {
+        loginState.error = true;
+        loginState.message = 'Network error. Please try again.';
+    } finally {
+        loginState.loading = false;
+        updateStepDisplay();
+    }
+}
+
+async function passwordLogin() {
+    if (!loginState.email || !loginState.password) return;
+    
+    loginState.loading = true;
+    loginState.message = '';
+    loginState.error = false;
+    
+    try {
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                email: loginState.email, 
+                password: loginState.password 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            loginState.success = true;
+            loginState.message = 'Login successful! Redirecting...';
+            showNotification('success', 'Success', 'Login successful! Redirecting...');
+            
+            // Redirect to dashboard or intended page
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1000);
+        } else {
+            loginState.error = true;
+            loginState.message = data.error || 'Invalid credentials';
+        }
+    } catch (error) {
+        loginState.error = true;
+        loginState.message = 'Network error. Please try again.';
+    } finally {
+        loginState.loading = false;
+        updateStepDisplay();
+    }
+}
+
+async function resendOtp() {
+    if (!loginState.email) return;
+    
+    loginState.resendLoading = true;
+    
+    try {
+        const response = await fetch('/auth/request-otp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: loginState.email })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification('success', 'OTP Resent', 'A new OTP has been sent to your email.');
+        } else {
+            showNotification('error', 'Error', data.error || 'Failed to resend OTP');
+        }
+    } catch (error) {
+        showNotification('error', 'Error', 'Network error. Please try again.');
+    } finally {
+        loginState.resendLoading = false;
+        updateStepDisplay();
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Login page initialized with hyperscript');
+    updateStepDisplay();
 });
-}, 100);
 

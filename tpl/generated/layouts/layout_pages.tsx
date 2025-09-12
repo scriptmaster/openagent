@@ -17,14 +17,13 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
 <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
 {/* Custom Styles */}
 <link rel="stylesheet" href="/static/css/custom.css" />
-{/* Alpine.js */}
-<script src="/static/js/alpine.min.js" defer></script>
-{/* Additional head content goes here */}
+{/* <script src="/static/js/alpine.min.js" defer></script> */}
+{/* <script src="/static/js/hyperscript.min.js"></script> */}
     {linkPaths && linkPaths.split(',').map((path, index) => (
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body>
+<body className="theme-pista">
     <div className="page">
         <div className="page-wrapper">
             <header className="navbar navbar-expand-md navbar-light d-print-none">

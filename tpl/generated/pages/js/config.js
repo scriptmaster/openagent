@@ -8,7 +8,7 @@
                 admin_token: '',
                 project_name: '',
                 project_desc: '',
-                primary_host: 'page.CurrentHost' || '', // Pre-fill if possible
+                primary_host: '{page.CurrentHost}' || '', // Pre-fill if possible
                 admin_email: '',
                 admin_password: '',
                 redirect_hosts: [''], // Start with one empty input

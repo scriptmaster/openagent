@@ -4,7 +4,7 @@ export default function Test({page}: {page: Page}) {
     return (
         <Layout page={page} linkPaths={``} scriptPaths={`/tsx/js/_common.js`}>
 <div className="container">
-    <h1>Custom View Override 3: {page.PageTitle}</h1>
+    <h1>Custom View Override 4: {page.PageTitle}</h1>
     <p>This is a custom view that overrides the generated template!</p>
     <p>App: {page.AppName}</p>
     <p>Version: {page.AppVersion}</p>

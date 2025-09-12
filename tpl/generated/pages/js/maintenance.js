@@ -8,7 +8,7 @@
                                 migrationField.value = '0';
                             } else {
                                 migrationField.disabled = false;
-                                migrationField.value = 'page.MigrationStart}';
+                                migrationField.value = '{page.MigrationStart}';
                             }
                         }
                         

@@ -1,3 +1,65 @@
+//#include /static/js/hyperscript.min.js
+
+_hyperscript.addCommand("post", function(parser, runtime, tokens) {
+    var formToken = tokens.matchAny("identifier", "idRef", "classRef");
+    if (!formToken) parser.raiseParseError(tokens, "Expected form element identifier (e.g., #myForm).");
+    
+    tokens.requireToken("to");
+    
+    var urlToken = tokens.matchAny("string", "identifier");
+    if (!urlToken) parser.raiseParseError(tokens, "Expected URL after 'to'.");
+    
+    return function(sender, evt, args) {
+      var form = runtime.find(formToken.value, sender);
+      var url = urlToken.value;
+      
+      if (!form) throw new Error("Could not find form element: " + formToken.value);
+      
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      .then(response => response.json());
+    };
+});
+
+_hyperscript.addCommand("loadingButton", function(parser, runtime, tokens) {
+    var buttonSelector = tokens.matchAny("identifier", "idRef", "classRef");
+    if (!buttonSelector) parser.raiseParseError(tokens, "Expected button selector (e.g., .btn-primary).");
+    
+    var loadingToken = tokens.matchAny("boolean", "identifier");
+    if (!loadingToken) parser.raiseParseError(tokens, "Expected loading state (true/false).");
+    
+    var textToken = tokens.matchAny("string", "identifier");
+    if (!textToken) parser.raiseParseError(tokens, "Expected button text.");
+    
+    return function(sender, evt, args) {
+      var button = runtime.find(buttonSelector.value, sender);
+      var isLoading = loadingToken.value === 'true' || loadingToken.value === true;
+      var text = textToken.value;
+      
+      if (!button) throw new Error("Could not find button element: " + buttonSelector.value);
+      
+      // Find spinner and text elements within the button
+      var spinner = button.querySelector('.spinner-border') || button.querySelector('[role="status"]') || button.querySelector('span:first-of-type');
+      var textElement = button.querySelector('.btn-text') || button.querySelector('span:last-of-type');
+      
+      if (isLoading) {
+        button.disabled = true;
+        if (spinner) spinner.style.display = 'inline-block';
+        if (textElement) textElement.textContent = text;
+      } else {
+        button.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+        if (textElement) textElement.textContent = text;
+      }
+    };
+});
+
 // Alpine.js plugin for data attribute support
 document.addEventListener('alpine:init', () => {
     console.log('🔧 Alpine.js initializing with custom directives...');

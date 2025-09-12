@@ -21,54 +21,5 @@
     .step.active {
         display: block;
     }
-    
-    /* Wizard Step Indicator Styles */
-    .wizard-steps {
-        margin-bottom: 2rem;
-    }
-    
-    .step-indicator {
-        text-align: center;
-        padding: 1rem;
-        border-radius: 8px;
-        background: #f8f9fa;
-        border: 2px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-    
-    .step-indicator.active {
-        background: #206bc4;
-        border-color: #206bc4;
-        color: white;
-    }
-    
-    .step-number {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: #6c757d;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        margin: 0 auto 0.5rem;
-        font-size: 14px;
-    }
-    
-    .step-indicator.active .step-number {
-        background: white;
-        color: #206bc4;
-    }
-    
-    .step-label {
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .step-indicator.active .step-label {
-        color: white;
-    }
+
 

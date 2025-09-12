@@ -582,7 +582,7 @@ func Handle404(w http.ResponseWriter, r *http.Request, templates types.TemplateE
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-	if err := templates.ExecuteTemplate(w, "404.html", data); err != nil {
+	if err := templates.ExecuteTemplate(w, "error_404.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

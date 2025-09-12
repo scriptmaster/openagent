@@ -11,7 +11,7 @@ export default function LayoutMarketing({page, children, linkPaths, scriptPaths}
     <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
 ))}
 </head>
-<body>
+<body className="theme-pista">
     <div className="page">
         {/* Marketing Header */}
         <header className="navbar navbar-expand-md navbar-light">

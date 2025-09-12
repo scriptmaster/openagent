@@ -4,3 +4,7 @@
 .ti {
     font-size: 20px !important;
 }
+
+/* Import Theme Files */
+@import url('/static/css/theme-dark.css');
+@import url('/static/css/theme-pista.css');
