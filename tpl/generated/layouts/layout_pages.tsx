@@ -124,8 +124,9 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
                 <ul className="list-inline list-inline-dots mb-0">
                     <li className="list-inline-item">
                         Copyright © {new Date().getFullYear()}
+                        &nbsp;
                         <a href="/" className="link-secondary">{page.AppName}</a>.
-                        All rights reserved.
+                        All rights reserved!
                     </li>
                     <li className="list-inline-item">
                         <a href="#" className="link-secondary" rel="noopener">

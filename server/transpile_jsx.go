@@ -64,6 +64,12 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		return fmt.Errorf("could not read input file: %w", err)
 	}
 
+	// Extract CSS and JS content to separate files BEFORE any Go template processing
+	cssContent, jsContent, err := extractCSSAndJS(string(content), inputPath, outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract CSS/JS: %v", err)
+	}
+
 	// Convert Go template syntax to JSX
 	htmlContent := string(content)
 
@@ -71,12 +77,6 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	htmlContent = strings.ReplaceAll(htmlContent, "<!DOCTYPE html>", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "<!doctype html>", "")
 	htmlContent = strings.ReplaceAll(htmlContent, "<!Doctype html>", "")
-
-	// Extract CSS and JS content to separate files
-	cssContent, jsContent, err := extractCSSAndJS(htmlContent, inputPath, outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to extract CSS/JS: %v", err)
-	}
 
 	// Fix self-closing tags for JSX compatibility
 	htmlContent = fixSelfClosingTags(htmlContent)
@@ -411,7 +411,9 @@ func transpileAllTemplates() error {
 			return err
 		}
 
+		fmt.Printf("DEBUG: Processing %d files in %s\n", len(files), inputDir)
 		for _, file := range files {
+			fmt.Printf("DEBUG: Processing file: %s\n", file)
 			baseName := filepath.Base(file)
 			baseNameWithoutExt := strings.TrimSuffix(baseName, ".html")
 
@@ -713,8 +715,10 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 
 	// Extract JS from <script> tags (multiline, excluding external scripts)
 	jsMatches := scriptPattern.FindAllStringSubmatch(htmlContent, -1)
-	for _, match := range jsMatches {
+	fmt.Printf("DEBUG: Found %d script matches in %s\n", len(jsMatches), inputPath)
+	for i, match := range jsMatches {
 		if len(match) > 1 {
+			fmt.Printf("DEBUG: Script match %d length: %d\n", i, len(match[1]))
 			jsContent.WriteString(match[1])
 			jsContent.WriteString("\n")
 		}
@@ -742,9 +746,17 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 			return "", "", fmt.Errorf("failed to create JS directory: %v", err)
 		}
 		jsPath := filepath.Join(jsDir, baseName+".js")
-		if err := os.WriteFile(jsPath, []byte(jsContent.String()), 0644); err != nil {
+		jsContentStr := jsContent.String()
+		fmt.Printf("DEBUG: Writing JS file %s with %d characters\n", jsPath, len(jsContentStr))
+		if len(jsContentStr) > 200 {
+			fmt.Printf("DEBUG: First 200 chars of JS content: %s\n", jsContentStr[:200])
+		} else {
+			fmt.Printf("DEBUG: Full JS content: %s\n", jsContentStr)
+		}
+		if err := os.WriteFile(jsPath, []byte(jsContentStr), 0644); err != nil {
 			return "", "", fmt.Errorf("failed to write JS file: %v", err)
 		}
+		fmt.Printf("DEBUG: Successfully wrote JS file %s\n", jsPath)
 	}
 
 	return cssContent.String(), jsContent.String(), nil

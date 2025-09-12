@@ -1,9 +1,12 @@
 # Stage 1: Build the Go application
-FROM golang:1.23-alpine AS builder
+FROM golang:1.23-bullseye AS builder
 
 WORKDIR /build
 
-# No build dependencies needed with CGO disabled
+# Install build dependencies for CGO (needed for tree-sitter)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy module files first for caching
 COPY go.mod go.sum ./
@@ -12,14 +15,13 @@ RUN go mod tidy
 # Copy all source code from root and subdirectories
 COPY . .
 
-# Set build constraints to avoid problematic dependencies
-ENV CGO_ENABLED=0
+# Set build environment for CGO
+ENV CGO_ENABLED=1
 ENV GOOS=linux
 ENV GOARCH=amd64
 
-# Build the Go binary for package main, including all its files
-# Use build tags to exclude problematic tree-sitter dependencies
-RUN go build -tags="!cgo" -ldflags="-s -w" -o /app/server .
+# Build the Go binary with CGO enabled (required for wax/tree-sitter)
+RUN go build -ldflags="-s -w" -o /app/server .
 
 # Stage 2: Create the runtime image
 FROM alpine:latest
@@ -30,7 +32,8 @@ WORKDIR /app
 # - ca-certificates: For HTTPS communication
 # - bash: For shell commands
 # - curl: Common utility
-RUN apk update && apk add --no-cache ca-certificates bash curl
+# - libc6-compat: For CGO runtime compatibility
+RUN apk update && apk add --no-cache ca-certificates bash curl libc6-compat
 
 # Create the data directory (if still needed for other runtime data)
 RUN mkdir -p /app/data/sql && chmod -R 755 /app/data # Ensure data/sql exists
