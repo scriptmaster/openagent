@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+// isDebugTranspile checks if DEBUG_TRANSPILE environment variable is set to "1"
+func isDebugTranspile() bool {
+	return debugTranspile
+}
+
 // Global regex patterns compiled once for performance
 var (
 	stylePattern            *regexp.Regexp
@@ -25,15 +30,18 @@ var (
 	selfClosingTags map[string]*regexp.Regexp
 
 	generateComponentName = true
+	debugTranspile        = false
 )
 
 // init initializes all regex patterns
 func init() {
+	debugTranspile = (os.Getenv("DEBUG_TRANSPILE") == "1")
+
 	stylePattern = regexp.MustCompile(`(?s)<style[^>]*>(.*?)</style>`)
 	scriptPattern = regexp.MustCompile(`(?s)<script[^>]*>(.*?)</script>`)
 	removeStylePattern = regexp.MustCompile(`(?s)<style[^>]*>.*?</style>`)
 	removeScriptPattern = regexp.MustCompile(`(?s)<script[^>]*>.*?</script>`)
-	commentPattern = regexp.MustCompile(`<!--(.*?)-->`)
+	commentPattern = regexp.MustCompile(`(?s)<!--(.*?)-->`)
 	hyphenUnderscorePattern = regexp.MustCompile(`[-_]`)
 	includePattern = regexp.MustCompile(`(?m)^\s*//#include\s+(?:"([^"]+)"|([^\s]+))\s*$`)
 	htmlIncludePattern = regexp.MustCompile(`(?s)<!--\s*#include\s+"([^"]+)"\s*-->`)
@@ -379,9 +387,9 @@ func injectDynamicTags(htmlContent string) string {
 	return htmlContent
 }
 
-// transpileAllTemplates finds and transpiles all HTML files from different directories.
-func transpileAllTemplates() error {
-	log.Println("Transpiling all HTML templates...")
+// TranspileAllTemplates finds and transpiles all HTML files from different directories.
+func TranspileAllTemplates() error {
+	log.Println("\t → 5. Transpiling all HTML templates...")
 
 	// Define input directories and their corresponding output directories
 	directories := map[string]string{
@@ -402,9 +410,13 @@ func transpileAllTemplates() error {
 			return err
 		}
 
-		fmt.Printf("DEBUG: Processing %d files in %s\n", len(files), inputDir)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Processing %d files in %s\n", len(files), inputDir)
+		}
 		for _, file := range files {
-			fmt.Printf("DEBUG: Processing file: %s\n", file)
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Processing file: %s\n", file)
+			}
 			baseName := filepath.Base(file)
 			baseNameWithoutExt := strings.TrimSuffix(baseName, ".html")
 
@@ -476,7 +488,9 @@ func transpileAllTemplates() error {
 		if err := os.WriteFile(commonDestPath, []byte(processedContent), 0644); err != nil {
 			return fmt.Errorf("failed to write processed _common.js: %w", err)
 		}
-		log.Printf("Copied _common.js from %s to %s", commonSourcePath, commonDestPath)
+		if isDebugTranspile() {
+			log.Printf("Copied _common.js from %s to %s", commonSourcePath, commonDestPath)
+		}
 	} else {
 		log.Printf("Warning: _common.js not found at %s", commonSourcePath)
 	}
@@ -490,7 +504,9 @@ func transpileAllTemplates() error {
 		if err := copyDirectory(partialsSourcePath, partialsDestPath); err != nil {
 			return fmt.Errorf("failed to copy _partials directory: %w", err)
 		}
-		log.Printf("Copied _partials directory from %s to %s", partialsSourcePath, partialsDestPath)
+		if isDebugTranspile() {
+			log.Printf("Copied _partials directory from %s to %s", partialsSourcePath, partialsDestPath)
+		}
 
 		// Retranspile layout files after partials are processed
 		// This ensures layout files include the updated partial content
@@ -508,13 +524,15 @@ func transpileAllTemplates() error {
 				if err := TranspileLayoutToTsx(file, outputPath); err != nil {
 					return fmt.Errorf("failed to retranspile layout %s: %w", file, err)
 				}
-				log.Printf("Retranspiled layout %s to pick up updated partials", file)
+				if isDebugTranspile() {
+					log.Printf("Retranspiled layout %s to pick up updated partials", file)
+				}
 			}
 		}
 	} else {
 		log.Printf("Warning: _partials directory not found at %s", partialsSourcePath)
 	}
-
+	log.Println("\t → \t → 5.1 Success: Transpiling all HTML templates")
 	return nil
 }
 
@@ -739,10 +757,14 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 
 	// Extract JS from <script> tags (multiline, excluding external scripts)
 	jsMatches := scriptPattern.FindAllStringSubmatch(htmlContent, -1)
-	fmt.Printf("DEBUG: Found %d script matches in %s\n", len(jsMatches), inputPath)
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: Found %d script matches in %s\n", len(jsMatches), inputPath)
+	}
 	for i, match := range jsMatches {
 		if len(match) > 1 {
-			fmt.Printf("DEBUG: Script match %d length: %d\n", i, len(match[1]))
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Script match %d length: %d\n", i, len(match[1]))
+			}
 			jsContent.WriteString(match[1])
 			jsContent.WriteString("\n")
 		}
@@ -772,16 +794,20 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 		}
 		jsPath := filepath.Join(jsDir, baseName+".js")
 		jsContentStr := jsContent.String()
-		fmt.Printf("DEBUG: Writing JS file %s with %d characters\n", jsPath, len(jsContentStr))
-		if len(jsContentStr) > 200 {
-			fmt.Printf("DEBUG: First 200 chars of JS content: %s\n", jsContentStr[:200])
-		} else {
-			fmt.Printf("DEBUG: Full JS content: %s\n", jsContentStr)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Writing JS file %s with %d characters\n", jsPath, len(jsContentStr))
+			if len(jsContentStr) > 200 {
+				fmt.Printf("DEBUG: First 200 chars of JS content: %s\n", jsContentStr[:200])
+			} else {
+				fmt.Printf("DEBUG: Full JS content: %s\n", jsContentStr)
+			}
 		}
 		if err := os.WriteFile(jsPath, []byte(jsContentStr), 0644); err != nil {
 			return "", "", fmt.Errorf("failed to write JS file: %v", err)
 		}
-		fmt.Printf("DEBUG: Successfully wrote JS file %s\n", jsPath)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Successfully wrote JS file %s\n", jsPath)
+		}
 	}
 
 	return cssContent.String(), jsContent.String(), nil

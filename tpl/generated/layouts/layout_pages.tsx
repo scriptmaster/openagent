@@ -5,7 +5,7 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{page.PageTitle || page.AppName}</title>
+    <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
     {/* Favicon */}
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />

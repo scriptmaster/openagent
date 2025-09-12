@@ -296,10 +296,10 @@ func InitDB() (*sql.DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping target database '%s': %w", targetDbName, err)
 	}
-	log.Printf("\t → 3. Successfully pinged to target database '%s'", targetDbName)
+	log.Printf("\t → \t → 2.1 Successfully pinged to target database '%s'", targetDbName)
 
 	// --- Run Database Migrations (Old Method) ---
-	log.Println("\t → 4. Applying database schema/migrations...")
+	log.Println("\t → 3. Applying database schema/migrations...")
 	if err := applySchema(sqlDB); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to apply database schema/migrations: %w", err)
@@ -309,10 +309,10 @@ func InitDB() (*sql.DB, error) {
 	// Store the initialized instance globally
 	dbInstance = sqlDB
 
-	log.Printf("\t → 4.100 Database '%s' completely initialized.", targetDbName) // Consolidated message
+	log.Printf("\t → \t → 3.1 Database '%s' completely initialized.", targetDbName) // Consolidated message
 
 	// -------------------------------------------
-	log.Println("\t → 5. Checking/Creating Admin Token...")
+	log.Println("\t → 4. Checking/Creating Admin Token...")
 	// --- Check/Create Admin Token ---
 	_, tokenErr := CheckOrCreateAdminToken(sqlDB)
 	if tokenErr != nil {
@@ -1648,7 +1648,7 @@ func CheckOrCreateAdminToken(db *sql.DB) (string, error) {
 	}
 
 	if existingToken != "" {
-		log.Printf("Admin token for today (%s): %s", today, existingToken)
+		log.Printf("\t → \t → Admin token for today (%s):\n\n%s\n\n", today, existingToken)
 		return existingToken, nil
 	}
 

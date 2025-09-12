@@ -119,9 +119,9 @@ func HandleTestPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := models.PageData{
-		AppName:    "OpenAgent",
+		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "Test Page",
-		AppVersion: "1.0.0.0",
+		AppVersion: common.GetEnv("APP_VERSION"),
 	}
 
 	err := globalTemplates.ExecuteTemplate(w, "test.html", data)

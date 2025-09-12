@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{page.PageTitle || page.AppName}</title>
+    <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
     
     <!--#include "../_partials/head.html" -->
 </head>

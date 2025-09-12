@@ -9,3 +9,4 @@ openagent
 nul
 *.local
 .devcontainer
+*bkup*

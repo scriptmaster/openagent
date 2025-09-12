@@ -1,1 +1,182 @@
-hi
+<div class="container-xl">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1 class="page-title">Hyperscript Tests - Debug Test 2!</h1>
+                <p class="text-muted">Testing various hyperscript functionality</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 1: Basic Click Event</h3>
+                </div>
+                <div class="card-body">
+                    <p>Click the button to test basic hyperscript click handling:</p>
+                    <button class="btn" _="on click add .text-success to me then set my.textContent to 'Clicked!'">
+                        Click Me
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 2: Show/Hide Toggle</h3>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-secondary mb-3" _="on click toggle .d-none on #test2-content">
+                        Toggle Content
+                    </button>
+                    <div id="test2-content" class="alert alert-info d-none">
+                        This content will be toggled.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 3: Form Input Interaction</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="test3-input">Type something:</label>
+                        <input type="text" class="form-control" id="test3-input" placeholder="Type here..." _="on input set #test3-output.textContent to me.value">
+                    </div>
+                    <div id="test3-output" class="alert alert-info">
+                        Output will appear here...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 4: Custom Commands</h3>
+                </div>
+                <div class="card-body">
+                    <p>Test our custom hyperscript commands:</p>
+                    <!-- <button class="btn btn-info" _="on click post me to '/test' then log result">
+                        Test Post Command
+                    </button> -->
+                    <button class="btn btn-warning" _="on click loadingButton">
+                        Test Loading Button
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 5: CSS Selector with Attributes</h3>
+                </div>
+                <div class="card-body">
+                    <div id="test5-form">
+                        <input type="text" id="test5-email" name="test5-email" value="test@example.com" class="form-control mb-2">
+                        <input type="hidden" id="test5-copy" name="test5-copy" _="on load set my.value to #test5-email.value">
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Hidden field value: <span id="test5-display"></span></small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" _="on click set #test5-display.textContent to #test5-copy.value">
+                        Show Hidden Value
+                    </button>
+                </div>
+            </div>
+        </div> -->
+
+        <!-- <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 6: Event Chaining</h3>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-success" _="on click 
+                        add .btn-outline-success to me
+                        remove .btn-success from me
+                        set my.textContent to 'Processing...'
+                        wait 2s
+                        set my.textContent to 'Done!'
+                        add .btn-success to me
+                        remove .btn-outline-success from me">
+                        Chain Events
+                    </button>
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+    <!-- <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test 7: Complex Form Handling</h3>
+                </div>
+                <div class="card-body">
+                    <form id="test7-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Name:</label>
+                                    <input type="text" name="name" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Email:</label>
+                                    <input type="email" name="email" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Message:</label>
+                            <textarea name="message" class="form-control" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary" _="on click 
+                            halt the event's default
+                            log 'Form submitted'
+                            show .alert-success in #test7-form
+                            hide .alert-danger in #test7-form">
+                            Submit Form
+                        </button>
+                    </form>
+                    <div class="alert alert-success mt-3" style="display: none;">
+                        <i class="ti ti-check me-2"></i>Form submitted successfully!
+                    </div>
+                    <div class="alert alert-danger mt-3" style="display: none;">
+                        <i class="ti ti-alert-circle me-2"></i>Form submission failed!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> -->
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Console Output</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Check the browser console for hyperscript command logs and any errors.</p>
+                    <div class="alert alert-info">
+                        <i class="ti ti-info-circle me-2"></i>
+                        Open Developer Tools (F12) and check the Console tab to see hyperscript activity.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

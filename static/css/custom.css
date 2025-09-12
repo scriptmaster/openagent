@@ -1,10 +1,13 @@
+/* Import Theme Files */
+/* @import url('/static/css/theme-dark.css'); */
+@import url('/static/css/theme-pista.css');
+
 /* Custom Styles for OpenAgent */
 
 /* Tabler Icons Font Size Override */
 .ti {
     font-size: 20px !important;
+    min-width: 20px;
+    min-height: 20px;
 }
 
-/* Import Theme Files */
-@import url('/static/css/theme-dark.css');
-@import url('/static/css/theme-pista.css');

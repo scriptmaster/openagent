@@ -15,9 +15,6 @@ import (
 
 // RegisterRoutes sets up all the application routes
 func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt string) {
-	// Load HTML templates
-	globalTemplates = LoadTemplates() // Global Templates
-
 	// Initialize database and other services (handle potential nil db)
 	db := GetDB() // Get the initialized DB instance
 	var projectService projects.ProjectService

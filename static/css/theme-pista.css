@@ -10,20 +10,21 @@
     --pista-border-secondary: #c8dccb; /* Secondary borders - medium green */
     
     /* Text Colors */
-    --pista-text-primary: #2d4a3a;    /* Primary text - dark green */
-    --pista-text-secondary: #5a7a6b;  /* Secondary text - medium green */
+    --pista-text-primary: #016611;    /* Primary text - dark green (AA/AAA compliant) */
+    --pista-text-secondary: #016611;  /* Secondary text - same dark green for consistency */
     --pista-text-white: #ffffff;      /* White text for emphasis */
     
     /* Accent Colors */
-    --pista-accent-primary: #93c5a3;  /* Primary pistachio accent */
-    --pista-accent-primary-hover: #7fb392; /* Primary pistachio hover */
+    --pista-accent-primary: #40ad13;  /* Primary accent - green */
+    --pista-accent-primary-hover: #33990f; /* Primary accent hover - darker green */
+    --pista-accent-secondary: #93c5a3;  /* Secondary pistachio accent */
     --pista-accent-success: #4a9d5c;  /* Success green */
     --pista-accent-danger: #e74c3c;   /* Danger red */
     
     /* Alert Colors */
     --pista-alert-success-bg: #e8f5e8; /* Success alert background */
     --pista-alert-success-border: #c3e6c3; /* Success alert border */
-    --pista-alert-success-text: #2d5a3d; /* Success alert text */
+    --pista-alert-success-text: #016611; /* Success alert text - dark green */
     
     --pista-alert-danger-bg: #fdeaea; /* Danger alert background */
     --pista-alert-danger-border: #f5c6c6; /* Danger alert border */
@@ -31,10 +32,10 @@
     
     --pista-alert-info-bg: #e8f4f8;   /* Info alert background */
     --pista-alert-info-border: #c3e2ea; /* Info alert border */
-    --pista-alert-info-text: #0c5460; /* Info alert text */
+    --pista-alert-info-text: #016611; /* Info alert text - dark green */
     
     /* Focus/Shadow Colors */
-    --pista-focus-shadow: rgba(147, 197, 163, 0.25); /* Focus ring shadow */
+    --pista-focus-shadow: rgba(64, 173, 19, 0.25); /* Focus ring shadow - green accent */
 }
 
 /* Pistachio Theme Styles */

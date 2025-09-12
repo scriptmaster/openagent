@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/joho/godotenv" // Keep godotenv for loading .env
 
 	// Keep auth for UserService
@@ -85,6 +89,9 @@ func StartServer() error {
 		log.Println("WARNING: Using default insecure session salt. Set SESSION_SALT environment variable.")
 	}
 
+	// 5. Load HTML templates
+	globalTemplates = LoadTemplates() // Global Templates
+
 	// Create a new ServeMux
 	router := http.NewServeMux()
 
@@ -93,6 +100,12 @@ func StartServer() error {
 	// Pass the initialized userService and salt.
 	// Other services (db, templates, projectService, etc.) will be initialized *within* RegisterRoutes.
 	RegisterRoutes(router, userService, salt)
+
+	// Start file watching for development if DEBUG_FILE_WATCH is enabled
+	if common.GetEnvOrDefault("DEBUG_FILE_WATCH", "0") == "1" {
+		log.Println("\t → 7. Starting file watcher for development")
+		go startFileWatcher()
+	}
 
 	startAddress := ":" + common.GetEnvOrDefault("PORT", "8800")
 	log.Println("Server starting on " + startAddress)
@@ -103,4 +116,79 @@ func StartServer() error {
 
 	log.Println("!! Server STARTED !! " + startAddress)
 	return nil
+}
+
+// startFileWatcher runs a background goroutine that watches for file changes in tpl/ directory
+func startFileWatcher() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Printf("File watcher: Error creating watcher: %v", err)
+		return
+	}
+	defer watcher.Close()
+
+	// Watch the tpl directory recursively
+	err = filepath.Walk("./tpl", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// Skip the generated directory
+		if strings.Contains(path, "tpl/generated") {
+			return nil
+		}
+		// Only watch directories
+		if info.IsDir() {
+			return watcher.Add(path)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("File watcher: Error walking tpl directory: %v", err)
+		return
+	}
+
+	log.Println("File watcher started - watching tpl/ directory (excluding tpl/generated/)")
+
+	// Debounce timer
+	var debounceTimer *time.Timer
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+
+			// Skip generated files
+			if strings.Contains(event.Name, "tpl/generated") {
+				continue
+			}
+
+			// Only process write events
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				log.Printf("File watcher: Detected change in %s", event.Name)
+
+				// Cancel previous timer if it exists
+				if debounceTimer != nil {
+					debounceTimer.Stop()
+				}
+
+				// Set new debounce timer
+				debounceTimer = time.AfterFunc(500*time.Millisecond, func() {
+					log.Println("File watcher: Transpiling templates after debounce...")
+					if err := TranspileAllTemplates(); err != nil {
+						log.Printf("File watcher: Error transpiling templates: %v", err)
+					} else {
+						log.Println("File watcher: Templates transpiled successfully")
+					}
+				})
+			}
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("File watcher: Error: %v", err)
+		}
+	}
 }

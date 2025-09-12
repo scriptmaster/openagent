@@ -10,12 +10,47 @@ _hyperscript.addCommand("post", function(parser, runtime, tokens) {
 });
 
 _hyperscript.addCommand("loadingButton", function(parser, runtime, tokens) {
-    // Simple implementation that just returns a function
-    return function(sender, evt, args) {
-      // This will be called when the loadingButton command is used
-      console.log("loadingButton command called with args:", args);
+    console.log(parser, runtime, tokens);
+    return {
+        execute: function() {
+            return runtime.HALT;
+        }
     };
 });
+
+// _hyperscript.addCommand("loadingButton", function(parser, runtime, tokens) {
+//     return {
+//         // This is the correct structure for a custom command
+//         execute: function(step, hyperscript_context) {
+//             console.log("loadingButton command called");
+            
+//             // Hyperscript provides the `hyperscript_context` containing useful variables
+//             // The `me` variable holds the element the script is running on.
+//             const button = hyperscript_context.me;
+            
+//             if (button.disabled) {
+//                 button.disabled = false;
+//                 button.textContent = button.getAttribute('data-original-text') || 'Test Loading Button';
+//                 button.classList.remove('loading');
+//             } else {
+//                 button.disabled = true;
+//                 button.setAttribute('data-original-text', button.textContent);
+//                 button.textContent = 'Loading...';
+//                 button.classList.add('loading');
+                
+//                 // Auto-restore after 5 seconds for demo
+//                 setTimeout(() => {
+//                     button.disabled = false;
+//                     button.textContent = button.getAttribute('data-original-text') || 'Timed out. Try again.';
+//                     button.classList.remove('loading');
+//                 }, 5000);
+//             }
+            
+//             // This tells hyperscript the command has finished executing
+//             return runtime.HALT;
+//         }
+//     };
+// });
 
 // Alpine.js plugin for data attribute support
 document.addEventListener('alpine:init', () => {
