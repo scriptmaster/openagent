@@ -1,4 +1,4 @@
-export default function LayoutPages({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
+export default function LayoutPages({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 <html lang="en">
@@ -100,7 +100,7 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
             
             <div className="page-body">
                 <div className="container-xl">
-                    <div className="row row-deck row-cards">
+                    <div className="row row-cards">
                         <div className="col-12">
                             {/* Page content will be inserted here */}
                             {children}

@@ -15,6 +15,7 @@ require (
 	github.com/michal-laskowski/wax v0.0.0-20250708193110-33912a7cbc2d
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.39.0
+	golang.org/x/net v0.41.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

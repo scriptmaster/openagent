@@ -115,16 +115,7 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	htmlContent = regexp.MustCompile(`\{\{\.(\w+)\}\}`).ReplaceAllString(htmlContent, "{page.$1}")
 	htmlContent = strings.ReplaceAll(htmlContent, "}}", "}")
 
-	// JavaScript content should be output as-is without any Go template conversion
-	if jsContent != "" {
-		// No conversion needed for JavaScript content - output as-is
-		// Write the JS content to the file
-		baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
-		jsPath := filepath.Join(filepath.Dir(outputPath), "js", baseName+".js")
-		if err := os.WriteFile(jsPath, []byte(jsContent), 0644); err != nil {
-			return fmt.Errorf("failed to write JS file: %v", err)
-		}
-	}
+	// CSS and JS extraction/writing is handled by extractCSSAndJS function
 
 	// Convert class to className
 	htmlContent = strings.ReplaceAll(htmlContent, "class=", "className=")
@@ -143,15 +134,14 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		linkPaths = fmt.Sprintf("/tsx/css/%s.css", baseName)
 	}
 
+	var jsFileName string
 	// Prepare JS script paths
 	if jsContent != "" {
-		// Determine the correct JS path based on the output directory
+		// Determine the correct JS filename based on the output directory
 		outputDir := filepath.Dir(outputPath)
-		if strings.Contains(outputDir, "pages") {
-			scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
-		} else {
-			scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s.js", baseName)
-		}
+		lastDirComponent := filepath.Base(outputDir)
+		jsFileName = lastDirComponent + "_" + baseName + ".js"
+		scriptPaths = fmt.Sprintf("/tsx/js/_common.js,/tsx/js/%s", jsFileName)
 	} else {
 		scriptPaths = "/tsx/js/_common.js"
 	}
@@ -180,10 +170,9 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	componentName := ""
 	pageType := "Page" // Default type
 	layoutName := ""   // Default layout (will be set if needed)
+	baseName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
 	if generateComponentName {
-		baseName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-
 		// Check for dot notation pattern (e.g., test.landing_page.html or index.page.landing.html)
 		parts := strings.Split(baseName, ".")
 		if len(parts) >= 2 {
@@ -219,13 +208,56 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		if len(componentName) > 0 {
 			componentName = strings.ToUpper(string(componentName[0])) + componentName[1:]
 		}
-
 	}
 
 	// Determine if this page needs a layout wrapper
 	needsLayout := !strings.Contains(htmlContent, "<html") && !strings.Contains(htmlContent, "<head")
 
 	var tsxContent string
+
+	// Use fragment for pages with html/head tags - add CSS/JS links directly to HTML
+	// Add CSS link if there's CSS content
+	if linkPaths != "" {
+		cssLink := fmt.Sprintf(`<link rel="stylesheet" href="%s" />`, linkPaths)
+		// If </head> exists, add before it, otherwise prepend as style tag
+		if strings.Contains(htmlContent, "</head>") {
+			htmlContent = strings.Replace(htmlContent, "</head>", "\n    "+cssLink+"\n</head>", 1)
+		} else if !needsLayout {
+			htmlContent = cssLink + "\n" + htmlContent
+		}
+	}
+
+	// Add JS scripts if there's JS content
+	if scriptPaths != "" {
+		// Split scriptPaths and create script tags
+		paths := strings.Split(scriptPaths, ",")
+		var scriptTags string
+		for _, path := range paths {
+			scriptTags += fmt.Sprintf(`<script src="%s"></script>`, strings.TrimSpace(path)) + "\n"
+		}
+		// If </body> exists, add before it, otherwise add at end
+		if strings.Contains(htmlContent, "</body>") {
+			htmlContent = strings.Replace(htmlContent, "</body>", "\n"+scriptTags+"</body>", 1)
+		} else if !needsLayout {
+			htmlContent = htmlContent + "\n" + scriptTags
+		}
+	}
+
+	// Create the main component file (test.tsx) - contains the actual component
+	tsxContent = `export default function ` + componentName + `({page}) {
+    return (
+<main>
+` + htmlContent + `
+</main>
+    );
+}`
+
+	// Write the component file
+	componentPath := strings.Replace(outputPath, ".tsx", ".component.tsx", 1)
+	if err := os.WriteFile(componentPath, []byte(tsxContent), 0644); err != nil {
+		return fmt.Errorf("failed to write component file: %v", err)
+	}
+
 	if needsLayout {
 		// Determine which layout to use
 		layoutImport := "layout_pages"
@@ -233,56 +265,32 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 			layoutImport = layoutName
 		}
 
-		// Use layout wrapper for pages without html/head tags
-		tsxContent = `import Layout from '../layouts/` + layoutImport + `';
+		// Create the layout wrapper file (test.layout.tsx) - imports Layout and the component
+		layoutContent := `import Layout from '../layouts/` + layoutImport + `';
+import App from './` + baseName + `.component';
 
-export default function ` + componentName + `({page}: {page: ` + pageType + `}) {
+export default function ` + componentName + `Layout({page}: {page: ` + pageType + `}) {
     return (
         <Layout page={page} linkPaths={` + "`" + linkPaths + "`" + `} scriptPaths={` + "`" + scriptPaths + "`" + `}>
-` + htmlContent + `
+            <App page={page} />
         </Layout>
     );
 }`
+		// Write the layout wrapper file
+		layoutPath := strings.Replace(outputPath, ".tsx", ".tsx", 1)
+		if err := os.WriteFile(layoutPath, []byte(layoutContent), 0644); err != nil {
+			return fmt.Errorf("failed to write layout file: %v", err)
+		}
 	} else {
-		// Use fragment for pages with html/head tags - add CSS/JS links directly to HTML
-		// Add CSS link if there's CSS content
-		if linkPaths != "" {
-			cssLink := fmt.Sprintf(`<link rel="stylesheet" href="%s" />`, linkPaths)
-			// If </head> exists, add before it, otherwise prepend as style tag
-			if strings.Contains(htmlContent, "</head>") {
-				htmlContent = strings.Replace(htmlContent, "</head>", "\n    "+cssLink+"\n</head>", 1)
-			} else {
-				htmlContent = cssLink + "\n" + htmlContent
-			}
+		pagePath := strings.Replace(outputPath, ".tsx", ".tsx", 1)
+		if err := os.WriteFile(pagePath, []byte(tsxContent), 0644); err != nil {
+			return fmt.Errorf("failed to write component file: %v", err)
 		}
-
-		// Add JS scripts if there's JS content
-		if scriptPaths != "" {
-			// Split scriptPaths and create script tags
-			paths := strings.Split(scriptPaths, ",")
-			var scriptTags string
-			for _, path := range paths {
-				scriptTags += fmt.Sprintf(`<script src="%s"></script>`, strings.TrimSpace(path)) + "\n"
-			}
-			// If </body> exists, add before it, otherwise add at end
-			if strings.Contains(htmlContent, "</body>") {
-				htmlContent = strings.Replace(htmlContent, "</body>", "\n"+scriptTags+"</body>", 1)
-			} else {
-				htmlContent = htmlContent + "\n" + scriptTags
-			}
-		}
-
-		// Use fragment for pages with html/head tags
-		tsxContent = `export default function ` + componentName + `({page}: {page: ` + pageType + `}) {
-    return (
-<>
-` + htmlContent + `
-</>
-    );
-}`
 	}
 
-	return os.WriteFile(outputPath, []byte(tsxContent), 0644)
+	return nil
+
+	// return os.WriteFile(outputPath, []byte(tsxContent), 0644)
 }
 
 // TranspileLayoutToTsx converts a layout HTML file to a TSX layout component
@@ -359,7 +367,7 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 	}
 
 	// Write the layout TSX file
-	tsxContent := `export default function ` + componentName + `({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
+	tsxContent := `export default function ` + componentName + `({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 ` + htmlContent + `
@@ -404,6 +412,9 @@ func TranspileAllTemplates() error {
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			return err
 		}
+		// if err := os.MkdirAll(filepath.Join(inputDir, "js"), 0755); err != nil {
+		// 	return err
+		// }
 
 		files, err := filepath.Glob(filepath.Join(inputDir, "*.html"))
 		if err != nil {
@@ -786,24 +797,51 @@ func extractCSSAndJS(htmlContent, inputPath, outputPath string) (string, string,
 	}
 
 	// Write JS file if there's content
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: jsContent.Len() = %d\n", jsContent.Len())
+	}
 	if jsContent.Len() > 0 {
-		// Always write JS files to the main generated/js directory
+		// Always write to generated/js directory
 		jsDir := "tpl/generated/js"
 		if err := os.MkdirAll(jsDir, 0755); err != nil {
 			return "", "", fmt.Errorf("failed to create JS directory: %v", err)
 		}
-		jsPath := filepath.Join(jsDir, baseName+".js")
-		jsContentStr := jsContent.String()
+
+		// Determine filename - use pages_ prefix for page files
+		var jsFileName string
+		outputDir := filepath.Dir(outputPath)
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: Writing JS file %s with %d characters\n", jsPath, len(jsContentStr))
-			if len(jsContentStr) > 200 {
-				fmt.Printf("DEBUG: First 200 chars of JS content: %s\n", jsContentStr[:200])
-			} else {
-				fmt.Printf("DEBUG: Full JS content: %s\n", jsContentStr)
+			fmt.Printf("DEBUG: outputPath=%s, outputDir=%s, baseName=%s\n", outputPath, outputDir, baseName)
+		}
+		if strings.Contains(outputDir, "pages") {
+			jsFileName = "pages_" + baseName + ".js"
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Detected pages directory, using pages_ prefix\n")
+			}
+		} else {
+			jsFileName = baseName + ".js"
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Not a pages directory, using regular filename\n")
 			}
 		}
-		if err := os.WriteFile(jsPath, []byte(jsContentStr), 0644); err != nil {
-			return "", "", fmt.Errorf("failed to write JS file: %v", err)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: jsFileName=%s\n", jsFileName)
+		}
+		jsPath := filepath.Join(jsDir, jsFileName)
+
+		// Create React-enhanced JS content
+		reactJSContent := createReactJSContent(jsContent.String(), baseName)
+
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Writing JS file %s with %d characters\n", jsPath, len(reactJSContent))
+			if len(reactJSContent) > 200 {
+				fmt.Printf("DEBUG: First 200 chars of JS content: %s\n", reactJSContent[:200])
+			} else {
+				fmt.Printf("DEBUG: Full JS content: %s\n", reactJSContent)
+			}
+		}
+		if err := os.WriteFile(jsPath, []byte(reactJSContent), 0644); err != nil {
+			return "", "", fmt.Errorf("failed to write JS file[1]: %v", err)
 		}
 		if isDebugTranspile() {
 			fmt.Printf("DEBUG: Successfully wrote JS file %s\n", jsPath)
@@ -946,4 +984,79 @@ func sanitizeHtml(htmlContent string) string {
 		// Replace dots with dashes in attribute names
 		return strings.ReplaceAll(match, ".", "-")
 	})
+}
+
+// createReactJSContent creates React-enhanced JS content with TSX content directly embedded
+func createReactJSContent(originalJS, componentName string) string {
+	// Read the component TSX file first
+	componentTsxPath := filepath.Join("tpl/generated/pages", componentName+".component.tsx")
+	componentTsxContent, err := os.ReadFile(componentTsxPath)
+	if err != nil {
+		// If component file doesn't exist, try the regular TSX file
+		tsxPath := filepath.Join("tpl/generated/pages", componentName+".tsx")
+		tsxContent, err := os.ReadFile(tsxPath)
+		if err != nil {
+			// If neither file exists, just return the original JS
+			return originalJS
+		}
+		componentTsxContent = tsxContent
+	}
+
+	// Convert component TSX to JS
+	componentJS := TSX2JS(string(componentTsxContent))
+
+	actualComponentName := GetActualComponentName(componentJS, componentName)
+
+	// Create the React-enhanced JS content with dynamic component inclusion
+	reactJS := fmt.Sprintf(`
+// Component JS (converted to JS from TSX)
+%s
+
+///////////////////////////////
+
+// Original JS content
+%s
+
+///////////////////////////////
+
+// React hydration using common utilities
+try {
+    // Use the global hydration function from _common.js
+    window.hydrateReactApp('%s', { 
+        page: window.pageData || {},
+        container: 'main',
+		layout: React.createElement('div', {}, 'Layout placeholder')
+    });
+} catch(e) {
+    console.error('React hydration error:', e);
+}`, componentJS, originalJS, actualComponentName)
+
+	return reactJS
+}
+
+func TSX2JS(tsxStr string) string {
+	// Remove TypeScript types
+	log.Println("TSX2JS: ", tsxStr)
+
+	tsxStr = removeTypeScriptTypes(tsxStr)
+	// log.Println("removeTypeScriptTypes: ", tsxStr)
+
+	// Convert JSX to React.createElement calls
+	jsxStr := convertJSXToReactCreateElement(tsxStr)
+	// log.Println("convertJSXToReactCreateElement: ", jsxStr)
+
+	// Fix className case (HTML parser converts to lowercase)
+	jsxStr = strings.ReplaceAll(jsxStr, "{classname:", "{className:")
+	jsxStr = strings.ReplaceAll(jsxStr, "classname:", "className:")
+	// log.Println("className: ", jsxStr)
+
+	// Remove import/export statements
+	importPattern := regexp.MustCompile(`(?m)^import\s+.*?from\s+.*?;?\s*$`)
+	jsxStr = importPattern.ReplaceAllString(jsxStr, "")
+
+	exportPattern := regexp.MustCompile(`export\s+default\s+`)
+	jsxStr = exportPattern.ReplaceAllString(jsxStr, "")
+	// log.Println("FINAL JSX: ", jsxStr)
+
+	return jsxStr
 }

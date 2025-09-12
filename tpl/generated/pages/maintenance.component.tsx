@@ -1,26 +1,4 @@
-
-// TSX Component content (embedded directly)
-
-                        function toggleMigrationStart() {
-                            const checkbox = document.getElementById('reset_migrations');
-                            const migrationField = document.getElementById('migration_start');
-                            
-                            if (checkbox.checked) {
-                                migrationField.disabled = true;
-                                migrationField.value = '0';
-                            } else {
-                                migrationField.disabled = false;
-                                migrationField.value = '{page.MigrationStart}';
-                            }
-                        }
-                        
-
-
-
-///////////////////////////////
-
-// Original JS content
-function Maintenance({page}: {page: Page}) {
+export default function Maintenance({page}) {
     return (
 <main>
 <div className="page">
@@ -257,18 +235,4 @@ function Maintenance({page}: {page: Page}) {
     </div>
 </main>
     );
-}
-
-///////////////////////////////
-
-// React hydration using common utilities
-try {
-    // Use the global hydration function from _common.js
-    window.hydrateReactApp('maintenance', { 
-        page: window.pageData || {},
-        container: 'main',
-		layout: React.createElement('div', {}, 'Layout placeholder')
-    });
-} catch(e) {
-    console.error('React hydration error:', e);
 }

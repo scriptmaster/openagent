@@ -1,4 +1,4 @@
-export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {page: any, children: any, linkPaths?: string, scriptPaths?: string}) {
+export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
     return (
 <>
 <html lang="en">

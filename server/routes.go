@@ -72,13 +72,7 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 			return
 		}
 
-		// Handle _common.js specially
-		if filename == "_common.js" {
-			http.ServeFile(w, r, "./tpl/generated/js/_common.js")
-			return
-		}
-
-		// Serve from generated/js directory
+		// Serve from generated/js directory (all files consolidated here)
 		filePath := fmt.Sprintf("./tpl/generated/js/%s", filename)
 		http.ServeFile(w, r, filePath)
 	})
