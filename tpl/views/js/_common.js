@@ -1,10 +1,5 @@
-// React imports - loaded once for all pages
-// import React from '/static/js/react.production.min.js';
-// import { hydrateRoot } from '/static/js/react-dom.production.min.js';
-
 //#include /static/js/react.production.min.js
-//#-include /static/js/react-dom.production.min.js
-//#include /static/js/react-dom.development.js
+//#include /static/js/react-dom.production.min.js
 
 // Common React utilities and functions
 window.React = React;

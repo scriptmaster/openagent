@@ -1,0 +1,293 @@
+# OpenAgent Transpilation Flow: /test Route to React Components
+# This diagram shows the complete flow from HTTP request to React component rendering
+
+# HTTP Request Flow
+http_request: {
+  /test: {
+    routes.go: {
+      RegisterRoutes: {
+        router.HandleFunc("/test", HandleTestPage)
+      }
+    }
+  }
+}
+
+# Handler Layer
+handlers: {
+  HandleTestPage: {
+    globalTemplates.ExecuteTemplate(w, "test.html", data)
+  }
+}
+
+# Template System
+templates: {
+  globalTemplates: {
+    ExecuteTemplate: {
+      "test.html" -> "test.component.tsx"
+    }
+  }
+}
+
+# File System Paths
+file_paths: {
+  input_files: {
+    test_html: "Original HTML template"
+    simple_html: "Component HTML"
+    _common_js: "Common JavaScript utilities"
+  }
+  
+  generated_files: {
+    test_component_tsx: "Generated TSX component"
+    test_tsx: "Alternative TSX file"
+    simple_tsx: "Generated component TSX"
+    pages_test_js: "Final React JS file"
+    component_simple_js: "Component JS file"
+  }
+  
+  static_files: {
+    react_min_js: "React library"
+    react_dom_min_js: "React DOM library"
+    tabler_min_css: "CSS framework"
+    custom_css: "Custom styles"
+  }
+}
+
+# Transpilation Flow
+transpile_flow: {
+  # Main Transpilation Entry Point
+  TranspileHtmlToTsx: {
+    input: "tpl/pages/test.html"
+    output: "tpl/generated/pages/test.component.tsx"
+    
+    extractCSSAndJS: "Extract <style> and <script> tags"
+    processComponentImports: "Process <div id='component-*'> tags"
+    fixSelfClosingTags: "Convert <img> to <img />"
+    processIncludes: "Process <!--#include--> directives"
+    convertGoTemplateToJSX: "Convert {{.PageTitle}} to {page.PageTitle}"
+    generateImports: "Generate import statements for components"
+    createTSXContent: "Wrap in React component function"
+    
+    component_go: {
+      processComponentImports: "Find component references"
+      transpileComponentToTSX: "Convert component HTML to TSX"
+      convertComponentTSXToJS: "Convert component TSX to JS"
+    }
+  }
+  
+  # Component Processing
+  component_processing: {
+    processComponentImports: {
+      componentPattern: "Regex: <div id='component-([^']+)'>"
+      
+      for_each_component: {
+        transpileComponentToTSX: {
+          input: "tpl/components/simple.html"
+          output: "tpl/generated/components/simple.tsx"
+          
+          readComponentHTML: "Read component HTML file"
+          convertGoTemplateToJSX: "Convert template syntax"
+          wrapInFunction: "Wrap in React function component"
+        }
+        
+        convertComponentTSXToJS: {
+          convertCounterJSXToReact: "Convert component JSX to React.createElement"
+          parseJSXWithHTMLParser: "Parse JSX with HTML parser"
+        }
+      }
+    }
+  }
+  
+  # JSX to React.createElement Conversion
+  jsx_conversion: {
+    TSX2JS: {
+      input: "tpl/generated/pages/test.component.tsx"
+      output: "tpl/generated/js/pages_test.js"
+      
+      removeTypeScriptTypes: "Remove TypeScript type annotations"
+      
+      extractImportsAndContent: {
+        extractImportsAndContent: "Separate imports from main content"
+      }
+      
+      convertJSXToReactCreateElement: {
+        convertJSXToReactCreateElement: "Main JSX conversion entry point"
+        
+        parseJSXWithWalker: {
+          parseJSXWithWalker: "Extract <main> content with regex"
+          
+          parseJSXWithHTMLParser: {
+            parseJSXWithHTMLParser: "Parse JSX with html.Parse"
+            
+            extractCustomComponentNames: {
+              extractCustomComponentNames: "Find custom components with regex"
+              componentPattern: "Regex: <([A-Z][a-zA-Z0-9]*)(?:\\s+[^>]*)?/?>"
+            }
+            
+            walkHTMLNodeWithCustomComponents: {
+              walkHTMLNodeWithCustomComponents: "Walk HTML nodes recursively"
+              
+              convertElementToReactWithCustomComponents: {
+                convertElementToReactWithCustomComponents: "Convert HTML element to React.createElement"
+                
+                buildPropsObject: {
+                  buildPropsObject: "Build props object from HTML attributes"
+                  handleJSXExpressions: "Handle {value} expressions"
+                  convertClassToClassName: "Convert class to className"
+                }
+                
+                processChildren: "Process child nodes recursively"
+              }
+            }
+          }
+        }
+      }
+      
+      fixClassNameCase: "Fix className case after HTML parsing"
+      removeImportExportStatements: "Remove import/export statements"
+    }
+  }
+  
+  # Component Embedding
+  component_embedding: {
+    createReactJSContent: {
+      readComponentTSX: "Read component TSX file"
+      TSX2JS: "Convert component TSX to JS"
+      embedComponentJS: {
+        embedComponentJS: "Embed component JS into main JS"
+        
+        componentRefPattern: "Regex: React\\.createElement\\(['\"]?(\\w+)['\"]?,\\s*\\{[^}]*\\}\\)"
+        
+        findReferencedComponents: "Find components referenced in main JS"
+        readComponentJSFiles: "Read component JS files"
+        embedComponents: "Embed component JS above main component"
+      }
+      
+      createFinalJS: "Create final React JS with ASCII art separators"
+    }
+  }
+}
+
+# Static File Serving
+static_serving: {
+  routes.go: {
+    staticFilesRoot: "./static"
+    fs := http.FileServer(http.Dir(staticFilesRoot))
+    router.Handle("/static/", http.StripPrefix("/static/", fs))
+  }
+  
+  served_files: {
+    static_react_min_js: "React library"
+    static_react_dom_min_js: "React DOM library"
+    static_common_js: "Common utilities"
+    static_tabler_min_css: "CSS framework"
+    static_custom_css: "Custom styles"
+  }
+}
+
+# Client-Side Hydration
+client_hydration: {
+  _common.js: {
+    hydrateReactApp: "Global hydration function"
+    window.hydrateReactApp: "Make hydration function globally available"
+  }
+  
+  pages_test.js: {
+    windowTest: "Make component globally available"
+    windowHydrateReactApp: "Hydrate React component"
+  }
+  
+  react_dom: {
+    hydrateRoot: "React 18 hydration"
+    container: "main"
+  }
+}
+
+# Data Flow Connections
+connections: {
+  http_request./test -> handlers.HandleTestPage
+  handlers.HandleTestPage -> templates.globalTemplates
+  templates.globalTemplates -> transpile_flow.TranspileHtmlToTsx
+  
+  transpile_flow.TranspileHtmlToTsx -> component_processing.processComponentImports
+  component_processing.processComponentImports -> jsx_conversion.TSX2JS
+  jsx_conversion.TSX2JS -> component_embedding.createReactJSContent
+  
+  component_embedding.createReactJSContent -> file_paths.generated_files.pages_test_js
+  
+  static_serving.routes.go -> static_serving.served_files
+  static_serving.served_files -> client_hydration._common.js
+  client_hydration._common.js -> client_hydration.pages_test.js
+  client_hydration.pages_test.js -> client_hydration.react_dom
+}
+
+# Key Functions by File
+functions_by_file: {
+  transpile.go: {
+    TranspileHtmlToTsx: "Main HTML to TSX conversion"
+    TranspileLayoutToTsx: "Layout HTML to TSX conversion"
+    extractCSSAndJS: "Extract CSS and JS from HTML"
+    processIncludes: "Process include directives"
+    fixSelfClosingTags: "Fix self-closing tags for JSX"
+    convertGoTemplateToJSX: "Convert Go template syntax to JSX"
+    createReactJSContent: "Create final React JS content"
+    TSX2JS: "Convert TSX to JavaScript"
+    removeTypeScriptTypes: "Remove TypeScript type annotations"
+    removeHTMLComments: "Remove HTML comments"
+    injectDynamicTags: "Inject dynamic link and script tags"
+  }
+  
+  jsx.go: {
+    convertJSXToReactCreateElement: "Main JSX to React.createElement converter"
+    parseJSXWithWalker: "Parse JSX with regex and HTML parser"
+    parseJSXWithHTMLParser: "Parse JSX using html.Parse"
+    extractCustomComponentNames: "Extract custom component names from JSX"
+    walkHTMLNodeWithCustomComponents: "Walk HTML nodes recursively"
+    convertElementToReactWithCustomComponents: "Convert HTML element to React.createElement"
+    buildPropsObject: "Build props object from HTML attributes"
+    isCustomReactComponent: "Check if tag is custom React component"
+  }
+  
+  component.go: {
+    processComponentImports: "Process component import directives"
+    transpileComponentToTSX: "Convert component HTML to TSX"
+    convertComponentTSXToJS: "Convert component TSX to JS"
+    convertCounterJSXToReact: "Convert component JSX to React.createElement"
+    embedComponentJS: "Embed component JS into main JS"
+    findComponentFiles: "Find component files in directory"
+    isBuiltInComponent: "Check if component is built-in"
+  }
+  
+  routes.go: {
+    RegisterRoutes: "Register all application routes"
+    HandleTestPage: "Handle /test route"
+  }
+  
+  handlers.go: {
+    HandleTestPage: "Execute test template"
+  }
+}
+
+# Debug and Development
+debug_features: {
+  debug_transpile: {
+    DEBUG_TRANSPILE: "Environment variable for debug logging"
+    isDebugTranspile: "Check if debug mode is enabled"
+    debug_output: "Comprehensive logging throughout transpilation"
+  }
+  
+  file_watcher: {
+    watchTemplates: "Watch tpl/ directory for changes"
+    debounced_transpile: "Debounced transpilation on file changes"
+  }
+}
+
+# ASCII Art Separators
+ascii_art: {
+  component_section: "╔══════════════════════════════════════════════════════════════════════════════\n║                           🧩 EMBEDDED COMPONENT JS 🧩\n╚══════════════════════════════════════════════════════════════════════════════"
+  
+  main_component: "╔══════════════════════════════════════════════════════════════════════════════\n║                    ⚛️  MAIN COMPONENT JS (TSX → JS) ⚛️\n╚══════════════════════════════════════════════════════════════════════════════"
+  
+  original_js: "╔══════════════════════════════════════════════════════════════════════════════\n║                        📜 ORIGINAL JS CONTENT 📜\n╚══════════════════════════════════════════════════════════════════════════════"
+  
+  hydration: "╔══════════════════════════════════════════════════════════════════════════════\n║                        💧 HYDRATION 💧\n╚══════════════════════════════════════════════════════════════════════════════"
+}

@@ -1,0 +1,267 @@
+# Transpile Flow - Function Call Sequence
+# Vertical layout with call depth columns (max 12 columns)
+
+direction: right
+
+# Column 1: Entry Point
+TranspileHtmlToTsx: {
+  shape: rectangle
+  style.fill: "#e1f5fe"
+}
+
+# Column 2: Main Processing Steps (sequential)
+extractCSSAndJS: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+processComponentImports: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+fixSelfClosingTags: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+processIncludes: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+convertGoTemplateToJSX: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+generateImports: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+createTSXContent: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+# Column 3: Component Processing (depth 1)
+processComponentImports: {
+  shape: rectangle
+  style.fill: "#fff3e0"
+}
+
+# Column 4: Component Functions (depth 2)
+transpileComponentToTSX: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+convertComponentTSXToJS: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+# Column 5: Component TSX Processing (depth 3)
+readComponentHTML: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+convertGoTemplateToJSX: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+wrapInFunction: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+# Column 6: Component JSX Conversion (depth 3)
+convertCounterJSXToReact: {
+  shape: rectangle
+  style.fill: "#f1f8e9"
+}
+
+parseJSXWithHTMLParser: {
+  shape: rectangle
+  style.fill: "#f1f8e9"
+}
+
+# Column 7: JSX Parser (depth 4)
+extractCustomComponentNames: {
+  shape: rectangle
+  style.fill: "#e3f2fd"
+}
+
+walkHTMLNodeWithCustomComponents: {
+  shape: rectangle
+  style.fill: "#e3f2fd"
+}
+
+# Column 8: Node Walker (depth 5)
+convertElementToReactWithCustomComponents: {
+  shape: rectangle
+  style.fill: "#fff8e1"
+}
+
+# Column 9: Element Converter (depth 6)
+buildPropsObject: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+processChildren: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+# Column 10: Props Builder (depth 7)
+handleJSXExpressions: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+convertClassToClassName: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+# Column 11: TSX to JS Conversion (depth 1)
+TSX2JS: {
+  shape: rectangle
+  style.fill: "#fff3e0"
+}
+
+# Column 12: JSX Conversion Steps (depth 2)
+removeTypeScriptTypes: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+extractImportsAndContent: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+convertJSXToReactCreateElement: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+fixClassNameCase: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+removeImportExportStatements: {
+  shape: rectangle
+  style.fill: "#fce4ec"
+}
+
+# Column 13: JSX Converter (depth 3)
+parseJSXWithWalker: {
+  shape: rectangle
+  style.fill: "#f1f8e9"
+}
+
+# Column 14: Walker Parser (depth 4)
+parseJSXWithHTMLParser: {
+  shape: rectangle
+  style.fill: "#e3f2fd"
+}
+
+# Column 15: Component Embedding (depth 1)
+createReactJSContent: {
+  shape: rectangle
+  style.fill: "#fff8e1"
+}
+
+# Column 16: Embedding Functions (depth 2)
+readComponentTSX: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+embedComponentJS: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+createFinalJS: {
+  shape: rectangle
+  style.fill: "#f3e5f5"
+}
+
+# Column 17: Component Reference (depth 3)
+componentRefPattern: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+findReferencedComponents: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+readComponentJSFiles: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+embedComponents: {
+  shape: rectangle
+  style.fill: "#e8f5e8"
+}
+
+# Function Call Flow
+TranspileHtmlToTsx -> extractCSSAndJS
+extractCSSAndJS -> processComponentImports
+processComponentImports -> fixSelfClosingTags
+fixSelfClosingTags -> processIncludes
+processIncludes -> convertGoTemplateToJSX
+convertGoTemplateToJSX -> generateImports
+generateImports -> createTSXContent
+createTSXContent -> TSX2JS
+
+# Component Processing Flow
+processComponentImports -> transpileComponentToTSX
+transpileComponentToTSX -> readComponentHTML
+readComponentHTML -> convertGoTemplateToJSX
+convertGoTemplateToJSX -> wrapInFunction
+wrapInFunction -> convertComponentTSXToJS
+convertComponentTSXToJS -> convertCounterJSXToReact
+convertCounterJSXToReact -> parseJSXWithHTMLParser
+parseJSXWithHTMLParser -> extractCustomComponentNames
+extractCustomComponentNames -> walkHTMLNodeWithCustomComponents
+walkHTMLNodeWithCustomComponents -> convertElementToReactWithCustomComponents
+convertElementToReactWithCustomComponents -> buildPropsObject
+buildPropsObject -> handleJSXExpressions
+handleJSXExpressions -> convertClassToClassName
+convertClassToClassName -> processChildren
+
+# JSX Conversion Flow
+TSX2JS -> removeTypeScriptTypes
+removeTypeScriptTypes -> extractImportsAndContent
+extractImportsAndContent -> convertJSXToReactCreateElement
+convertJSXToReactCreateElement -> parseJSXWithWalker
+parseJSXWithWalker -> parseJSXWithHTMLParser
+parseJSXWithHTMLParser -> extractCustomComponentNames
+extractCustomComponentNames -> walkHTMLNodeWithCustomComponents
+walkHTMLNodeWithCustomComponents -> convertElementToReactWithCustomComponents
+convertElementToReactWithCustomComponents -> buildPropsObject
+buildPropsObject -> handleJSXExpressions
+handleJSXExpressions -> convertClassToClassName
+convertClassToClassName -> fixClassNameCase
+fixClassNameCase -> removeImportExportStatements
+removeImportExportStatements -> createReactJSContent
+
+# Component Embedding Flow
+createReactJSContent -> readComponentTSX
+readComponentTSX -> embedComponentJS
+embedComponentJS -> componentRefPattern
+componentRefPattern -> findReferencedComponents
+findReferencedComponents -> readComponentJSFiles
+readComponentJSFiles -> embedComponents
+embedComponents -> createFinalJS
