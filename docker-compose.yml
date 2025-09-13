@@ -28,7 +28,7 @@ services:
       - SMTP_FROM=${SMTP_FROM}
       - SYSADMIN_EMAIL=${SYSADMIN_EMAIL}
       - APP_NAME=${APP_NAME:-OpenAgent}
-      - APP_VERSION=${APP_VERSION:-1.0.0}
+      - APP_VERSION=${APP_VERSION:-1.1.0}
     depends_on:
       - postgres
     networks:
