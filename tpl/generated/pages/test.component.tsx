@@ -6,8 +6,7 @@ export default function Test({page}) {
 <main>
 <div className="container-xl">
     <div className="card-body">
-        <p className="card-text">Simple counter with increment/decrement buttons</p>
-        <Simple />
+        <Simple suppressHydrationWarning={true} />
     </div>
 </div>
 </main>

@@ -1,6 +1,6 @@
 function Simple() {
     return (
-        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'), React.createElement('button', null, 'Hey!'))
+        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'))
     );
 }
 

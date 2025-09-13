@@ -88,10 +88,13 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 	}
 	// fmt.Printf("DEBUG: parseJSXWithHTMLParser called with: %s\n", jsxContent)
 
-	// First, extract custom component names to preserve their case
+	// Simple approach: no special handling needed
+
+	// Extract custom component names to preserve their case
 	customComponents := extractCustomComponentNames(jsxContent)
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: Found custom components: %v\n", customComponents)
+		fmt.Printf("DEBUG: JSX content: %s\n", jsxContent[:min(200, len(jsxContent))])
 	}
 
 	// Wrap JSX content in html/body tags for proper parsing
@@ -184,16 +187,28 @@ func convertElementToReactWithCustomComponents(n *html.Node, result *strings.Bui
 	var isCustomComponent bool
 
 	if customComponents != nil {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Looking for component '%s' in customComponents map: %v\n", n.Data, customComponents)
+		}
 		if originalName, exists := customComponents[n.Data]; exists {
 			componentName = originalName
 			isCustomComponent = true
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Found custom component: %s -> %s\n", n.Data, originalName)
+			}
 		} else {
 			componentName = n.Data
 			isCustomComponent = false
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Not a custom component: %s (not found in map)\n", n.Data)
+			}
 		}
 	} else {
 		componentName = n.Data
 		isCustomComponent = isCustomReactComponent(n.Data)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: No customComponents map, using isCustomReactComponent: %s -> %v\n", n.Data, isCustomComponent)
+		}
 	}
 
 	// Build props object
@@ -247,7 +262,15 @@ func buildPropsObject(n *html.Node) string {
 		if key == "class" || key == "classname" {
 			key = "className"
 		}
-		props = append(props, fmt.Sprintf("%s: '%s'", key, attr.Val))
+		// Handle JSX-style expressions {value} - render as JavaScript expressions
+		if strings.HasPrefix(attr.Val, "{") && strings.HasSuffix(attr.Val, "}") {
+			// Extract the value from JSX-style attributes and render as JavaScript expression
+			val := attr.Val[1 : len(attr.Val)-1] // Remove { and }
+			props = append(props, fmt.Sprintf("%s: %s", key, val))
+		} else {
+			// Regular string values - wrap in quotes
+			props = append(props, fmt.Sprintf("%s: '%s'", key, attr.Val))
+		}
 	}
 
 	return "{" + strings.Join(props, ", ") + "}"
@@ -258,8 +281,8 @@ func extractCustomComponentNames(jsxContent string) map[string]string {
 	customComponents := make(map[string]string)
 
 	// Find all custom component tags (capitalized first letter)
-	// Pattern: <ComponentName> or <ComponentName />
-	componentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s*/?>`)
+	// Pattern: <ComponentName>, <ComponentName />, or <ComponentName attributes />
+	componentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)(?:\s+[^>]*)?/?>`)
 	matches := componentPattern.FindAllStringSubmatch(jsxContent, -1)
 
 	for _, match := range matches {
@@ -270,7 +293,14 @@ func extractCustomComponentNames(jsxContent string) map[string]string {
 		}
 	}
 
+	// Simple approach: only look for direct component tags
+
 	return customComponents
+}
+
+// replaceDataComponentDivs - no longer needed with simple approach
+func replaceDataComponentDivs(jsxContent string) string {
+	return jsxContent
 }
 
 // isCustomReactComponent checks if a tag name is a custom React component

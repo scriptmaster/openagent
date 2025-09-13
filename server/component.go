@@ -8,13 +8,10 @@ import (
 	"strings"
 )
 
-// Global variable to store imported components for TSX generation
-var globalImportedComponents map[string]bool
-
 // Component JS files are now stored as separate files and read when needed
 
 // processComponentImports processes component divs and imports component files
-func processComponentImports(htmlContent, inputPath string) (string, error) {
+func processComponentImports(htmlContent, inputPath string) (string, []string, error) {
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: Processing component imports for: %s\n", inputPath)
 	}
@@ -27,8 +24,7 @@ func processComponentImports(htmlContent, inputPath string) (string, error) {
 		fmt.Printf("DEBUG: Found %d component matches: %v\n", len(matches), matches)
 	}
 
-	// Track which components we're importing for later use
-	importedComponents := make(map[string]bool)
+	var importedComponents []string
 
 	result := componentPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
 		// Extract component name from the match
@@ -58,19 +54,13 @@ func processComponentImports(htmlContent, inputPath string) (string, error) {
 		}
 
 		// Track this component for import statements
-		importedComponents[componentNameCapitalized] = true
+		importedComponents = append(importedComponents, componentNameCapitalized)
 
-		// Replace the div with the component directly
-		return fmt.Sprintf(`<%s />`, componentNameCapitalized)
+		// Replace the div with the component directly, with hydration warning suppression
+		return fmt.Sprintf(`<%s suppressHydrationWarning={true} />`, componentNameCapitalized)
 	})
 
-	// Store the imported components in a global variable for later use
-	if len(importedComponents) > 0 {
-		// Store in a global variable that can be accessed during TSX generation
-		globalImportedComponents = importedComponents
-	}
-
-	return result, nil
+	return result, importedComponents, nil
 }
 
 // importAndTranspileComponent imports a component file and transpiles it
@@ -275,8 +265,8 @@ func findComponentJSFiles(htmlContent string) []string {
 // embedComponentJS embeds only the component JS content that is referenced in the main JS file
 func embedComponentJS(mainJSContent string) string {
 	// Find components that are actually referenced in the main JS content
-	// Look for React.createElement(ComponentName, {}) or React.createElement(ComponentName, null) patterns
-	componentRefPattern := regexp.MustCompile(`React\.createElement\((\w+),\s*(?:\{\}|null)\)`)
+	// Look for React.createElement('componentName', {...}) or React.createElement(ComponentName, {...}) patterns
+	componentRefPattern := regexp.MustCompile(`React\.createElement\(['"]?(\w+)['"]?,\s*\{[^}]*\}\)`)
 	matches := componentRefPattern.FindAllStringSubmatch(mainJSContent, -1)
 
 	if isDebugTranspile() {
@@ -295,6 +285,8 @@ func embedComponentJS(mainJSContent string) string {
 	for _, match := range matches {
 		if len(match) > 1 {
 			componentName := match[1]
+			// Capitalize the component name (e.g., 'simple' -> 'Simple')
+			componentName = Title(componentName)
 			// Skip built-in React components and common HTML elements
 			if !isBuiltInComponent(componentName) {
 				referencedComponents[componentName] = true

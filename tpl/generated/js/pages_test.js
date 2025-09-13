@@ -8,7 +8,7 @@
 // └─────────────────────────────────────────────────────────────────────────────
 function Simple() {
     return (
-        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'), React.createElement('button', null, 'Hey!'))
+        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'))
     );
 }
 
@@ -37,7 +37,7 @@ function Simple() {
 
 function Test({page}) {
     return (
-React.createElement('div', {className: 'container-xl'}, React.createElement('div', {className: 'card-body'}, React.createElement('p', {className: 'card-text'}, 'Simple counter with increment/decrement buttons'), React.createElement(Simple, null)))
+React.createElement('div', {className: 'container-xl'}, React.createElement('div', {className: 'card-body'}, React.createElement(Simple, {suppresshydrationwarning: true})))
     );
 }
 

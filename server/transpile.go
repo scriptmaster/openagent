@@ -82,10 +82,11 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 	htmlContent := string(content)
 
 	// Clear global imported components for this file
-	globalImportedComponents = nil
+	// Simple approach: no global variables needed
 
 	// Process component imports (e.g., <div id="component-counter"></div>)
-	htmlContent, err = processComponentImports(htmlContent, inputPath)
+	var importedComponents []string
+	htmlContent, importedComponents, err = processComponentImports(htmlContent, inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to process component imports: %v", err)
 	}
@@ -258,23 +259,16 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		}
 	}
 
-	// Generate imports from globalImportedComponents
+	// Generate imports for components
 	var imports string
-	var mainContent string
-
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: htmlContent after component processing: %s\n", htmlContent[:min(200, len(htmlContent))])
-	}
-
-	// Check if we have imported components
-	if globalImportedComponents != nil && len(globalImportedComponents) > 0 {
+	if len(importedComponents) > 0 {
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: Found %d imported components: %v\n", len(globalImportedComponents), globalImportedComponents)
+			fmt.Printf("DEBUG: Found %d imported components: %v\n", len(importedComponents), importedComponents)
 		}
 
 		var importsBuilder strings.Builder
 		importsBuilder.WriteString("// Component imports\n")
-		for componentName := range globalImportedComponents {
+		for _, componentName := range importedComponents {
 			importsBuilder.WriteString(fmt.Sprintf("import %s from '../components/%s';\n", componentName, strings.ToLower(componentName)))
 		}
 		importsBuilder.WriteString("\n")
@@ -285,13 +279,15 @@ func TranspileHtmlToTsx(inputPath, outputPath string) error {
 		}
 	}
 
-	mainContent = htmlContent
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: htmlContent after component processing: %s\n", htmlContent[:min(200, len(htmlContent))])
+	}
 
 	// Create the main component file (test.tsx) - contains the actual component
 	tsxContent = imports + `export default function ` + componentName + `({page}) {
     return (
 <main>
-` + mainContent + `
+` + htmlContent + `
 </main>
     );
 }`

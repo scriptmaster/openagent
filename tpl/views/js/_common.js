@@ -3,7 +3,8 @@
 // import { hydrateRoot } from '/static/js/react-dom.production.min.js';
 
 //#include /static/js/react.production.min.js
-//#include /static/js/react-dom.production.min.js
+//#-include /static/js/react-dom.production.min.js
+//#include /static/js/react-dom.development.js
 
 // Common React utilities and functions
 window.React = React;
