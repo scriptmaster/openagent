@@ -145,9 +145,10 @@ func walkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, cus
 		// Convert element to React.createElement
 		convertElementToReactWithCustomComponents(n, result, customComponents)
 	case html.TextNode:
-		// Convert text node
-		text := strings.TrimSpace(n.Data)
-		if text != "" {
+		// Convert text node - preserve meaningful whitespace to avoid hydration mismatch
+		text := n.Data
+		// Only preserve whitespace if it's not just indentation (tabs/spaces at start of line)
+		if text != "" && !isOnlyIndentation(text) {
 			result.WriteString(fmt.Sprintf("'%s'", text))
 		}
 	case html.DocumentNode:
@@ -218,8 +219,8 @@ func convertElementToReactWithCustomComponents(n *html.Node, result *strings.Bui
 	var children strings.Builder
 	hasChildren := false
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		// Skip empty text nodes
-		if c.Type == html.TextNode && strings.TrimSpace(c.Data) == "" {
+		// Skip completely empty text nodes and indentation-only nodes
+		if c.Type == html.TextNode && (c.Data == "" || isOnlyIndentation(c.Data)) {
 			continue
 		}
 		if hasChildren {
@@ -311,6 +312,16 @@ func isCustomReactComponent(tagName string) bool {
 	}
 	firstChar := tagName[0]
 	return firstChar >= 'A' && firstChar <= 'Z'
+}
+
+// isOnlyIndentation checks if text is only whitespace (tabs, spaces, newlines)
+func isOnlyIndentation(text string) bool {
+	for _, char := range text {
+		if char != ' ' && char != '\t' && char != '\n' && char != '\r' {
+			return false
+		}
+	}
+	return true
 }
 
 // parseJSXAttributes parses JSX attributes into a JavaScript object string
