@@ -52,7 +52,8 @@ test:
 	@echo "Running go mod tidy..."
 	go mod tidy
 	@echo "Running tests..."
-	go test -v ./...
+	# go test -v ./...
+	make test2
 	@echo "Test completed"
 	make start
 
