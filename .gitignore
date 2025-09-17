@@ -10,3 +10,4 @@ nul
 *.local
 .devcontainer
 *bkup*
+*backup*

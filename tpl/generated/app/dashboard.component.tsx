@@ -1,6 +1,5 @@
-export default function Dashboard({page}) {
+export default function Dashboard({page}: {page: any}) {
     return (
-<main>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Dashboard - {page.AppName}</title>
@@ -51,6 +50,5 @@ export default function Dashboard({page}) {
         </div>
     </div>
 </div>
-</main>
     );
 }

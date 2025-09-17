@@ -1,6 +1,5 @@
-export default function Index({page}) {
+export default function Index({page}: {page: any}) {
     return (
-<main>
 <div className="hero-section">
     <div className="hero-content">
         <h1 className="hero-title">
@@ -15,6 +14,5 @@ export default function Index({page}) {
         </div>
     </div>
 </div>
-</main>
     );
 }

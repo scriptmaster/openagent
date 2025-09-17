@@ -1,6 +1,6 @@
-export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
+export default function Layout_admin({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any}) {
     return (
-<>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -9,11 +9,8 @@ export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {p
     <link rel="stylesheet" href="/static/css/tabler.min.css" />
     <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
     {linkTags}
-    {linkPaths && linkPaths.split(',').map((path, index) => (
-    <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
-))}
-</head>
-<body className="theme-pista">
+{linkPaths && linkPaths.split(',').map((link: string, index: any) => (<link rel="stylesheet" src={link} />))}\n</head>
+<body class="theme-pista">
 <div className="page">
     <div className="page-wrapper">
         <div className="navbar navbar-expand-md navbar-light d-print-none">
@@ -33,6 +30,7 @@ export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {p
                 </div>
             </div>
         </div>
+
         <div className="page-body">
             <div className="container-xl">
                 <div className="row row-deck row-cards">
@@ -44,12 +42,10 @@ export default function LayoutAdmin({page, children, linkPaths, scriptPaths}: {p
         </div>
     </div>
 </div>
+
 <script src="/static/js/alpine.min.js" defer></script>
-    {scriptPaths && scriptPaths.split(',').map((path, index) => (
-    <script key={'gen-script-'+index} src={path.trim()}></script>
-))}
-</body>
+{scriptPaths && scriptPaths.split(',').map((script: string, index: any) => (<script type="text/javascript" src={script} />))}\n</body>
 </html>
-</>
+
     );
 }

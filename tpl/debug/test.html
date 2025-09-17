@@ -1,0 +1,35 @@
+<div class="container-xl">
+    <div class="card-body">
+        <div id="component-simple"></div>
+        <span>Element beside a component.</span>
+    </div>
+</div>
+
+<script>
+    console.log('please wait...');
+    
+    // Extend Test component prototype with all demo functionality
+    Object.assign(Test.prototype, {
+        // Demo 1: Counter functionality
+        counterState: { count: 0 },
+        incrementCounter() {
+            this.counterState.count++;
+            this.forceUpdate();
+        },
+        decrementCounter() {
+            this.counterState.count--;
+            this.forceUpdate();
+        },
+        resetCounter() {
+            this.counterState.count = 0;
+            this.forceUpdate();
+        },
+        
+        // Demo 2: Toggle functionality
+        toggleState: { isVisible: false },
+        toggleVisibility() {
+            this.toggleState.isVisible = !this.toggleState.isVisible;
+            this.forceUpdate();
+        },
+    });
+</script>

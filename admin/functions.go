@@ -49,6 +49,16 @@ func GetBuildNumber() int {
 	return buildNumber
 }
 
+func ReadFileAsString(file string) string {
+	// Read the input file
+	content, err := os.ReadFile(file)
+	if err != nil {
+		return fmt.Sprintf("failed to read input file: %v", err)
+	}
+
+	return string(content)
+}
+
 // UpdateEnvFile reads the .env file, updates or adds the provided key-value pairs,
 // and writes the changes back to the file.
 func UpdateEnvFile(updates map[string]string) error {

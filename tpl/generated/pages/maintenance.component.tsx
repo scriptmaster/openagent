@@ -1,11 +1,10 @@
-export default function Maintenance({page}) {
+export default function Maintenance({page}: {page: any}) {
     return (
-<main>
 <div className="page">
         <div className="container container-tight py-4">
             <div className="header-container text-center">
                 <a href="/" className="navbar-brand navbar-brand-autodark">
-                    <img src="/static/img/logo.svg" height="36" alt="OpenAgent"/>
+                    <img src="/static/img/logo.svg" height="36" alt="OpenAgent">
                 </a>
                 <h2 className="h3 text-muted">OpenAgent</h2>
                 <div className="col-12 text-center">
@@ -39,7 +38,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-server"></i>
                                 </span>
-                                <input type="text" className="form-control" name="db_host" value="{page.DBHost}" placeholder="localhost" required/>
+                                <input type="text" className="form-control" name="db_host" value="{page.DBHost}" placeholder="localhost" required>
                             </div>
                         </div>
                         
@@ -49,7 +48,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-network"></i>
                                 </span>
-                                <input type="text" className="form-control" name="db_port" value="{page.DBPort}" placeholder="5432" required/>
+                                <input type="text" className="form-control" name="db_port" value="{page.DBPort}" placeholder="5432" required>
                             </div>
                         </div>
                         
@@ -59,7 +58,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-user"></i>
                                 </span>
-                                <input type="text" className="form-control" name="db_user" value="{page.DBUser}" placeholder="postgres" required/>
+                                <input type="text" className="form-control" name="db_user" value="{page.DBUser}" placeholder="postgres" required>
                             </div>
                         </div>
                         
@@ -69,7 +68,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-key"></i>
                                 </span>
-                                <input type="password" className="form-control" name="db_password" value="{page.DBPassword}" placeholder="Enter password"/>
+                                <input type="password" className="form-control" name="db_password" value="{page.DBPassword}" placeholder="Enter password">
                             </div>
                         </div>
                         
@@ -79,11 +78,11 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-database"></i>
                                 </span>
-                                <input type="text" className="form-control" name="db_name" value="{page.DBName}" placeholder="postgres" required/>
+                                <input type="text" className="form-control" name="db_name" value="{page.DBName}" placeholder="postgres" required>
                             </div>
                         </div>
                         
-                        <hr className="my-4"/>
+                        <hr className="my-4">
                         
                         
                         <h4 className="mt-4 mb-3">Email (SMTP) Configuration</h4>
@@ -93,7 +92,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-mail"></i>
                                 </span>
-                                <input type="text" className="form-control" name="smtp_host" value="{page.SMTPHost}" placeholder="smtp.example.com"/>
+                                <input type="text" className="form-control" name="smtp_host" value="{page.SMTPHost}" placeholder="smtp.example.com">
                             </div>
                         </div>
                         
@@ -103,7 +102,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-network"></i>
                                 </span>
-                                <input type="text" className="form-control" name="smtp_port" value="{page.SMTPPort}" placeholder="587"/>
+                                <input type="text" className="form-control" name="smtp_port" value="{page.SMTPPort}" placeholder="587">
                             </div>
                         </div>
                         
@@ -113,7 +112,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-user"></i>
                                 </span>
-                                <input type="text" className="form-control" name="smtp_user" value="{page.SMTPUser}" placeholder="username"/>
+                                <input type="text" className="form-control" name="smtp_user" value="{page.SMTPUser}" placeholder="username">
                             </div>
                         </div>
                         
@@ -123,7 +122,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-key"></i>
                                 </span>
-                                <input type="password" className="form-control" name="smtp_password" value="{page.SMTPPassword}" placeholder="password"/>
+                                <input type="password" className="form-control" name="smtp_password" value="{page.SMTPPassword}" placeholder="password">
                             </div>
                         </div>
                         
@@ -133,11 +132,11 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-mail-forward"></i>
                                 </span>
-                                <input type="email" className="form-control" name="smtp_from" value="{page.SMTPFrom}" placeholder="noreply@example.com"/>
+                                <input type="email" className="form-control" name="smtp_from" value="{page.SMTPFrom}" placeholder="noreply@example.com">
                             </div>
                         </div>
                         
-                        <hr className="my-4"/>
+                        <hr className="my-4">
                         
                         
                         <h4 className="mt-4 mb-3">App Version</h4>
@@ -148,7 +147,7 @@ export default function Maintenance({page}) {
                                     <span className="input-group-text">
                                         <i className="ti ti-versions"></i>
                                     </span>
-                                    <input type="number" min="0" className="form-control" name="version_major" value="{page.VersionMajor}" required/>
+                                    <input type="number" min="0" className="form-control" name="version_major" value="{page.VersionMajor}" required>
                                 </div>
                             </div>
                             <div className="col">
@@ -157,7 +156,7 @@ export default function Maintenance({page}) {
                                     <span className="input-group-text">
                                         <i className="ti ti-versions"></i>
                                     </span>
-                                    <input type="number" min="0" className="form-control" name="version_minor" value="{page.VersionMinor}" required/>
+                                    <input type="number" min="0" className="form-control" name="version_minor" value="{page.VersionMinor}" required>
                                 </div>
                             </div>
                             <div className="col">
@@ -166,7 +165,7 @@ export default function Maintenance({page}) {
                                     <span className="input-group-text">
                                         <i className="ti ti-versions"></i>
                                     </span>
-                                    <input type="number" min="0" className="form-control" name="version_patch" value="{page.VersionPatch}" required/>
+                                    <input type="number" min="0" className="form-control" name="version_patch" value="{page.VersionPatch}" required>
                                 </div>
                             </div>
                             <div className="col">
@@ -175,7 +174,7 @@ export default function Maintenance({page}) {
                                     <span className="input-group-text">
                                         <i className="ti ti-refresh"></i>
                                     </span>
-                                    <input type="number" className="form-control bg-light" value="{page.VersionBuild}" readonly/>
+                                    <input type="number" className="form-control bg-light" value="{page.VersionBuild}" readonly>
                                 </div>
                             </div>
                         </div>
@@ -185,7 +184,7 @@ export default function Maintenance({page}) {
                         </div>
                         
                         
-                        <hr className="my-4"/>
+                        <hr className="my-4">
                         <h4 className="mt-4 mb-3">Database Tools</h4>
                         
                         <div className="mb-3">
@@ -194,7 +193,7 @@ export default function Maintenance({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-database-import"></i>
                                 </span>
-                                <input type="text" className="form-control" name="migration_start" id="migration_start" value="{page.MigrationStart}" placeholder="e.g. 007"/>
+                                <input type="text" className="form-control" name="migration_start" id="migration_start" value="{page.MigrationStart}" placeholder="e.g. 007">
                             </div>
                             <div className="form-text text-muted small">
                                 <i className="ti ti-info-circle me-1"></i> The last applied migration number (format: 001-999). Will apply migrations after this number.
@@ -202,7 +201,7 @@ export default function Maintenance({page}) {
                         </div>
                         
                         <div className="mb-3 form-check">
-                            <input type="checkbox" className="form-check-input" id="reset_migrations" name="reset_migrations" value="1" onchange="toggleMigrationStart()"/>
+                            <input type="checkbox" className="form-check-input" id="reset_migrations" name="reset_migrations" value="1" onchange="toggleMigrationStart()">
                             <label className="form-check-label" for="reset_migrations">
                                 Reset migration tracking (apply all migrations from beginning)
                             </label>
@@ -233,6 +232,5 @@ export default function Maintenance({page}) {
             </div>
         </div>
     </div>
-</main>
     );
 }

@@ -1,6 +1,5 @@
-export default function Login({page}) {
+export default function Login({page}: {page: any}) {
     return (
-<main>
 <div className="container container-tight py-4">
     <div className="text-center mb-4">
         <p></p>
@@ -115,6 +114,5 @@ export default function Login({page}) {
         Don't have an account yet? <a href={`mailto:${page.AdminEmail}`} tabIndex="-1">Contact administrator</a>
     </div>
 </div>
-</main>
     );
 }

@@ -1,12 +1,11 @@
-export default function Projects({page}) {
+export default function Projects({page}: {page: any}) {
     return (
-<main>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Projects - {page.AppName}</title>
 <link rel="stylesheet" href="/static/css/tabler.min.css" />
 <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
-<div data-x-data="projectsApp()" x-init="loadProjects()">
+<div data-alpine-data="projectsApp()" x-init="loadProjects()">
     <div className="page-header">
         <div className="container-xl">
             <div className="row g-2 align-items-center">
@@ -20,11 +19,11 @@ export default function Projects({page}) {
                 </div>
                 <div className="col-auto ms-auto d-print-none">
                     <div className="btn-list">
-                        <button className="btn btn-primary d-none d-sm-inline-block" data-click="showCreateModal = true">
+                        <button className="btn btn-primary d-none d-sm-inline-block" @click="showCreateModal = true">
                             <i className="ti ti-plus"></i>
                             Create New Project
                         </button>
-                        <button className="btn btn-primary d-sm-none btn-icon" data-click="showCreateModal = true">
+                        <button className="btn btn-primary d-sm-none btn-icon" @click="showCreateModal = true">
                             <i className="ti ti-plus"></i>
                         </button>
                     </div>
@@ -41,13 +40,13 @@ export default function Projects({page}) {
                             <h3 className="card-title">Your Projects</h3>
                         </div>
                         <div className="card-body">
-                            <div data-x-show="loading" className="text-center py-4">
+                            <div data-alpine-show="loading" className="text-center py-4">
                                 <div className="spinner-border" role="status">
                                     <span className="visually-hidden">Loading...</span>
                                 </div>
                             </div>
                             
-                            <div data-x-show="!loading && projects.length === 0" className="text-center py-4">
+                            <div data-alpine-show="!loading && projects.length === 0" className="text-center py-4">
                                 <div className="empty">
                                     <div className="empty-icon">
                                         <i className="ti ti-folder-off"></i>
@@ -57,15 +56,15 @@ export default function Projects({page}) {
                                         Get started by creating your first project.
                                     </p>
                                     <div className="empty-action">
-                                        <button className="btn btn-primary" data-click="showCreateModal = true">
+                                        <button className="btn btn-primary" @click="showCreateModal = true">
                                             <i className="ti ti-plus"></i>
                                             Create Project
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <div data-x-show="!loading && projects.length > 0" className="row">
-                                <template data-x-for="project in projects" data-key="project.id">
+                            <div data-alpine-show="!loading && projects.length > 0" className="row">
+                                <template data-alpine-for="project in projects" :key="project.id">
                                     <div className="col-md-6 col-lg-4 mb-3">
                                         <div className="card card-sm">
                                             <div className="card-body">
@@ -77,10 +76,10 @@ export default function Projects({page}) {
                                                     </div>
                                                     <div className="col">
                                                         <div className="font-weight-medium">
-                                                            <span data-x-text="project.name"></span>
+                                                            <span x-text="project.name"></span>
                                                         </div>
                                                         <div className="text-muted">
-                                                            <span data-x-text="project.domain_name"></span>
+                                                            <span x-text="project.domain_name"></span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -90,11 +89,11 @@ export default function Projects({page}) {
                                                     <div className="col">
                                                         <div className="text-muted">
                                                             <i className="ti ti-database me-1"></i>
-                                                            <span data-x-text="project.connection_count"></span> connections
+                                                            <span x-text="project.connection_count"></span> connections
                                                         </div>
                                                     </div>
                                                     <div className="col-auto">
-                                                        <a data-href="`/projects/${project.id}`" className="btn btn-sm btn-primary">
+                                                        <a :href="`/projects/${project.id}`" className="btn btn-sm btn-primary">
                                                             View
                                                         </a>
                                                     </div>
@@ -111,6 +110,5 @@ export default function Projects({page}) {
         </div>
     </div>
 </div>
-</main>
     );
 }

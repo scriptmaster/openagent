@@ -1,11 +1,10 @@
-export default function MaintenanceLogin({page}) {
+export default function MaintenanceLogin({page}: {page: any}) {
     return (
-<main>
-<div className="page page-center" data-x-data="{ showAuth: false }">
+<div className="page page-center" data-alpine-data="{ showAuth: false }">
     <div className="container container-tight py-2">
         <div className="text-center mb-3">
             <h1 className="navbar-brand navbar-brand-autodark">
-                <img src="/static/img/logo.svg" width="130" alt="OpenAgent"/>
+                <img src="/static/img/logo.svg" width="130" alt="OpenAgent">
             </h1>
             <h2 className="h3 text-muted">OpenAgent</h2>
             <p className="text-muted">Maintenance Access</p>
@@ -18,7 +17,7 @@ export default function MaintenanceLogin({page}) {
             <div className="card-body">
                 
                 <div className="text-center mb-3">
-                    <img src="https://media.tenor.com/images/36788ddef89ef20a91ebebc14c2454ad/tenor.gif" className="trending-gif" alt="Funny Tech GIF"/>
+                    <img src="https://media.tenor.com/images/36788ddef89ef20a91ebebc14c2454ad/tenor.gif" className="trending-gif" alt="Funny Tech GIF">
                 </div>
                 
                 <div className="alert alert-warning mb-3">
@@ -27,7 +26,7 @@ export default function MaintenanceLogin({page}) {
                 </div>
                 
                 
-                <div data-x-show="showAuth" x-transition>
+                <div data-alpine-show="showAuth" x-transition>
                     {page.Error && (
                     <div className="alert alert-danger" role="alert">
                         <i className="ti ti-alert-circle me-2"></i> {page.Error}
@@ -41,7 +40,7 @@ export default function MaintenanceLogin({page}) {
                                 <span className="input-group-text">
                                     <i className="ti ti-key"></i>
                                 </span>
-                                <input type="password" className="form-control" name="token" placeholder="Enter maintenance token" required/>
+                                <input type="password" className="form-control" name="token" placeholder="Enter maintenance token" required>
                             </div>
                         </div>
                         
@@ -57,11 +56,10 @@ export default function MaintenanceLogin({page}) {
         
         <div className="text-center text-muted mt-3">
             <p>Need help? Contact your <a href="mailto:{page.AdminEmail}">system administrator</a>.</p>
-            <p className="restricted-link" data-click="showAuth = true">Restricted: Maintenance Administration</p>
+            <p className="restricted-link" @click="showAuth = true">Restricted: Maintenance Administration</p>
             <p className="text-muted small">Version {page.AppVersion}</p>
         </div>
     </div>
 </div>
-</main>
     );
 }

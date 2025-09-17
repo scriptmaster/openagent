@@ -1,6 +1,5 @@
-export default function Admin({page}) {
+export default function Admin({page}: {page: any}) {
     return (
-<main>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{page.AppName} - Admin Dashboard</title>
@@ -137,6 +136,5 @@ export default function Admin({page}) {
         </footer>
     </div>
 </div>
-</main>
     );
 }

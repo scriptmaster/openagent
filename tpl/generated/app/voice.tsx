@@ -1,16 +1,13 @@
-export default function Voice({page}) {
+export default function Voice({page}: {page: any}) {
     return (
-<main>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Agent</title>
     
      
      
-
-    <link rel="stylesheet" href="/tsx/css/voice.css" />
 </head>
 <body>
     <div className="container">
@@ -20,7 +17,7 @@ export default function Voice({page}) {
                 
                  <div className="agent-message">Hello! How can I help you today?</div>
             </div>
-            <input type="text" id="chat-input" placeholder="Type or speak your message..."/>
+            <input type="text" id="chat-input" placeholder="Type or speak your message...">
         </div>
         <div className="main-content">
             <h2>Voice Input</h2>
@@ -31,11 +28,7 @@ export default function Voice({page}) {
             <div id="status">Loading...</div>
         </div>
     </div>
-
-<script src="/tsx/js/_common.js"></script>
-<script src="/tsx/js/app_voice.js"></script>
 </body>
 </html>
-</main>
     );
 }

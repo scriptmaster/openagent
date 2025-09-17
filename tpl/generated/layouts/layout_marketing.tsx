@@ -1,55 +1,54 @@
-export default function LayoutMarketing({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
+export default function Layout_marketing({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any}) {
     return (
-<>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>{page.Title}</title>
     {page.Head}
-    {linkPaths && linkPaths.split(',').map((path, index) => (
-    <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
-))}
-</head>
-<body className="theme-pista">
-    <div className="page">
+{linkPaths && linkPaths.split(',').map((link: string, index: any) => (<link rel="stylesheet" src={link} />))}\n</head>
+<body class="theme-pista">
+    <div class="page">
         
-        <header className="navbar navbar-expand-md navbar-light">
-            <div className="container-xl">
-                <h1 className="navbar-brand navbar-brand-autodark">
+        <header class="navbar navbar-expand-md navbar-light">
+            <div class="container-xl">
+                <h1 class="navbar-brand navbar-brand-autodark">
                     <a href="/">
-                        <img src="/static/img/logo.svg" width="110" height="32" alt="OpenAgent" className="navbar-brand-image"/>
+                        <img src="/static/img/logo.svg" width="110" height="32" alt="OpenAgent" class="navbar-brand-image"/>
                     </a>
                 </h1>
-                <div className="navbar-nav flex-row order-md-last">
-                    <div className="nav-item">
-                        <a href="/login" className="btn btn-outline-primary">Login</a>
+                <div class="navbar-nav flex-row order-md-last">
+                    <div class="nav-item">
+                        <a href="/login" class="btn btn-outline-primary">Login</a>
                     </div>
                 </div>
             </div>
         </header>
+
         
-        <div className="page-wrapper">
-            <div className="page-body">
-                <div className="container-xl">
+        <div class="page-wrapper">
+            <div class="page-body">
+                <div class="container-xl">
                     {children}
                 </div>
             </div>
         </div>
+
         
-        <footer className="footer footer-transparent d-print-none">
-            <div className="container-xl">
-                <div className="row text-center align-items-center flex-row-reverse">
-                    <div className="col-lg-auto ms-lg-auto">
-                        <ul className="list-inline list-inline-dots mb-0">
-                            <li className="list-inline-item"><a href="/" className="link-secondary">Home</a></li>
-                            <li className="list-inline-item"><a href="/config" className="link-secondary">Setup</a></li>
+        <footer class="footer footer-transparent d-print-none">
+            <div class="container-xl">
+                <div class="row text-center align-items-center flex-row-reverse">
+                    <div class="col-lg-auto ms-lg-auto">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item"><a href="/" class="link-secondary">Home</a></li>
+                            <li class="list-inline-item"><a href="/config" class="link-secondary">Setup</a></li>
                         </ul>
                     </div>
-                    <div className="col-12 col-lg-auto mt-3 mt-lg-0">
-                        <ul className="list-inline list-inline-dots mb-0">
-                            <li className="list-inline-item">
-                                Copyright © 2025 <a href="/" className="link-secondary">OpenAgent</a>. All rights reserved.
+                    <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item">
+                                Copyright © 2025 <a href="/" class="link-secondary">OpenAgent</a>. All rights reserved.
                             </li>
                         </ul>
                     </div>
@@ -57,11 +56,7 @@ export default function LayoutMarketing({page, children, linkPaths, scriptPaths}
             </div>
         </footer>
     </div>
-    {scriptPaths && scriptPaths.split(',').map((path, index) => (
-    <script key={'gen-script-'+index} src={path.trim()}></script>
-))}
-</body>
+{scriptPaths && scriptPaths.split(',').map((script: string, index: any) => (<script type="text/javascript" src={script} />))}\n</body>
 </html>
-</>
     );
 }

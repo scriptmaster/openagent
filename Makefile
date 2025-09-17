@@ -19,7 +19,7 @@ export
 
 .PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query
 
-all: test build
+all: stop start
 
 # Test PSQL connection
 test-psql:
@@ -53,7 +53,11 @@ test:
 	go mod tidy
 	@echo "Running tests..."
 	go test -v ./...
-	@echo "Testing local build..."
+	@echo "Test completed"
+	make start
+
+start:
+	@echo "Starting local build..."
 	# Start a background process to check the server after a delay
 	@( \
 		echo "Background server health check initiated. Waiting 5 seconds..."; \
@@ -67,10 +71,12 @@ test:
 	echo "Starting application in foreground. Press Ctrl+C to stop."; \
 	go run . ; \
 	echo "Application stopped."
-	@echo "Test completed"
 
 stop-port:
 	lsof -ti:8800 | xargs kill -9
+
+debug: stop-port
+	DEBUG_TRANSPILE=1 go run .
 
 # Clean build files
 clean:
@@ -178,7 +184,7 @@ fix-remote:
 	@echo "Fix complete! Backup files are stored in $(BACKUP_DIR) on the remote server."
 
 # Stop all running openagent processes
-stop:
+stop: stop-port
 	@echo "Stopping all $(BINARY_NAME) processes..."
 	@if [ "$(OS)" = "Windows_NT" ]; then \
 		echo "Detected Windows. Stopping $(BINARY_NAME).exe processes..."; \
@@ -195,6 +201,7 @@ stop:
 	else \
 		killall "$(BINARY_NAME)" || true; \
 	fi
+	@echo "✅ Done"
 
 # CLI commands
 cli-build:

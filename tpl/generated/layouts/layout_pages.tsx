@@ -1,61 +1,67 @@
-export default function LayoutPages({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths?: string, scriptPaths?: string}) {
+export default function Layout_pages({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any}) {
     return (
-<>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
     
+    
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
 <link rel="icon" type="image/svg+xml" href="/static/img/icon.svg" />
 <link rel="icon" href="/static/favicon.ico" />
+
+
 <link rel="stylesheet" href="/static/css/tabler.min.css" />
+
 <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
+
 <link rel="stylesheet" href="/static/css/custom.css" />
-    {linkPaths && linkPaths.split(',').map((path, index) => (
-    <link key={'gen-link-'+index} rel="stylesheet" href={path.trim()} />
-))}
-</head>
-<body className="theme-pista">
+
+
+
+
+{linkPaths && linkPaths.split(',').map((link: string, index: any) => (<link rel="stylesheet" src={link} />))}\n</head>
+<body class="theme-pista">
     <div className="page">
         <div className="page-wrapper">
-            <header className="navbar navbar-expand-md navbar-light d-print-none">
-    <div className="container-xl">
-        <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
-            <span className="navbar-toggler-icon"></span>
+            <header class="navbar navbar-expand-md navbar-light d-print-none">
+    <div class="container-xl">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+            <span class="navbar-toggler-icon"></span>
         </button>
-        <h1 className="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
+        <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
             <a href="/">
                 <img src="/static/img/logo.svg" height="36" alt="{page.AppName}"/>
             </a>
         </h1>
-        <div className="navbar-nav flex-row order-md-last">
+        <div class="navbar-nav flex-row order-md-last">
             {page.User ? (
                 <>
                     {/* User is logged in */}
-                    <div className="nav-item dropdown">
-                        <a href="#" className="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
-                            <span className="avatar avatar-sm" style="background-image: url(/static/img/default-avatar.png)"></span>
-                            <div className="d-none d-xl-block ps-2">
+                    <div class="nav-item dropdown">
+                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                            <span class="avatar avatar-sm" style="background-image: url(/static/img/default-avatar.png)"></span>
+                            <div class="d-none d-xl-block ps-2">
                                 <div>{page.User.Email}</div>
-                                <div className="mt-1 small text-muted">{page.User.IsAdmin ? 'Admin' : 'User'}</div>
+                                <div class="mt-1 small text-muted">{page.User.IsAdmin ? 'Admin' : 'User'}</div>
                             </div>
                         </a>
-                        <div className="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            <a href="#" className="dropdown-item">Profile</a>
-                            <div className="dropdown-divider"></div>
-                            <a href="/logout" className="dropdown-item">Logout</a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <a href="#" class="dropdown-item">Profile</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="/logout" class="dropdown-item">Logout</a>
                         </div>
                     </div>
                 </>
             ) : (
                 <>
                     {/* User is not logged in */}
-                    <div className="nav-item">
-                        <a href="/login" className="btn btn-outline-primary">
-                            <i className="ti ti-login me-1"></i>
+                    <div class="nav-item">
+                        <a href="/login" class="btn btn-outline-primary">
+                            <i class="ti ti-login me-1"></i>
                             Login
                         </a>
                     </div>
@@ -63,25 +69,25 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
             )}
         </div>
         
-        <div className="collapse navbar-collapse" id="navbar-menu">
-            <div className="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
-                <ul className="navbar-nav">
-                    <li className="nav-item">
-                        <a className="nav-link" href="/dashboard">
-                            <span className="nav-link-icon d-md-none d-lg-inline-block">
-                                <i className="ti ti-dashboard"></i>
+        <div class="collapse navbar-collapse" id="navbar-menu">
+            <div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-dashboard"></i>
                             </span>
-                            <span className="nav-link-title">
+                            <span class="nav-link-title">
                                 Dashboard
                             </span>
                         </a>
                     </li>
-                     <li className="nav-item">
-                        <a className="nav-link" href="/projects">
-                            <span className="nav-link-icon d-md-none d-lg-inline-block">
-                                <i className="ti ti-briefcase"></i>
+                     <li class="nav-item">
+                        <a class="nav-link" href="/projects">
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-briefcase"></i>
                             </span>
-                            <span className="nav-link-title">
+                            <span class="nav-link-title">
                                 Projects
                             </span>
                         </a>
@@ -97,33 +103,32 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
                 <div className="container-xl">
                     <div className="row row-cards">
                         <div className="col-12">
-                            {/* Page content will be inserted here */}
-                            {children}
+                            <main>{children}</main>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <footer className="footer footer-transparent d-print-none">
-    <div className="container-xl">
-        <div className="row text-center align-items-center flex-row-reverse">
-            <div className="col-lg-auto ms-lg-auto">
-                <ul className="list-inline list-inline-dots mb-0">
-                    <li className="list-inline-item"><a href="/about" className="link-secondary">About</a></li>
-                    <li className="list-inline-item"><a href="/contact" className="link-secondary">Contact</a></li>
-                    <li className="list-inline-item"><a href="/privacy" className="link-secondary">Privacy</a></li>
+            <footer class="footer footer-transparent d-print-none">
+    <div class="container-xl">
+        <div class="row text-center align-items-center flex-row-reverse">
+            <div class="col-lg-auto ms-lg-auto">
+                <ul class="list-inline list-inline-dots mb-0">
+                    <li class="list-inline-item"><a href="/about" class="link-secondary">About</a></li>
+                    <li class="list-inline-item"><a href="/contact" class="link-secondary">Contact</a></li>
+                    <li class="list-inline-item"><a href="/privacy" class="link-secondary">Privacy</a></li>
                 </ul>
             </div>
-            <div className="col-12 col-lg-auto mt-3 mt-lg-0">
-                <ul className="list-inline list-inline-dots mb-0">
-                    <li className="list-inline-item">
+            <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                <ul class="list-inline list-inline-dots mb-0">
+                    <li class="list-inline-item">
                         Copyright © {new Date().getFullYear()}
                         &nbsp;
-                        <a href="/" className="link-secondary">{page.AppName}</a>.
+                        <a href="/" class="link-secondary">{page.AppName}</a>.
                         All rights reserved!
                     </li>
-                    <li className="list-inline-item">
-                        <a href="#" className="link-secondary" rel="noopener">
+                    <li class="list-inline-item">
+                        <a href="#" class="link-secondary" rel="noopener">
                             Version {page.AppVersion}
                         </a>
                     </li>
@@ -134,11 +139,7 @@ export default function LayoutPages({page, children, linkPaths, scriptPaths}: {p
 </footer>
         </div>
     </div>
-    {scriptPaths && scriptPaths.split(',').map((path, index) => (
-    <script key={'gen-script-'+index} src={path.trim()}></script>
-))}
-</body>
+{scriptPaths && scriptPaths.split(',').map((script: string, index: any) => (<script type="text/javascript" src={script} />))}\n</body>
 </html>
-</>
     );
 }
