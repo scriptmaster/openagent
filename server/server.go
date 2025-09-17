@@ -16,6 +16,9 @@ import (
 	"github.com/scriptmaster/openagent/common" // Updated import path
 )
 
+// Application version - hardcoded for deployment tracking
+const AppVersion = "1.2.0.0"
+
 var (
 	globalTemplates *TemplateEngine
 	appVersion      string
@@ -108,6 +111,7 @@ func StartServer() error {
 	}
 
 	startAddress := ":" + common.GetEnvOrDefault("PORT", "8800")
+	log.Printf("--- Server (Version %s) Starting ---", AppVersion)
 	log.Println("Server starting on " + startAddress)
 
 	if err := http.ListenAndServe(startAddress, router); err != nil {

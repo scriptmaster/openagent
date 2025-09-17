@@ -196,6 +196,13 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 	// Test route for template system
 	router.HandleFunc("/test", HandleTestPage)
 
+	// Version endpoint for deployment verification
+	router.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"version": "%s", "timestamp": "%s"}`, AppVersion, time.Now().UTC().Format(time.RFC3339))
+	})
+
 	// Root route handler - serve default index page
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Only handle root path "/" - serve the default index page

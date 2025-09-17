@@ -124,7 +124,7 @@ func HandleTestPage(w http.ResponseWriter, r *http.Request) {
 	data := models.PageData{
 		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "Test Page",
-		AppVersion: common.GetEnv("APP_VERSION"),
+		AppVersion: AppVersion,
 	}
 
 	err := globalTemplates.ExecuteTemplate(w, "test.html", data)
@@ -151,7 +151,7 @@ func HandleConfigPage(w http.ResponseWriter, r *http.Request) {
 		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "System Configuration",
 		User:       user, // Pass user info if available
-		AppVersion: common.GetEnv("APP_VERSION"),
+		AppVersion: AppVersion,
 		// Add any specific flags or data needed for config page
 		// e.g., pass the current host?
 		CurrentHost: strings.Split(r.Host, ":")[0],
@@ -284,7 +284,7 @@ func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
 	// Create default page data
 	pageData := models.PageData{
 		AppName:    "OpenAgent",
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: AppVersion,
 		PageTitle:  "Welcome to OpenAgent",
 		User:       nil, // No user context for landing page
 	}
