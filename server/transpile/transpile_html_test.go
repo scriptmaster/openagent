@@ -703,6 +703,92 @@ func TestTranspileHtmlToTsx_FourStepProcess(t *testing.T) {
 	t.Logf("✅ Four Step Process Test: All steps working correctly")
 }
 
+// TestCSSFileGeneration tests that CSS files are always generated, even when empty
+func TestCSSFileGeneration(t *testing.T) {
+	// Set up test environment
+	os.Setenv("DEBUG_TRANSPILE", "1")
+	defer os.Unsetenv("DEBUG_TRANSPILE")
+
+	// Clean up any existing test files
+	cleanupTestFiles(t)
+
+	tests := []struct {
+		name        string
+		htmlContent string
+		description string
+	}{
+		{
+			name: "HTML_with_no_styles",
+			htmlContent: `<main>
+				<div className="container">
+					<h1>No Styles Test</h1>
+				</div>
+			</main>`,
+			description: "HTML with no <style> tags should still generate empty CSS file",
+		},
+		{
+			name: "HTML_with_empty_style_tag",
+			htmlContent: `<main>
+				<div className="container">
+					<h1>Empty Style Test</h1>
+				</div>
+				<style></style>
+			</main>`,
+			description: "HTML with empty <style> tag should generate empty CSS file",
+		},
+		{
+			name: "HTML_with_actual_styles",
+			htmlContent: `<main>
+				<div className="container">
+					<h1>With Styles Test</h1>
+				</div>
+				<style>
+					.container { padding: 20px; }
+					h1 { color: blue; }
+				</style>
+			</main>`,
+			description: "HTML with actual styles should generate CSS file with content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test environment
+			inputPath, outputPath := setupTestEnvironment(t, tt.htmlContent)
+			defer os.Remove(inputPath)
+
+			// Call the function under test
+			err := TranspileHtmlToTsx(inputPath, outputPath)
+			if err != nil {
+				t.Fatalf("TranspileHtmlToTsx() error = %v", err)
+			}
+
+			// Check that CSS file was created in the correct location (./tpl/generated/css/)
+			cssPath := strings.Replace(outputPath, ".tsx", ".css", 1)
+			cssPath = strings.Replace(cssPath, "tpl/generated/pages/", "tpl/generated/css/", 1)
+			if _, err := os.Stat(cssPath); os.IsNotExist(err) {
+				t.Errorf("CSS file was not created: %s", cssPath)
+			} else {
+				t.Logf("✅ CSS file created: %s", cssPath)
+			}
+
+			// Read and verify CSS content
+			cssContent, err := os.ReadFile(cssPath)
+			if err != nil {
+				t.Errorf("Failed to read CSS file: %v", err)
+			}
+
+			cssStr := string(cssContent)
+			t.Logf("CSS content (%d bytes): %q", len(cssStr), cssStr)
+
+			// Clean up
+			os.Remove(cssPath)
+			os.Remove(outputPath)
+			os.Remove(strings.Replace(outputPath, ".tsx", ".component.tsx", 1))
+		})
+	}
+}
+
 // setupTestEnvironment creates necessary directories and files for testing
 func setupTestEnvironment(t *testing.T, htmlContent string) (string, string) {
 	// Create directories

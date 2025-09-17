@@ -46,22 +46,32 @@ migrations:
 
 # Run tests (includes running migrations first if needed)
 test:
-	make stop
-	# Optionally run migrations before testing if tests depend on schema
-	# make migrations
+	$(MAKE) stop-port # Ensure no server is running on the test port
+	$(MAKE) build     # Build the application binary
+	$(MAKE) migrations # Apply database migrations (if tests depend on schema)
 	@echo "Running go mod tidy..."
 	go mod tidy
-	@echo "Running tests..."
-	# go test -v ./...
-	make test2
+	@echo "Starting application in background for integration tests..."
+	go run . & # Start the server in the background
+	$(MAKE) wait-for-server # Wait for the server to become ready
+	@echo "Running TSX2JS and sibling tests..."
+	$(MAKE) test2
+	@echo "Running E2E integration tests to check regression..."
+	$(MAKE) test-integration
 	@echo "Test completed"
-	make start
 
 # Run TSX2JS and sibling tests only (faster test for transpile functionality)
 test2:
 	@echo "Running TSX2JS and sibling tests..."
 	go test -v ./server/transpile -run "TestTSX2JS|TestTSX2JS_SiblingElements"
 	@echo "TSX2JS tests completed"
+
+# Run integration tests for transpile functionality
+test-integration:
+	@echo "Running transpile integration tests..."
+	@echo "This will test the complete transpile process end-to-end"
+	go test -v ./server/transpile -run TestTranspileIntegration
+	@echo "Integration tests completed"
 
 start:
 	@echo "Starting local build..."
@@ -253,6 +263,8 @@ help:
 	@echo "Available commands:"
 	@echo "  make build      - Build the application"
 	@echo "  make test       - Run tests"
+	@echo "  make test2      - Run TSX2JS and sibling tests only"
+	@echo "  make test-integration - Run transpile integration tests"
 	@echo "  make clean      - Clean build artifacts"
 	@echo "  make migrations - Apply database migrations manually (runs the app)"
 	@echo "  make deploy     - Deploy using Git (uses deploy.sh on remote)"

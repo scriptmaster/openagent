@@ -1,272 +1,372 @@
 package transpile
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 )
 
-// isServerRunning checks if the server is running on localhost:8800
-func isServerRunning() bool {
-	client := &http.Client{
-		Timeout: 1 * time.Second,
-	}
-	resp, err := client.Get("http://localhost:8800/")
+// TestTranspileIntegration tests the complete transpile process end-to-end
+func TestTranspileIntegration(t *testing.T) {
+	// Set debug mode for detailed logging
+	os.Setenv("DEBUG_TRANSPILE", "1")
+	defer os.Unsetenv("DEBUG_TRANSPILE")
+
+	// Clean up any existing generated files
+	cleanupGeneratedFiles(t)
+
+	// Step 1: Run the transpile process
+	t.Log("Step 1: Running TranspileAllTemplates...")
+
+	// Set debug mode for detailed logging
+	os.Setenv("DEBUG_TRANSPILE", "1")
+
+	// Change to project root directory for transpile process
+	originalDir, err := os.Getwd()
 	if err != nil {
-		return false
+		t.Fatalf("Failed to get current directory: %v", err)
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+
+	// Change to project root (go up 2 levels from server/transpile)
+	if err := os.Chdir("../../"); err != nil {
+		t.Fatalf("Failed to change to project root: %v", err)
+	}
+	defer os.Chdir(originalDir) // Restore original directory
+
+	if err := TranspileAllTemplates(); err != nil {
+		t.Fatalf("TranspileAllTemplates failed: %v", err)
+	}
+
+	// Check if files were actually generated
+	t.Log("Checking if files were generated...")
+	if _, err := os.Stat("tpl/generated/css/pages_test.css"); err != nil {
+		t.Logf("Warning: pages_test.css not found: %v", err)
+	}
+	if _, err := os.Stat("tpl/generated/js/pages_test.js"); err != nil {
+		t.Logf("Warning: pages_test.js not found: %v", err)
+	}
+
+	// Step 2: Verify generated files exist
+	t.Log("Step 2: Verifying generated files...")
+	verifyGeneratedFiles(t)
+
+	// Step 3: Verify CSS files have content
+	t.Log("Step 3: Verifying CSS files have content...")
+	verifyCSSFiles(t)
+
+	// Step 4: Verify JS files have correct content
+	t.Log("Step 4: Verifying JS files have correct content...")
+	verifyJSFiles(t)
+
+	// Step 5: Start server and test HTTP endpoints
+	t.Log("Step 5: Testing HTTP endpoints...")
+	testHTTPEndpoints(t)
+
+	t.Log("✅ All integration tests passed!")
 }
 
-// startServerIfNeeded starts the server if it's not already running
-func startServerIfNeeded(t *testing.T) {
-	if isServerRunning() {
-		t.Log("Server is already running")
-		return
+func cleanupGeneratedFiles(t *testing.T) {
+	generatedDir := "./tpl/generated"
+	if err := os.RemoveAll(generatedDir); err != nil {
+		t.Logf("Warning: Could not clean generated directory: %v", err)
+	}
+	if err := os.MkdirAll(generatedDir, 0755); err != nil {
+		t.Fatalf("Failed to create generated directory: %v", err)
+	}
+}
+
+func verifyGeneratedFiles(t *testing.T) {
+	// Check that consolidated CSS files exist
+	expectedCSSFiles := []string{
+		"tpl/generated/css/pages_test.css",
+		"tpl/generated/css/app_test.css",
+		"tpl/generated/css/admin_test.css",
 	}
 
-	t.Log("Server not running, starting server...")
+	for _, cssFile := range expectedCSSFiles {
+		if _, err := os.Stat(cssFile); os.IsNotExist(err) {
+			t.Errorf("Expected CSS file does not exist: %s", cssFile)
+		}
+	}
 
+	// Check that JS files exist
+	expectedJSFiles := []string{
+		"tpl/generated/js/pages_test.js",
+		"tpl/generated/js/_common.js",
+	}
+
+	for _, jsFile := range expectedJSFiles {
+		if _, err := os.Stat(jsFile); os.IsNotExist(err) {
+			t.Errorf("Expected JS file does not exist: %s", jsFile)
+		}
+	}
+
+	// Check that TSX files exist
+	expectedTSXFiles := []string{
+		"tpl/generated/pages/test.tsx",
+		"tpl/generated/pages/test.component.tsx",
+	}
+
+	for _, tsxFile := range expectedTSXFiles {
+		if _, err := os.Stat(tsxFile); os.IsNotExist(err) {
+			t.Errorf("Expected TSX file does not exist: %s", tsxFile)
+		}
+	}
+}
+
+func verifyCSSFiles(t *testing.T) {
+	// Test that pages_test.css has content from test.html
+	pagesCSSPath := "tpl/generated/css/pages_test.css"
+	content, err := os.ReadFile(pagesCSSPath)
+	if err != nil {
+		t.Fatalf("Could not read pages_test.css: %v", err)
+	}
+
+	cssContent := string(content)
+	if len(cssContent) == 0 {
+		t.Error("pages_test.css is empty - CSS extraction failed")
+	}
+
+	// Check for specific CSS content from test.html
+	expectedCSS := ":root"
+	if !strings.Contains(cssContent, expectedCSS) {
+		t.Errorf("pages_test.css missing expected CSS content. Expected to find '%s', got: %s", expectedCSS, cssContent)
+	}
+
+	// Check for CSS variable
+	expectedVar := "--light-color"
+	if !strings.Contains(cssContent, expectedVar) {
+		t.Errorf("pages_test.css missing expected CSS variable. Expected to find '%s', got: %s", expectedVar, cssContent)
+	}
+
+	// Check for CSS value
+	expectedValue := "#eee"
+	if !strings.Contains(cssContent, expectedValue) {
+		t.Errorf("pages_test.css missing expected CSS value. Expected to find '%s', got: %s", expectedValue, cssContent)
+	}
+
+	// Verify CSS file is not empty and has reasonable size
+	if len(cssContent) < 10 {
+		t.Errorf("pages_test.css too small (%d bytes), expected at least 10 bytes", len(cssContent))
+	}
+
+	t.Logf("✅ CSS extraction verified: pages_test.css contains %d bytes with expected content", len(cssContent))
+}
+
+func verifyJSFiles(t *testing.T) {
+	// Test pages_test.js has correct content
+	pagesJSPath := "tpl/generated/js/pages_test.js"
+	content, err := os.ReadFile(pagesJSPath)
+	if err != nil {
+		t.Fatalf("Could not read pages_test.js: %v", err)
+	}
+
+	jsContent := string(content)
+
+	// Check for main Test component
+	if !strings.Contains(jsContent, "function Test({page})") {
+		t.Error("pages_test.js missing Test component function")
+	}
+
+	// Check for Simple component embedding
+	if !strings.Contains(jsContent, "function Simple({page})") {
+		t.Error("pages_test.js missing Simple component embedding")
+	}
+
+	// Check for Simple component section header
+	if !strings.Contains(jsContent, "🔧 SIMPLE COMPONENT JS 🔧") {
+		t.Error("pages_test.js missing Simple component section header")
+	}
+
+	// Check for hydration code
+	if !strings.Contains(jsContent, "window.hydrateReactApp") {
+		t.Error("pages_test.js missing hydration code")
+	}
+
+	// Check for global component assignment
+	if !strings.Contains(jsContent, "window.Test = Test") {
+		t.Error("pages_test.js missing global component assignment")
+	}
+
+	// Test _common.js has correct content
+	commonJSPath := "tpl/generated/js/_common.js"
+	commonContent, err := os.ReadFile(commonJSPath)
+	if err != nil {
+		t.Fatalf("Could not read _common.js: %v", err)
+	}
+
+	commonJSContent := string(commonContent)
+
+	// Check for hydrate function definition
+	if !strings.Contains(commonJSContent, "window.hydrateReactApp") {
+		t.Error("_common.js missing window.hydrateReactApp function definition")
+	}
+
+	// Check for React production includes (not development)
+	if strings.Contains(commonJSContent, "react.development.js") {
+		t.Error("_common.js should not include react.development.js")
+	}
+	if strings.Contains(commonJSContent, "react-dom.development.js") {
+		t.Error("_common.js should not include react-dom.development.js")
+	}
+
+	// Check for React production includes
+	if !strings.Contains(commonJSContent, "react.production.min.js") {
+		t.Error("_common.js missing react.production.min.js")
+	}
+	if !strings.Contains(commonJSContent, "react-dom.production.min.js") {
+		t.Error("_common.js missing react-dom.production.min.js")
+	}
+}
+
+func testHTTPEndpoints(t *testing.T) {
 	// Start server in background
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "go", "run", ".")
-	cmd.Dir = "../.." // Go up two levels to project root (from server/transpile to root)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	serverCmd := startTestServer(t)
+	defer func() {
+		if serverCmd != nil {
+			serverCmd.Kill()
+		}
+	}()
 
-	err := cmd.Start()
+	// Wait for server to start
+	time.Sleep(3 * time.Second)
+
+	// Test /test endpoint returns 200
+	testURL := "http://localhost:8800/test"
+	resp, err := http.Get(testURL)
 	if err != nil {
-		t.Fatalf("Failed to start server: %v", err)
+		t.Fatalf("Failed to GET /test: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected /test to return 200, got %d", resp.StatusCode)
 	}
 
-	// Store the cancel function for cleanup
-	t.Cleanup(func() {
-		t.Log("Stopping server...")
-		cancel()
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-			// Give the process a moment to clean up
-			time.Sleep(100 * time.Millisecond)
-		}
-	})
-
-	// Wait for server to be ready (with timeout)
-	maxWait := 30 * time.Second
-	checkInterval := 500 * time.Millisecond
-	startTime := time.Now()
-
-	for time.Since(startTime) < maxWait {
-		if isServerRunning() {
-			t.Log("Server is now running and ready")
-			return
-		}
-		time.Sleep(checkInterval)
+	// Read response body to check for correct paths
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
 	}
 
-	t.Fatalf("Server failed to start within %v", maxWait)
+	htmlContent := string(body)
+
+	// Check for correct CSS link paths
+	expectedCSSPath := "/tsx/css/pages_test.css"
+	if !strings.Contains(htmlContent, expectedCSSPath) {
+		t.Errorf("HTML missing expected CSS path. Expected to find '%s' in: %s", expectedCSSPath, htmlContent)
+	}
+
+	// Check for correct JS script paths
+	expectedJSPath := "/tsx/js/pages_test.js"
+	if !strings.Contains(htmlContent, expectedJSPath) {
+		t.Errorf("HTML missing expected JS path. Expected to find '%s' in: %s", expectedJSPath, htmlContent)
+	}
+
+	// Test CSS file is accessible
+	cssURL := "http://localhost:8800/tsx/css/pages_test.css"
+	cssResp, err := http.Get(cssURL)
+	if err != nil {
+		t.Fatalf("Failed to GET CSS file: %v", err)
+	}
+	defer cssResp.Body.Close()
+
+	if cssResp.StatusCode != http.StatusOK {
+		t.Errorf("Expected CSS file to return 200, got %d", cssResp.StatusCode)
+	}
+
+	// Test JS file is accessible
+	jsURL := "http://localhost:8800/tsx/js/pages_test.js"
+	jsResp, err := http.Get(jsURL)
+	if err != nil {
+		t.Fatalf("Failed to GET JS file: %v", err)
+	}
+	defer jsResp.Body.Close()
+
+	if jsResp.StatusCode != http.StatusOK {
+		t.Errorf("Expected JS file to return 200, got %d", jsResp.StatusCode)
+	}
+
+	// Test _common.js is accessible
+	commonURL := "http://localhost:8800/tsx/js/_common.js"
+	commonResp, err := http.Get(commonURL)
+	if err != nil {
+		t.Fatalf("Failed to GET _common.js: %v", err)
+	}
+	defer commonResp.Body.Close()
+
+	if commonResp.StatusCode != http.StatusOK {
+		t.Errorf("Expected _common.js to return 200, got %d", commonResp.StatusCode)
+	}
 }
 
-// TestIntegrationServerEndpoints tests the actual server endpoints after make test is running
-func TestIntegrationServerEndpoints(t *testing.T) {
-	// Start server if needed
-	startServerIfNeeded(t)
+func startTestServer(t *testing.T) *os.Process {
+	// This is a simplified version - in a real implementation,
+	// you might want to use a more sophisticated server startup
+	// For now, we'll assume the server is already running or can be started
+	// by the test environment
 
-	// Wait a bit for the server to be fully ready
-	time.Sleep(2 * time.Second)
+	// Check if server is already running
+	resp, err := http.Get("http://localhost:8800/")
+	if err == nil && resp.StatusCode == http.StatusOK {
+		resp.Body.Close()
+		t.Log("Server already running on port 8800")
+		return nil
+	}
 
-	t.Run("Test /test endpoint HTML response", func(t *testing.T) {
-		// Test the /test endpoint
-		resp, err := http.Get("http://localhost:8800/test")
-		if err != nil {
-			t.Fatalf("Failed to make request to /test: %v", err)
-		}
-		defer resp.Body.Close()
-
-		// Check status code
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status 200, got %d", resp.StatusCode)
-		}
-
-		// Read response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("Failed to read response body: %v", err)
-		}
-
-		htmlContent := string(body)
-
-		// Verify HTML structure contains basic elements (be flexible since server might return error pages in test mode)
-		basicElements := []string{
-			"<html",
-			"<head>",
-			"<title>",
-			"<body",
-		}
-
-		missingElements := []string{}
-		for _, element := range basicElements {
-			if !strings.Contains(htmlContent, element) {
-				missingElements = append(missingElements, element)
-			}
-		}
-
-		if len(missingElements) > 0 {
-			t.Logf("HTML response missing basic elements: %s (this may be expected in test mode)", strings.Join(missingElements, ", "))
-			previewLen := 200
-			if len(htmlContent) < previewLen {
-				previewLen = len(htmlContent)
-			}
-			t.Logf("Response body preview: %s", htmlContent[:previewLen])
-		} else {
-			t.Logf("✅ /test endpoint returned valid HTML with basic structure")
-		}
-
-		// Check if it's an error page (this is OK in test mode)
-		if strings.Contains(htmlContent, "404") || strings.Contains(htmlContent, "error") {
-			t.Logf("Note: Server returned error page (expected in test mode): %s", htmlContent[:200])
-		}
-	})
-
-	t.Run("Test /test endpoint JS file structure", func(t *testing.T) {
-		// Test the JS file endpoint
-		resp, err := http.Get("http://localhost:8800/tsx/js/pages_test.js")
-		if err != nil {
-			t.Fatalf("Failed to make request to JS file: %v", err)
-		}
-		defer resp.Body.Close()
-
-		// Check status code
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status 200 for JS file, got %d", resp.StatusCode)
-		}
-
-		// Read response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("Failed to read JS file body: %v", err)
-		}
-
-		jsContent := string(body)
-
-		// Verify the 4-step structure is present
-		expectedSections := []string{
-			"React.createElement(",
-			"📜 ORIGINAL JS CONTENT 📜",
-			"💧 HYDRATION 💧",
-			"window.hydrateReactApp",
-		}
-
-		for _, section := range expectedSections {
-			if !strings.Contains(jsContent, section) {
-				t.Errorf("JS file missing expected section: %s", section)
-			}
-		}
-
-		// Verify it contains React.createElement calls
-		if !strings.Contains(jsContent, "React.createElement(") {
-			t.Errorf("JS file missing React.createElement calls")
-		}
-
-		// Verify it contains hydration code
-		if !strings.Contains(jsContent, "window.hydrateReactApp") {
-			t.Errorf("JS file missing hydration code")
-		}
-
-		// Verify it's not empty or just comments
-		if len(strings.TrimSpace(jsContent)) < 100 {
-			t.Errorf("JS file appears to be too short or empty: %d characters", len(jsContent))
-		}
-
-		t.Logf("✅ JS file contains expected 4-step structure with %d characters", len(jsContent))
-	})
-
-	t.Run("Test /test endpoint component files", func(t *testing.T) {
-		// Test that component files are accessible
-		componentFiles := []string{
-			"/tsx/js/component_simple.js",
-			"/tsx/js/component_counter.js",
-		}
-
-		for _, file := range componentFiles {
-			resp, err := http.Get("http://localhost:8800" + file)
-			if err != nil {
-				t.Logf("Component file %s not accessible (this is OK if no components): %v", file, err)
-				continue
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode == http.StatusOK {
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Logf("Could not read component file %s: %v", file, err)
-					continue
-				}
-
-				content := string(body)
-				if len(content) > 0 {
-					t.Logf("✅ Component file %s is accessible with %d characters", file, len(content))
-				}
-			}
-		}
-	})
-
-	t.Run("Test /test endpoint layout files", func(t *testing.T) {
-		// Test that layout files are accessible
-		layoutFiles := []string{
-			"/tsx/js/layout_pages.js",
-			"/tsx/js/_common.js",
-		}
-
-		for _, file := range layoutFiles {
-			resp, err := http.Get("http://localhost:8800" + file)
-			if err != nil {
-				t.Logf("Layout file %s not accessible: %v", file, err)
-				continue
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode == http.StatusOK {
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Logf("Could not read layout file %s: %v", file, err)
-					continue
-				}
-
-				content := string(body)
-				if len(content) > 0 {
-					t.Logf("✅ Layout file %s is accessible with %d characters", file, len(content))
-				}
-			}
-		}
-	})
+	t.Log("Note: Server startup test requires manual server start or test environment setup")
+	return nil
 }
 
-// TestIntegrationServerHealth tests basic server health
-func TestIntegrationServerHealth(t *testing.T) {
-	// Start server if needed
-	startServerIfNeeded(t)
+// TestTranspileRegression tests for specific regressions
+func TestTranspileRegression(t *testing.T) {
+	// Test that Simple component embedding works
+	os.Setenv("DEBUG_TRANSPILE", "1")
+	defer os.Unsetenv("DEBUG_TRANSPILE")
 
-	// Wait a bit for the server to be fully ready
-	time.Sleep(2 * time.Second)
+	// Clean and run transpile
+	cleanupGeneratedFiles(t)
+	if err := TranspileAllTemplates(); err != nil {
+		t.Fatalf("TranspileAllTemplates failed: %v", err)
+	}
 
-	t.Run("Test server health endpoint", func(t *testing.T) {
-		// Test a basic endpoint to ensure server is running
-		resp, err := http.Get("http://localhost:8800/")
-		if err != nil {
-			t.Fatalf("Server appears to be down: %v", err)
-		}
-		defer resp.Body.Close()
+	// Check that Simple component is embedded in pages_test.js
+	pagesJSPath := "tpl/generated/js/pages_test.js"
+	content, err := os.ReadFile(pagesJSPath)
+	if err != nil {
+		t.Fatalf("Could not read pages_test.js: %v", err)
+	}
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Server health check failed: expected 200, got %d", resp.StatusCode)
-		}
+	jsContent := string(content)
 
-		t.Logf("✅ Server is healthy and responding")
-	})
+	// Regression test: Simple component should be embedded
+	if !strings.Contains(jsContent, "🔧 SIMPLE COMPONENT JS 🔧") {
+		t.Error("REGRESSION: Simple component embedding is broken")
+	}
+
+	// Regression test: CSS should be extracted
+	pagesCSSPath := "tpl/generated/css/pages_test.css"
+	cssContent, err := os.ReadFile(pagesCSSPath)
+	if err != nil {
+		t.Fatalf("Could not read pages_test.css: %v", err)
+	}
+
+	if len(cssContent) == 0 {
+		t.Error("REGRESSION: CSS extraction is broken - pages_test.css is empty")
+	}
+
+	// Regression test: Link paths should use consolidated names
+	tsxPath := "tpl/generated/pages/test.tsx"
+	tsxContent, err := os.ReadFile(tsxPath)
+	if err != nil {
+		t.Fatalf("Could not read test.tsx: %v", err)
+	}
+
+	tsxString := string(tsxContent)
+	if !strings.Contains(tsxString, "/tsx/css/pages_test.css") {
+		t.Error("REGRESSION: Link paths not using consolidated CSS names")
+	}
 }

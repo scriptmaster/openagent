@@ -33,7 +33,7 @@ window.hydrateReactApp = function(componentName, props = {}) {
         if (container && window[componentName]) {
             const Component = window[componentName];
             ReactDOM.hydrateRoot(container, React.createElement(Component, props));
-            console.log(`React app ${componentName} hydrated successfully on main tag`);
+            console.log(`${componentName} <- This React app component hydrated successfully on main tag`);
         } else {
             console.warn(`React hydration failed: main container or component ${componentName} not found`);
         }
