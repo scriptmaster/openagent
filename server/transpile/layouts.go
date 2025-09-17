@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/scriptmaster/openagent/common"
 	"golang.org/x/net/html"
 )
 
@@ -73,6 +74,11 @@ func TranspileLayoutToTsx(inputPath, outputPath string) error {
 		imports = importsBuilder.String()
 	}
 
+	// Apply HTML minification to the content before creating TSX
+	// Check if HTML_WHITESPACE_NOHYDRATE=1 is set to preserve whitespace for hydration
+	preserveWhitespace := os.Getenv("HTML_WHITESPACE_NOHYDRATE") == "1"
+	htmlContent = common.MinifyHTML(htmlContent, preserveWhitespace)
+
 	// Create the layout component
 	tsxContent := imports + `export default function ` + componentName + `({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any}) {
     return (
@@ -132,7 +138,7 @@ func integrateLinkPathsAndScriptPaths(htmlContent string) string {
 	if headClosePattern.MatchString(htmlContent) {
 		// Insert linkPaths before </head>
 		linkPathsJSX := `{linkPaths && linkPaths.split(',').map((link: string, index: any) => (` +
-			`<link rel="stylesheet" src={link} />))}\n`
+			`<link rel="stylesheet" href={link} />))}\n`
 		htmlContent = headClosePattern.ReplaceAllString(htmlContent, linkPathsJSX+"</head>")
 	}
 

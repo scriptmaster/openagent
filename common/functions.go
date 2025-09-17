@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -265,4 +266,35 @@ func ResetMigrationTracking(db *sql.DB) error {
 		return fmt.Errorf("failed to reset migration tracking: %w", err)
 	}
 	return nil
+}
+
+// HTML minification regex patterns
+var (
+	aggressiveWhitespacePattern = regexp.MustCompile(`>\s*\n\s*<`)
+	whitespaceAfterTagPattern   = regexp.MustCompile(`>\s*\n\s*`)
+	whitespaceBeforeTagPattern  = regexp.MustCompile(`\s*\n\s*<`)
+	remainingNewlinesPattern    = regexp.MustCompile(`(\n\s*)+`)
+)
+
+// MinifyHTML performs aggressive HTML minification by removing whitespace
+// Set preserveWhitespace=true to skip minification (useful for hydration)
+func MinifyHTML(content string, preserveWhitespace bool) string {
+	if preserveWhitespace {
+		return content
+	}
+
+	// Aggressive HTML Minification - remove ALL newlines and spaces after > and before <
+	// 1. Remove all whitespace (including newlines) between tags
+	content = aggressiveWhitespacePattern.ReplaceAllString(content, "><")
+
+	// 2. Remove all newlines and spaces after any > character
+	content = whitespaceAfterTagPattern.ReplaceAllString(content, ">")
+
+	// 3. Remove all newlines and spaces before any < character
+	content = whitespaceBeforeTagPattern.ReplaceAllString(content, "<")
+
+	// 4. Replace any remaining newlines and spaces with a single space
+	content = remainingNewlinesPattern.ReplaceAllString(content, " ")
+
+	return content
 }

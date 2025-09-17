@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/scriptmaster/openagent/common"
 	"golang.org/x/net/html"
 )
 
@@ -153,6 +154,11 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 	if err := os.MkdirAll("tpl/generated/components", 0755); err != nil {
 		return "", fmt.Errorf("failed to create components directory: %v", err)
 	}
+
+	// Apply HTML minification to the content before creating TSX
+	// Check if HTML_WHITESPACE_NOHYDRATE=1 is set to preserve whitespace for hydration
+	preserveWhitespace := os.Getenv("HTML_WHITESPACE_NOHYDRATE") == "1"
+	componentHTML = common.MinifyHTML(componentHTML, preserveWhitespace)
 
 	// Write component TSX
 	componentTSX := fmt.Sprintf("export default function %s() {\n    return (\n        %s\n    );\n}",
