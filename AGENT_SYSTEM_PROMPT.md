@@ -102,10 +102,23 @@ The application uses a **4-step generation process** for page-specific assets:
 - ❌ **NEVER** use `key` attributes for one-time rendered meta tags
 - ❌ **NEVER** place meta tags in the body section
 
+### CSS/JS Asset Issues
+- ❌ **NEVER** consolidate CSS files - each page needs its own CSS
+- ❌ **NEVER** break the 4-step JS generation process
+- ❌ **NEVER** use incorrect naming conventions for assets
+- ❌ **NEVER** forget to include `_common.js` in script paths
+
+### TSX Generation Issues (CRITICAL - Causes Internal Server Errors)
+- ❌ **NEVER** leave HTML comments in generated TSX files
+- ❌ **NEVER** generate invalid JSX syntax
+- ❌ **NEVER** break the Go wax engine rendering process
+- ❌ **ALWAYS** validate generated TSX files for syntax errors
+
 ### Deployment Issues
 - ❌ **NEVER** deploy without explicit user permission
 - ❌ **NEVER** assume deployment is needed after changes
 - ❌ **ALWAYS** test locally first
+- ❌ **NEVER** deploy without git commit
 
 ## 🔄 Development Workflow
 
@@ -173,39 +186,80 @@ openagent/
 - `layout_admin.html`: Admin panel layout
 - `layout_marketing.html`: Marketing pages layout
 
-## 🧪 Testing Guidelines
+## 🧪 Testing Guidelines (TDD MANDATORY)
+
+### Test-Driven Development (TDD) Requirements
+- **MANDATORY**: Write tests BEFORE implementing features
+- **MANDATORY**: All tests must pass before deployment
+- **MANDATORY**: Test coverage report must be generated
+- **MANDATORY**: Integration tests must confirm no internal server errors
+
+### Test Coverage Requirements
+- **Component Tests**: Test all components up to depth 5
+- **Inner Component Tests**: Test nested component interactions
+- **Integration Tests**: End-to-end functionality testing
+- **TSX Generation Tests**: Validate generated TSX syntax
+- **Asset Generation Tests**: Verify CSS/JS file generation
 
 ### Before Making Changes
 1. Understand the current architecture
 2. Read existing code patterns
-3. Test changes locally first
-4. Verify no regressions
+3. **Write tests first (TDD)**
+4. Test changes locally first
+5. Verify no regressions
 
 ### After Making Changes
-1. Run `make test` to ensure all tests pass
-2. Test the specific functionality manually
-3. Check generated files for correctness
-4. Verify meta tags render properly
+1. **Run test coverage report**
+2. Run `make test` to ensure all tests pass
+3. **Check for internal server errors**
+4. Test the specific functionality manually
+5. Check generated files for correctness
+6. Verify meta tags render properly
+7. **Validate generated TSX files for syntax errors**
 
-### Common Test Commands
+### Critical Test Commands
 ```bash
-# Run all tests
+# Run all tests with coverage
 make test
+go test -cover ./...
 
 # Test specific functionality
 curl -s http://localhost:8800/test | grep -A 3 -B 3 "meta name"
 
-# Check transpiled output
+# Check transpiled output for syntax errors
 cat tpl/generated/pages/test.tsx
+
+# Test for internal server errors
+curl -v http://localhost:8800/test
+
+# Component depth testing (up to depth 5)
+go test -v ./server/transpile -run "TestComponentDepth"
+
+# Integration tests for TSX generation
+go test -v ./server/transpile -run "TestTranspileIntegration"
 ```
+
+### Internal Server Error Debugging
+If internal server errors occur:
+1. **Check generated TSX files** for syntax errors
+2. **Validate JSX syntax** in transpiled files
+3. **Remove HTML comments** from generated TSX
+4. **Check Go wax engine** rendering process
+5. **Verify asset paths** are correct
+6. **Test component hydration** code
 
 ## 🚀 Deployment Guidelines
 
 ### Pre-Deployment Checklist
-- [ ] All tests pass locally
-- [ ] Changes work as expected
-- [ ] No regressions introduced
-- [ ] User has explicitly approved deployment
+- [ ] **TDD**: Tests written and passing
+- [ ] **Test Coverage**: Coverage report generated and reviewed
+- [ ] **Internal Server Errors**: Integration tests confirm no 500 errors
+- [ ] **TSX Validation**: Generated TSX files have valid syntax
+- [ ] **Asset Generation**: CSS/JS files generated correctly
+- [ ] **Git Commit**: All changes committed to git
+- [ ] **Local Testing**: Changes work as expected locally
+- [ ] **No Regressions**: Existing functionality not broken
+- [ ] **User Approval**: User has explicitly approved deployment
 
 ### Deployment Commands
 ```bash
@@ -249,6 +303,11 @@ ssh root@in.msheriff.com "cd /var/www/openagent && docker compose restart"
 2. **Meta tags in body**: Check transpilation logic and layout structure
 3. **HTML encoding**: Use structured approach instead of raw HTML strings
 4. **Architecture broken**: Revert to proper Layout → App component structure
+5. **Internal Server Error**: Check generated TSX files for syntax errors
+6. **HTML comments in TSX**: Remove all HTML comments from generated files
+7. **CSS/JS not loading**: Verify asset generation and path structure
+8. **Component hydration fails**: Check React hydration code generation
+9. **Go wax engine errors**: Validate TSX syntax before rendering
 
 ### Debug Commands
 ```bash
