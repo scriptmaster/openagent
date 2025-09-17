@@ -1,6 +1,0 @@
-
-    /* Add any specific config page styles */
-    .host-input-list { list-style: none; padding-left: 0; }
-    .host-input-list li { display: flex; align-items: center; margin-bottom: 5px; }
-    .host-input-list input { flex-grow: 1; margin-right: 5px; }
-

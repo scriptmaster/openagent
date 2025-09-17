@@ -40,7 +40,7 @@ func processComponentImports(htmlContent, inputPath string) (string, []string, e
 	}
 
 	// Use regex for initial component div replacement (more reliable for this specific case)
-	componentPattern := regexp.MustCompile(`<div\s+id="component[-_](\w+)"[^>]*></div>`)
+	componentPattern := regexp.MustCompile(`<div\s+id="component[-_](\w+)"[^>]*>\s*</div>`)
 
 	var importedComponents []string
 
@@ -93,6 +93,7 @@ func processComponentImports(htmlContent, inputPath string) (string, []string, e
 
 		// Replace the div with the component directly, with hydration warning suppression
 		result := fmt.Sprintf(`<%s suppressHydrationWarning={true} />`, componentNameCapitalized)
+		// result := fmt.Sprintf(`<%s suppressHydrationWarning="true"></%s>`, componentNameCapitalized, componentNameCapitalized)
 		if isDebugTranspile() {
 			fmt.Printf("DEBUG: Replacing component div with: %s\n", result)
 		}
@@ -108,8 +109,14 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 		fmt.Printf("DEBUG: Importing component: %s\n", componentName)
 	}
 
-	// Construct component file path
+	// Construct component file path (try relative first, then absolute)
 	componentPath := fmt.Sprintf("tpl/components/%s.html", componentName)
+
+	// If relative path doesn't exist, try from project root
+	if _, err := os.Stat(componentPath); os.IsNotExist(err) {
+		// Try from project root (go up two directories from server/transpile)
+		componentPath = fmt.Sprintf("../../tpl/components/%s.html", componentName)
+	}
 
 	// Check if component file exists
 	if _, err := os.Stat(componentPath); os.IsNotExist(err) {

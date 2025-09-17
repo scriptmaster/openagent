@@ -153,6 +153,16 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 		}
 	}
 
+	// Fix custom JSX self-closing tags before parsing
+	jsxContent = fixCustomJSXSelfClosingTags(jsxContent)
+
+	// Convert JSX self-closing custom components to React.createElement calls directly
+	// This bypasses the HTML parser issues with custom components
+	jsxContent = convertJSXComponentsToReactCreateElement(jsxContent)
+
+	// Now convert the remaining HTML elements to React.createElement calls
+	// This will handle the div and span elements properly
+
 	// Extract custom component names to preserve their case
 	customComponents := extractCustomComponentNames(jsxContent)
 	if isDebugTranspile() {
@@ -250,20 +260,45 @@ func recWalkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, 
 		text := strings.TrimSpace(n.Data)
 		// Only preserve whitespace if it's not just indentation (tabs/spaces at start of line)
 		if text != "" && !isOnlyIndentation(n.Data) {
-			result.WriteString(fmt.Sprintf("'%s'", text))
+			// Check if this text is a React.createElement call (from our conversion)
+			if strings.HasPrefix(text, "React.createElement(") {
+				// This is a React.createElement call, don't wrap it in quotes
+				result.WriteString(text)
+			} else {
+				// This is regular text, wrap it in quotes
+				result.WriteString(fmt.Sprintf("'%s'", text))
+			}
 		}
 	case html.DocumentNode:
-		// Process children for document node
+		// Process children for document node with comma separation
+		hasChildren := false
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			// Skip completely empty text nodes and indentation-only nodes
+			if c.Type == html.TextNode && (c.Data == "" || isOnlyIndentation(c.Data)) {
+				continue
+			}
+			if hasChildren {
+				result.WriteString(", ")
+			}
 			recWalkHTMLNodeWithCustomComponents(c, result, customComponents)
+			hasChildren = true
 		}
 	case html.DoctypeNode:
 		// Skip doctype
 		return
 	default:
-		// Process children for other node types
+		// Process children for other node types with comma separation
+		hasChildren := false
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			// Skip completely empty text nodes and indentation-only nodes
+			if c.Type == html.TextNode && (c.Data == "" || isOnlyIndentation(c.Data)) {
+				continue
+			}
+			if hasChildren {
+				result.WriteString(", ")
+			}
 			recWalkHTMLNodeWithCustomComponents(c, result, customComponents)
+			hasChildren = true
 		}
 	}
 }
@@ -283,7 +318,26 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 	var componentName string
 	var isCustomComponent bool
 
-	if customComponents != nil {
+	// Check if this is a temporary JSX tag (jsx_componentname)
+	if strings.HasPrefix(n.Data, "jsx_") {
+		// Extract original component name from data-original-component attribute
+		for _, attr := range n.Attr {
+			if attr.Key == "data-original-component" {
+				componentName = attr.Val
+				isCustomComponent = true
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: Found temporary JSX component: %s -> %s\n", n.Data, componentName)
+				}
+				break
+			}
+		}
+		if !isCustomComponent {
+			// Fallback: extract from tag name
+			componentName = strings.TrimPrefix(n.Data, "jsx_")
+			componentName = strings.Title(componentName)
+			isCustomComponent = true
+		}
+	} else if customComponents != nil {
 		if isDebugTranspile() {
 			// fmt.Printf("DEBUG: Looking for component '%s' in customComponents map: %v\n", n.Data, customComponents)
 		}
@@ -354,6 +408,11 @@ func buildPropsObject(n *html.Node) string {
 
 	first := true
 	for _, attr := range n.Attr {
+		// Skip the data-original-component attribute as it's only for internal processing
+		if attr.Key == "data-original-component" {
+			continue
+		}
+
 		if !first {
 			props.WriteString(", ")
 		}
@@ -470,6 +529,107 @@ func fixCustomJSXSelfClosingTags(htmlContent string) string {
 	}
 
 	return htmlContent
+}
+
+// convertJSXSelfClosingToHTML converts JSX self-closing custom components to proper HTML format
+func convertJSXSelfClosingToHTML(jsxContent string) string {
+	// Pattern to match JSX self-closing custom components: <ComponentName ... />
+	jsxSelfClosingPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s+([^>]*?)\s*/>`)
+
+	jsxContent = jsxSelfClosingPattern.ReplaceAllStringFunc(jsxContent, func(match string) string {
+		// Extract component name and attributes
+		submatches := jsxSelfClosingPattern.FindStringSubmatch(match)
+		if len(submatches) >= 3 {
+			componentName := submatches[1]
+			attributes := strings.TrimSpace(submatches[2])
+
+			// Convert to proper HTML self-closing format
+			// Use a temporary tag name that won't conflict
+			tempTagName := "jsx_" + strings.ToLower(componentName)
+
+			// Ensure proper spacing
+			if attributes != "" && !strings.HasPrefix(attributes, " ") {
+				attributes = " " + attributes
+			}
+
+			// Add a data attribute to track the original component name
+			originalNameAttr := fmt.Sprintf(" data-original-component=\"%s\"", componentName)
+
+			return fmt.Sprintf("<%s%s%s />", tempTagName, attributes, originalNameAttr)
+		}
+		return match
+	})
+
+	return jsxContent
+}
+
+// convertJSXComponentsToReactCreateElement converts JSX custom components to React.createElement calls
+func convertJSXComponentsToReactCreateElement(jsxContent string) string {
+	// Pattern to match JSX self-closing custom components: <ComponentName ... />
+	jsxComponentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s*([^>]*?)\s*/>`)
+
+	jsxContent = jsxComponentPattern.ReplaceAllStringFunc(jsxContent, func(match string) string {
+		// Extract component name and attributes
+		submatches := jsxComponentPattern.FindStringSubmatch(match)
+		if len(submatches) >= 3 {
+			componentName := submatches[1]
+			attributes := strings.TrimSpace(submatches[2])
+
+			// Convert attributes to props object
+			props := "null"
+			if attributes != "" {
+				// Convert JSX attribute syntax to JavaScript object syntax
+				// Replace = with : for proper object syntax
+				jsAttributes := strings.ReplaceAll(attributes, "=", ": ")
+				// Remove curly braces from JSX values like {true} -> true
+				jsAttributes = strings.ReplaceAll(jsAttributes, "{", "")
+				jsAttributes = strings.ReplaceAll(jsAttributes, "}", "")
+				props = "{" + jsAttributes + "}"
+			}
+
+			return fmt.Sprintf("React.createElement(%s, %s)", componentName, props)
+		}
+		return match
+	})
+
+	// After converting components, handle multiple React.createElement calls on separate lines
+	// by putting them on the same line with commas
+	lines := strings.Split(jsxContent, "\n")
+	var resultLines []string
+	skipNext := false
+
+	for i, line := range lines {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+
+		trimmedLine := strings.TrimSpace(line)
+
+		// If this line contains a React.createElement call
+		if strings.HasPrefix(trimmedLine, "React.createElement(") {
+			// Check if the next non-empty line also contains a React.createElement call
+			nextLineIndex := i + 1
+			for nextLineIndex < len(lines) && strings.TrimSpace(lines[nextLineIndex]) == "" {
+				nextLineIndex++
+			}
+
+			if nextLineIndex < len(lines) {
+				nextLine := strings.TrimSpace(lines[nextLineIndex])
+				if strings.HasPrefix(nextLine, "React.createElement(") {
+					// Combine the two React.createElement calls with a comma
+					resultLines = append(resultLines, trimmedLine+", "+nextLine)
+					// Skip the next line since we've already processed it
+					skipNext = true
+					continue
+				}
+			}
+		}
+
+		resultLines = append(resultLines, line)
+	}
+
+	return strings.Join(resultLines, "\n")
 }
 
 // getTitleCase converts a string to title case by trimming, splitting by non-word characters,

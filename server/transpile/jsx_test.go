@@ -46,7 +46,7 @@ func TestTSX2JS(t *testing.T) {
 					<Counter initialValue={0} />
 				</div>
 			</main>`,
-			expected: `React.createElement('div', {className: "container"}, React.createElement(Simple, {suppressHydrationWarning: true}, React.createElement(Counter, {initialValue: 0})))`,
+			expected: `React.createElement('div', {className: "container"}, React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement(Counter, {initialValue: 0}))`,
 		},
 		{
 			name: "Self-closing tags",
@@ -206,13 +206,20 @@ func TestTSX2JS(t *testing.T) {
 
 			// Clean up the result for comparison (remove extra whitespace)
 			result = strings.ReplaceAll(result, "\n", "")
-			result = strings.ReplaceAll(result, "  ", " ")
+			result = strings.ReplaceAll(result, "\t", " ")
+			// Remove multiple spaces and replace with single space
+			for strings.Contains(result, "  ") {
+				result = strings.ReplaceAll(result, "  ", " ")
+			}
 			result = strings.TrimSpace(result)
 
 			// Test exact match if expected is provided
 			if tt.expected != "" {
 				expected := strings.ReplaceAll(tt.expected, "\n", "")
-				expected = strings.ReplaceAll(expected, "  ", " ")
+				// Remove multiple spaces and replace with single space
+				for strings.Contains(expected, "  ") {
+					expected = strings.ReplaceAll(expected, "  ", " ")
+				}
 				expected = strings.TrimSpace(expected)
 
 				if result != expected {
@@ -337,7 +344,7 @@ export default function ComplexPage({page}) {
         </main>
     );
 }`,
-			expected: `React.createElement('div', null, React.createElement(Simple, null, React.createElement(Counter, null)))`,
+			expected: `React.createElement('div', null, React.createElement(Simple, null), React.createElement(Counter, null))`,
 		},
 	}
 

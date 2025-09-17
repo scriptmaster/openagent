@@ -1,6 +1,6 @@
-function Simple() {
+function Counter() {
     return (
-        React.createElement('div', null, React.createElement('span', null, 'Simple Component 2:'))
+        React.createElement('div', {className: "counter-component"}, React.createElement('h2', null, 'Counter: {this.value}'), React.createElement('button', {onclick: increment}, '+'), React.createElement('button', {onclick: decrement}, '-'))
     );
 }
 
@@ -9,9 +9,15 @@ function Simple() {
 // ╚══════════════════════════════════════════════════════════════════════════════
 
 
-    Object.assign({}, Simple.prototype, {
-        hey() {
-            alert('hey');
-        }
-    });
-
+		Counter.prototype.increment = function() {
+			this.value++;
+		};
+		
+		Counter.prototype.decrement = function() {
+			this.value--;
+		};
+		
+		Counter.prototype.init = function() {
+			this.value = 0;
+		};
+	

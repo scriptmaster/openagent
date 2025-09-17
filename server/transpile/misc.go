@@ -77,25 +77,33 @@ func convertAlpineAttributesToData(htmlContent string) string {
 	return htmlContent
 }
 
-// convertToCamelCase converts kebab-case to camelCase
+// convertToCamelCase converts kebab-case, snake_case, etc. to camelCase
 func convertToCamelCase(str string) string {
 	// Handle empty string
 	if str == "" {
 		return str
 	}
 
-	// Split by hyphens
-	parts := strings.Split(str, "-")
+	// Split by underscores, hyphens, and other separators
+	re := regexp.MustCompile(`[_\-\s]+`)
+	parts := re.Split(str, -1)
+
 	if len(parts) == 1 {
-		// No hyphens, capitalize first letter
+		// No separators, capitalize first letter
 		return strings.ToUpper(string(str[0])) + str[1:]
 	}
 
-	// Capitalize first part and subsequent parts
-	result := parts[0]
-	for i := 1; i < len(parts); i++ {
-		if parts[i] != "" {
-			result += strings.ToUpper(string(parts[i][0])) + parts[i][1:]
+	// Capitalize first part and subsequent parts (camelCase)
+	result := ""
+	for i, part := range parts {
+		if part != "" {
+			if i == 0 {
+				// First part: capitalize first letter
+				result += strings.ToUpper(string(part[0])) + part[1:]
+			} else {
+				// Subsequent parts: capitalize first letter (camelCase)
+				result += strings.ToUpper(string(part[0])) + part[1:]
+			}
 		}
 	}
 

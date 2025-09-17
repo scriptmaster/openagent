@@ -11,3 +11,5 @@ nul
 .devcontainer
 *bkup*
 *backup*
+tpl/generated
+server/transpile/tpl/generated

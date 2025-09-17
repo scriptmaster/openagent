@@ -56,6 +56,12 @@ test:
 	@echo "Test completed"
 	make start
 
+# Run TSX2JS and sibling tests only (faster test for transpile functionality)
+test2:
+	@echo "Running TSX2JS and sibling tests..."
+	go test -v ./server/transpile -run "TestTSX2JS|TestTSX2JS_SiblingElements"
+	@echo "TSX2JS tests completed"
+
 start:
 	@echo "Starting local build..."
 	# Start a background process to check the server after a delay
