@@ -296,6 +296,59 @@ ssh root@in.msheriff.com "cd /var/www/openagent && docker compose restart"
 - Keep meta tags in the `<head>` section
 - Use proper content values
 
+### SEO & Performance Optimization
+- **Cache Headers**: Implement proper caching for static assets
+- **ETags**: Use ETags for efficient cache validation
+- **Expires Headers**: Set appropriate expiration times for different asset types
+- **Compression**: Enable gzip compression for text-based assets
+- **Minification**: Minify CSS, JS, and HTML for production
+
+## 🚀 Caching & Performance Architecture
+
+### Cache Header Strategy
+Implement different caching strategies for different asset types:
+
+#### Static Assets (CSS, JS, Images)
+```go
+// Long-term caching for versioned assets
+w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+w.Header().Set("Expires", "Thu, 31 Dec 2025 23:59:59 GMT")
+w.Header().Set("ETag", `"${fileHash}"`)
+```
+
+#### HTML Pages
+```go
+// Short-term caching for dynamic content
+w.Header().Set("Cache-Control", "public, max-age=300") // 5 minutes
+w.Header().Set("ETag", `"${pageHash}"`)
+```
+
+#### API Responses
+```go
+// Conditional caching for API data
+w.Header().Set("Cache-Control", "private, max-age=60")
+w.Header().Set("ETag", `"${dataHash}"`)
+```
+
+### Asset Caching Implementation
+1. **File Hashing**: Generate content-based hashes for assets
+2. **Versioned URLs**: Use hashes in asset URLs for cache busting
+3. **Conditional Requests**: Implement If-None-Match for ETags
+4. **Compression**: Enable gzip for text-based assets
+
+### Cache Header Types
+- **Cache-Control**: Modern caching directive
+- **Expires**: Legacy expiration header
+- **ETag**: Entity tag for conditional requests
+- **Last-Modified**: File modification time
+- **Vary**: Cache variation headers
+
+### Performance Monitoring
+- **PageSpeed Insights**: Monitor Core Web Vitals
+- **GTmetrix**: Analyze loading performance
+- **WebPageTest**: Detailed performance analysis
+- **Lighthouse**: SEO and performance auditing
+
 ## 🔧 Troubleshooting
 
 ### Common Issues

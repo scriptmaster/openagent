@@ -118,6 +118,9 @@ func HandleTestPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set cache headers for the page
+	SetCacheHeaders(w, r, r.URL.Path)
+
 	data := models.PageData{
 		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "Test Page",
@@ -275,6 +278,9 @@ func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService auth
 
 // HandleIndexPage serves the default index page with "Welcome to OpenAgent" message
 func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
+	// Set cache headers for the page
+	SetCacheHeaders(w, r, r.URL.Path)
+
 	// Create default page data
 	pageData := models.PageData{
 		AppName:    "OpenAgent",

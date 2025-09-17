@@ -49,13 +49,12 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 
 	// --- Static Files with Cache Headers ---
 	fs := http.FileServer(http.Dir(staticFilesRoot))
-	router.Handle("/static/", http.StripPrefix("/static/", addCacheHeaders(fs)))
+	router.Handle("/static/", http.StripPrefix("/static/", CacheMiddleware(fs)))
 
 	// --- TSX Generated CSS and JS Files with Cache Headers ---
 	router.HandleFunc("/tsx/css/", func(w http.ResponseWriter, r *http.Request) {
-		// Add cache headers for generated CSS files (shorter cache than static files)
-		w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour
-		w.Header().Set("ETag", `"`+fmt.Sprintf("%d", time.Now().Unix())+`"`)
+		// Set cache headers using our comprehensive cache system
+		SetCacheHeaders(w, r, r.URL.Path)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 
 		// Extract filename from path
@@ -67,13 +66,22 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 
 		// Serve from generated/css directory
 		filePath := fmt.Sprintf("./tpl/generated/css/%s", filename)
+
+		// Generate ETag for the file
+		etag, err := GenerateETag(filePath)
+		if err == nil {
+			// Handle conditional request
+			if HandleConditionalRequest(w, r, etag) {
+				return // 304 Not Modified
+			}
+		}
+
 		http.ServeFile(w, r, filePath)
 	})
 
 	router.HandleFunc("/tsx/js/", func(w http.ResponseWriter, r *http.Request) {
-		// Add cache headers for generated JS files (shorter cache than static files)
-		w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour
-		w.Header().Set("ETag", `"`+fmt.Sprintf("%d", time.Now().Unix())+`"`)
+		// Set cache headers using our comprehensive cache system
+		SetCacheHeaders(w, r, r.URL.Path)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 
 		// Extract filename from path
@@ -85,6 +93,16 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 
 		// Serve from generated/js directory (all files consolidated here)
 		filePath := fmt.Sprintf("./tpl/generated/js/%s", filename)
+
+		// Generate ETag for the file
+		etag, err := GenerateETag(filePath)
+		if err == nil {
+			// Handle conditional request
+			if HandleConditionalRequest(w, r, etag) {
+				return // 304 Not Modified
+			}
+		}
+
 		http.ServeFile(w, r, filePath)
 	})
 
