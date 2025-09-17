@@ -13,3 +13,5 @@ nul
 *backup*
 tpl/generated
 server/transpile/tpl/generated
+nginx*
+*.conf

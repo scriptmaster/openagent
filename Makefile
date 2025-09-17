@@ -3,7 +3,7 @@
 # Configuration variables - update these for your environment
 REMOTE_USER := root
 REMOTE_HOST := in.msheriff.com
-REMOTE_DIR := /root/github.com/openagent
+REMOTE_DIR := /var/www/openagent
 DEPLOY_PATH := $(REMOTE_DIR)/cicd
 REMOTE_CMD := "cd $(DEPLOY_PATH) && chmod +x deploy.sh && ./deploy.sh $(VERSION) $(LATEST_COMMIT)" # Command to run deploy.sh in DEPLOY_PATH
 GIT_REMOTE := origin
@@ -139,6 +139,10 @@ deploy-scp:
 	# Run docker compose using the compose file in cicd/
 	
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "cd $(REMOTE_DIR) && docker compose -f docker-compose.yml up -d --build"
+	
+	@echo "Setting proper ownership for web files..."
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) "chown -R www-data:www-data $(REMOTE_DIR)"
+	
 	@echo "SCP Deployment complete!"
 
 # Docker commands

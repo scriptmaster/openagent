@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/scriptmaster/openagent/admin"
@@ -46,12 +47,17 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 		http.ServeFile(w, r, "./static/favicon.ico")
 	})
 
-	// --- Static Files ---
+	// --- Static Files with Cache Headers ---
 	fs := http.FileServer(http.Dir(staticFilesRoot))
-	router.Handle("/static/", http.StripPrefix("/static/", fs))
+	router.Handle("/static/", http.StripPrefix("/static/", addCacheHeaders(fs)))
 
-	// --- TSX Generated CSS and JS Files ---
+	// --- TSX Generated CSS and JS Files with Cache Headers ---
 	router.HandleFunc("/tsx/css/", func(w http.ResponseWriter, r *http.Request) {
+		// Add cache headers for generated CSS files (shorter cache than static files)
+		w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour
+		w.Header().Set("ETag", `"`+fmt.Sprintf("%d", time.Now().Unix())+`"`)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
 		// Extract filename from path
 		filename := strings.TrimPrefix(r.URL.Path, "/tsx/css/")
 		if filename == "" {
@@ -65,6 +71,11 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 	})
 
 	router.HandleFunc("/tsx/js/", func(w http.ResponseWriter, r *http.Request) {
+		// Add cache headers for generated JS files (shorter cache than static files)
+		w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour
+		w.Header().Set("ETag", `"`+fmt.Sprintf("%d", time.Now().Unix())+`"`)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
 		// Extract filename from path
 		filename := strings.TrimPrefix(r.URL.Path, "/tsx/js/")
 		if filename == "" {
@@ -227,3 +238,20 @@ func registerAgentRoutes(mux *http.ServeMux) {
 	// ... implementation ...
 }
 */
+
+// addCacheHeaders wraps an http.Handler to add cache headers for static files
+func addCacheHeaders(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add cache headers for static files
+		w.Header().Set("Cache-Control", "public, max-age=86400") // 1 day
+		w.Header().Set("ETag", `"`+fmt.Sprintf("%d", time.Now().Unix())+`"`)
+
+		// Add security headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+		// Call the original handler
+		h.ServeHTTP(w, r)
+	})
+}

@@ -6,6 +6,8 @@ WORKDIR /build
 # Install build dependencies for CGO (needed for tree-sitter)
 RUN apt-get update && apt-get install -y \
     build-essential \
+    gcc-multilib \
+    g++-multilib \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy module files first for caching

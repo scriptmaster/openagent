@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
     
+    {page.contentMeta && page.contentMeta.map((meta: any) => (
+        <meta name={meta.name} content={meta.content} />
+    ))}
+
+    <meta property="og:type" content="website" />
+    {page.propMeta && page.propMeta.map((meta: any) => (
+        <meta property={meta.property} content={meta.content} />
+    ))}
+    
     <!--#include "../_partials/head.html" -->
 </head>
 <body class="theme-pista">

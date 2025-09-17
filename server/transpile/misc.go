@@ -216,3 +216,144 @@ func processIncludes(htmlContent, basePath string) string {
 
 	return htmlContent
 }
+
+// extractMetaTags extracts meta tags from HTML content and returns them as a string
+func extractMetaTags(htmlContent string) string {
+	// Find all meta tags in the HTML content
+	metaPattern := regexp.MustCompile(`(?i)<meta[^>]*>`)
+	matches := metaPattern.FindAllString(htmlContent, -1)
+
+	if len(matches) == 0 {
+		return ""
+	}
+
+	// Join all meta tags with newlines
+	var metaTags strings.Builder
+	for _, match := range matches {
+		metaTags.WriteString("    ")
+		metaTags.WriteString(match)
+		metaTags.WriteString("\n")
+	}
+
+	return metaTags.String()
+}
+
+// MetaTag represents a structured meta tag
+type MetaTag struct {
+	Name     string
+	Content  string
+	Property string
+}
+
+// extractMetaTagsStructured extracts meta tags from HTML content and returns them as structured data
+func extractMetaTagsStructured(htmlContent string) ([]MetaTag, error) {
+	// Parse the HTML content
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, err
+	}
+
+	var metaTags []MetaTag
+
+	// Function to traverse the HTML tree
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "meta" {
+			var metaTag MetaTag
+
+			// Extract attributes
+			for _, attr := range n.Attr {
+				switch attr.Key {
+				case "name":
+					metaTag.Name = attr.Val
+				case "content":
+					metaTag.Content = attr.Val
+				case "property":
+					metaTag.Property = attr.Val
+				}
+			}
+
+			// Only add if it has content and either name or property
+			if metaTag.Content != "" && (metaTag.Name != "" || metaTag.Property != "") {
+				metaTags = append(metaTags, metaTag)
+			}
+		}
+
+		// Traverse children
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			traverse(c)
+		}
+	}
+
+	traverse(doc)
+	return metaTags, nil
+}
+
+// convertMetaTagsToJS converts structured meta tags to JavaScript array format
+func convertMetaTagsToJS(metaTags []MetaTag, tagType string) string {
+	var result strings.Builder
+	result.WriteString("[")
+
+	first := true
+	for _, meta := range metaTags {
+		// Filter by tag type (name or property)
+		if tagType == "name" && meta.Name != "" {
+			if !first {
+				result.WriteString(", ")
+			}
+			result.WriteString(fmt.Sprintf(`{name: "%s", content: "%s"}`, meta.Name, meta.Content))
+			first = false
+		} else if tagType == "property" && meta.Property != "" {
+			if !first {
+				result.WriteString(", ")
+			}
+			result.WriteString(fmt.Sprintf(`{property: "%s", content: "%s"}`, meta.Property, meta.Content))
+			first = false
+		}
+	}
+
+	result.WriteString("]")
+	return result.String()
+}
+
+// removeMetaTags removes meta tags from HTML content
+func removeMetaTags(htmlContent string) string {
+	// Remove meta tags from the HTML content
+	metaPattern := regexp.MustCompile(`(?i)<meta[^>]*>`)
+	return metaPattern.ReplaceAllString(htmlContent, "")
+}
+
+// integrateLinkPathsAndScriptPathsWithValues integrates actual linkPaths and scriptPaths into the HTML content
+func integrateLinkPathsAndScriptPathsWithValues(htmlContent, linkPaths, scriptPaths string) string {
+	// Find the </head> tag and insert linkPaths before it
+	headClosePattern := regexp.MustCompile(`(?i)</head>`)
+	if headClosePattern.MatchString(htmlContent) && linkPaths != "" {
+		// Split linkPaths and create actual link tags
+		links := strings.Split(linkPaths, ",")
+		var linkTags strings.Builder
+		for _, link := range links {
+			link = strings.TrimSpace(link)
+			if link != "" {
+				linkTags.WriteString(fmt.Sprintf(`<link rel="stylesheet" href="%s" />`, link))
+			}
+		}
+		htmlContent = headClosePattern.ReplaceAllString(htmlContent, linkTags.String()+"</head>")
+	}
+
+	// Find the </body> tag and insert scriptPaths before it
+	bodyClosePattern := regexp.MustCompile(`(?i)</body>`)
+	if bodyClosePattern.MatchString(htmlContent) && scriptPaths != "" {
+		// Split scriptPaths and create actual script tags
+		scripts := strings.Split(scriptPaths, ",")
+		var scriptTags strings.Builder
+		for _, script := range scripts {
+			script = strings.TrimSpace(script)
+			if script != "" {
+				scriptTags.WriteString(fmt.Sprintf(`<script type="text/javascript" src="%s"></script>`, script))
+			}
+		}
+		htmlContent = bodyClosePattern.ReplaceAllString(htmlContent, scriptTags.String()+"</body>")
+	}
+
+	return htmlContent
+}
