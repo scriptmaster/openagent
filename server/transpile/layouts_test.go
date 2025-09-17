@@ -39,7 +39,7 @@ func TestTranspileLayoutToTsx(t *testing.T) {
 </body>
 </html>`,
 			expectedTSX: []string{
-				"export default function Test_layout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
+				"export default function TestLayout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
 				"<html lang=\"en\">",
 				"<head>",
 				"<meta charset=\"UTF-8\" />",
@@ -77,7 +77,7 @@ func TestTranspileLayoutToTsx(t *testing.T) {
 </body>
 </html>`,
 			expectedTSX: []string{
-				"export default function Test_layout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
+				"export default function TestLayout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
 				"<html>",
 				"<head>",
 				"<title>{page.PageTitle} - {page.AppName}</title>",
@@ -112,7 +112,7 @@ func TestTranspileLayoutToTsx(t *testing.T) {
 </body>
 </html>`,
 			expectedTSX: []string{
-				"export default function Test_layout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
+				"export default function TestLayout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
 				"<html>",
 				"<head>",
 				"<title>Test Layout</title>",
@@ -160,7 +160,7 @@ func TestTranspileLayoutToTsx(t *testing.T) {
 </body>
 </html>`,
 			expectedTSX: []string{
-				"export default function Test_layout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
+				"export default function TestLayout({page, children, linkPaths, scriptPaths}: {page: any, children?: any, linkPaths: any, scriptPaths: any})",
 				"<html lang=\"en\">",
 				"<head>",
 				"<meta charset=\"UTF-8\" />",

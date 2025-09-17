@@ -257,16 +257,18 @@ func recWalkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, 
 		recConvertElementToReactWithCustomComponents(n, result, customComponents)
 	case html.TextNode:
 		// Convert text node - preserve meaningful whitespace to avoid hydration mismatch
-		text := strings.TrimSpace(n.Data)
+		text := n.Data // strings.TrimSpace(n.Data)
 		// Only preserve whitespace if it's not just indentation (tabs/spaces at start of line)
 		if text != "" && !isOnlyIndentation(n.Data) {
 			// Check if this text is a React.createElement call (from our conversion)
-			if strings.HasPrefix(text, "React.createElement(") {
-				// This is a React.createElement call, don't wrap it in quotes
-				result.WriteString(text)
+			trimmedText := strings.TrimSpace(text)
+			if strings.HasPrefix(trimmedText, "React.createElement(") {
+				// This is a React.createElement call, trim whitespace and don't wrap it in quotes
+				result.WriteString(trimmedText)
 			} else {
-				// This is regular text, wrap it in quotes
-				result.WriteString(fmt.Sprintf("'%s'", text))
+				// This is regular text, escape it for JavaScript and wrap it in quotes
+				escapedText := escapeJSString(text)
+				result.WriteString(fmt.Sprintf("'%s'", escapedText))
 			}
 		}
 	case html.DocumentNode:
@@ -483,6 +485,30 @@ func isOnlyIndentation(text string) bool {
 		}
 	}
 	return true
+}
+
+// escapeJSString escapes a string for use in JavaScript string literals
+func escapeJSString(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+		switch r {
+		case '\n':
+			result.WriteString("\\n")
+		case '\r':
+			result.WriteString("\\r")
+		case '\t':
+			result.WriteString("\\t")
+		case '\\':
+			result.WriteString("\\\\")
+		case '\'':
+			result.WriteString("\\'")
+		case '"':
+			result.WriteString("\\\"")
+		default:
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
 // fixCustomJSXSelfClosingTags fixes custom JSX components to be self-closing

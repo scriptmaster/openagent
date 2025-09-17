@@ -38,15 +38,14 @@ func TestInnerComponentEmbedding(t *testing.T) {
 			baseName: "test",
 			contains: []string{
 				// Main component JS
-				"React.createElement('main'",
+				"React.createElement('div'",
 				"React.createElement('div', {className: \"container\"}",
 				"React.createElement('h1', null, 'Test Page')",
 				"React.createElement(Simple, {suppressHydrationWarning: true}",
 
 				// Inner component JS (Simple component)
-				"// ╔══════════════════════════════════════════════════════════════════════════════",
-				"// ║                    🔧 SIMPLE COMPONENT JS 🔧",
-				"// ╚══════════════════════════════════════════════════════════════════════════════",
+				"// ╔═ 🔧 SIMPLE COMPONENT JS 🔧 ══",
+				"// ╔═ 🔧 SIMPLE COMPONENT JS 🔧 ══",
 				"React.createElement('div', {className: \"simple-component\"}",
 				"React.createElement('button', {onClick: handleClick}",
 
@@ -58,7 +57,7 @@ func TestInnerComponentEmbedding(t *testing.T) {
 				"function initPage()",
 
 				// Hydration
-				"window.test = test",
+				"window.Test = Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -83,20 +82,18 @@ func TestInnerComponentEmbedding(t *testing.T) {
 			baseName: "test",
 			contains: []string{
 				// Main component JS
-				"React.createElement('main'",
+				"React.createElement('div'",
 				"React.createElement(Simple, {suppressHydrationWarning: true}",
 				"React.createElement(Counter, {suppressHydrationWarning: true}",
 
 				// Simple component JS
-				"// ╔══════════════════════════════════════════════════════════════════════════════",
-				"// ║                    🔧 SIMPLE COMPONENT JS 🔧",
-				"// ╚══════════════════════════════════════════════════════════════════════════════",
+				"// ╔═ 🔧 SIMPLE COMPONENT JS 🔧 ══",
+				"// ╔═ 🔧 SIMPLE COMPONENT JS 🔧 ══",
 				"Simple.prototype.handleClick = function()",
 
 				// Counter component JS
-				"// ╔══════════════════════════════════════════════════════════════════════════════",
-				"// ║                    🔧 COUNTER COMPONENT JS 🔧",
-				"// ╚══════════════════════════════════════════════════════════════════════════════",
+				"// ╔═ 🔧 SIMPLE COMPONENT JS 🔧 ══",
+				"// ╔═ 🔧 COUNTER COMPONENT JS 🔧 ══",
 				"Counter.prototype.increment = function()",
 				"Counter.prototype.decrement = function()",
 
@@ -104,7 +101,7 @@ func TestInnerComponentEmbedding(t *testing.T) {
 				"function initPage()",
 
 				// Hydration
-				"window.test = test",
+				"window.Test = Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{

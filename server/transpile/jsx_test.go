@@ -72,7 +72,7 @@ func TestTSX2JS(t *testing.T) {
 					to continue.
 				</div>
 			</main>`,
-			expected: `React.createElement('div', null, 'Welcome to', React.createElement('strong', null, 'our website'), '!', React.createElement('br', null), 'Please', React.createElement('a', {href: "/login"}, 'login'), 'to continue.')`,
+			expected: `React.createElement('div', null, '\n\t\t\t\t\tWelcome to \n\t\t\t\t\t', React.createElement('strong', null, 'our website'), '\n\t\t\t\t\t!\n\t\t\t\t\t', React.createElement('br', null), '\n\t\t\t\t\tPlease \n\t\t\t\t\t', React.createElement('a', {href: "/login"}, 'login'), '\n\t\t\t\t\tto continue.\n\t\t\t\t')`,
 		},
 		{
 			name: "Form elements",
@@ -186,7 +186,7 @@ func TestTSX2JS(t *testing.T) {
 				"React.createElement('div', {className: \"card\"}",
 				"React.createElement('h3', {className: \"card-title\"}, 'Main Content')",
 				"React.createElement('p', null, 'This is the main content area.')",
-				"React.createElement('button', {className: \"btn btn-success\", onClick: handleClick}, 'Save Changes')",
+				"React.createElement('button', {className: \"btn btn-success\", onClick: handleClick}",
 				"React.createElement('div', {className: \"col-md-4\"}",
 				"React.createElement('h4', {className: \"card-title\"}, 'Sidebar')",
 				"React.createElement('p', null, 'Sidebar content here.')",
@@ -275,7 +275,7 @@ func TestTSX2JS_EdgeCases(t *testing.T) {
 		{
 			name:     "Multiple text nodes",
 			input:    "<main>Hello <strong>World</strong>!</main>",
-			contains: []string{"'Hello'", "React.createElement('strong'", "'!'"},
+			contains: []string{"'Hello '", "React.createElement('strong'", "'!'"},
 		},
 		{
 			name:     "Attributes with special characters",

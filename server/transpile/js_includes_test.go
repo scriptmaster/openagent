@@ -18,14 +18,19 @@ console.log('test');`
 	reactContent := `// React library content
 window.React = { createElement: function() {} };`
 
+	// Create tmp directory if it doesn't exist
+	if err := os.MkdirAll("./tmp", 0755); err != nil {
+		t.Fatalf("Failed to create tmp directory: %v", err)
+	}
+
 	// Write temporary files
-	if err := os.WriteFile("/tmp/test_react.js", []byte(reactContent), 0644); err != nil {
+	if err := os.WriteFile("./tmp/test_react.js", []byte(reactContent), 0644); err != nil {
 		t.Fatalf("Failed to create test React file: %v", err)
 	}
-	defer os.Remove("/tmp/test_react.js")
+	defer os.Remove("./tmp/test_react.js")
 
-	// Test with absolute path
-	testContentWithPath := strings.Replace(testContent, "/static/js/react.production.min.js", "/tmp/test_react.js", 1)
+	// Test with relative path
+	testContentWithPath := strings.Replace(testContent, "/static/js/react.production.min.js", "./tmp/test_react.js", 1)
 
 	result := processJSIncludes(testContentWithPath)
 

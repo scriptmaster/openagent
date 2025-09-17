@@ -38,7 +38,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 			notContains: []string{
 				"<script>",
 				"prototype",
-				"window.test",
+				"window.Test",
 			},
 			description: "Basic HTML structure without any JavaScript",
 		},
@@ -100,7 +100,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"React.createElement('main', {className: \"content\"}",
 				"function initPage()",
 				"function handleNavigation()",
-				"window.test",
+				"window.Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -135,7 +135,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"React.createElement('p', null, 'Content after component')",
 				"function handleComponent()",
 				"Simple.prototype.init",
-				"window.test",
+				"window.Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -180,7 +180,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"function handleClick()",
 				"Simple.prototype.render",
 				"function afterComponent()",
-				"window.test",
+				"window.Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -226,7 +226,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"Simple.prototype.init",
 				"Counter.prototype.increment",
 				"Counter.prototype.decrement",
-				"window.test",
+				"window.Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -323,7 +323,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"React.createElement('div', {className: \"app\"}",
 				"React.createElement('header', {className: \"app-header\"}",
 				"React.createElement('main', {className: \"app-main\"}",
-				"React.createElement(Footer, {className: \"app-footer\"}",
+				"React.createElement(Footer, {suppressHydrationWarning: true}",
 				"React.createElement('div', {className: \"sidebar\"}",
 				"React.createElement('div', {className: \"content\"}",
 				"React.createElement('nav', null",
@@ -338,7 +338,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				"Chart.prototype.init",
 				"Chart.prototype.addData",
 				"Footer.prototype.init",
-				"window.test",
+				"window.Test",
 				"hydrateReactApp",
 			},
 			notContains: []string{
@@ -674,7 +674,7 @@ func TestTranspileHtmlToTsx_FourStepProcess(t *testing.T) {
 	t.Run("Step4_AddHydrationCode", func(t *testing.T) {
 		// Should contain hydration code
 		contains := []string{
-			"window.test",
+			"window.Test",
 			"hydrateReactApp",
 			"React.createElement",
 		}
