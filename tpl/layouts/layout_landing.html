@@ -5,28 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{page.PageTitle || page.AppName}</title>
     
-    <!-- Meta tags from page -->
-    {page.MetaTags}
+    {page.contentMeta && page.contentMeta.map((meta: any) => (
+        <meta name={meta.name} content={meta.content} />
+    ))}
+
+    <meta property="og:type" content="website" />
+    {page.propMeta && page.propMeta.map((meta: any) => (
+        <meta property={meta.property} content={meta.content} />
+    ))}
     
-    <link rel="stylesheet" href="/static/css/tabler.min.css" />
-    <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
+    <!--#include "../_partials/head.html" -->
 </head>
 <body class="theme-pista">
     <div className="page">
         <div className="page-wrapper">
             <div className="page-body">
                 <div className="container-xl">
-                    <div className="row row-deck row-cards">
-                        <div className="col-12">
-                            {/* Landing page content will be inserted here */}
-                            {children}
-                        </div>
-                    </div>
+                    {children}
                 </div>
             </div>
         </div>
     </div>
-    
-    <script src="/static/js/alpine.min.js" defer></script>
 </body>
 </html>
