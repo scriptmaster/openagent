@@ -770,12 +770,8 @@ func (s *ProjectService) GetProjects() ([]Project, error) {
 
 // GetProjectMembers retrieves members of a project
 func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID int) ([]auth.User, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT u.id, u.email, u.is_admin, u.created_at, u.last_logged_in 
-		FROM ai.users u
-		JOIN ai.project_members pm ON u.id = pm.user_id
-		WHERE pm.project_id = $1
-	`, projectID)
+	query := common.MustGetSQL("project_members/list_by_project_id")
+	rows, err := s.db.QueryContext(ctx, query, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -794,15 +790,14 @@ func (s *ProjectService) GetProjectMembers(ctx context.Context, projectID int) (
 
 // AddProjectMember adds a user to a project
 func (s *ProjectService) AddProjectMember(ctx context.Context, projectID int, user *auth.User) error {
-	query := common.MustGetSQL("project_members/add") // Load query
+	query := common.MustGetSQL("project_members/create")
 	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
 	return err
 }
 
 // RemoveProjectMember removes a user from a project
 func (s *ProjectService) RemoveProjectMember(ctx context.Context, projectID int, user *auth.User) error {
-	query := "DELETE FROM ai.project_members WHERE project_id = $1 AND user_id = $2" // Keeping inline due to file creation issue
-	// query := common.MustGetSQL("project_members/remove") // Load query (if file existed)
+	query := common.MustGetSQL("project_members/delete")
 	_, err := s.db.ExecContext(ctx, query, projectID, user.ID)
 	return err
 }
@@ -1141,11 +1136,11 @@ func (s *SettingsService) GetSetting(key string, scope string, scopeID *int) (Se
 	var query string
 
 	if scopeID != nil {
-		query = common.MustGetSQL("settings/get_scoped") // Load scoped query
+		query = common.MustGetSQL("settings/read_by_key_and_scope_with_id")
 		err = s.db.QueryRow(query, key, scope, *scopeID).Scan(&setting.ID, &setting.Key, &setting.Value, &setting.Description, &setting.Scope, &setting.ScopeID, &setting.UpdatedAt)
 	} else {
-		query = common.MustGetSQL("settings/get_global") // Load global query
-		err = s.db.QueryRow(query, key).Scan(&setting.ID, &setting.Key, &setting.Value, &setting.Description, &setting.Scope, &setting.ScopeID, &setting.UpdatedAt)
+		query = common.MustGetSQL("settings/read_by_key_and_scope_no_id")
+		err = s.db.QueryRow(query, key, scope).Scan(&setting.ID, &setting.Key, &setting.Value, &setting.Description, &setting.Scope, &setting.ScopeID, &setting.UpdatedAt)
 	}
 
 	if err != nil {
@@ -1161,20 +1156,10 @@ func (s *SettingsService) UpdateSetting(key, value, scope string, scopeID *int) 
 	var args []interface{}
 
 	if scopeID == nil {
-		query = `
-			INSERT INTO ai.settings (key, value, scope, scope_id, updated_at)
-			VALUES ($1, $2, $3, NULL, NOW())
-			ON CONFLICT (key, scope, COALESCE(scope_id, 0)) 
-			DO UPDATE SET value = $2, updated_at = NOW()
-		`
+		query = common.MustGetSQL("settings/upsert_no_scope_id")
 		args = []interface{}{key, value, scope}
 	} else {
-		query = `
-			INSERT INTO ai.settings (key, value, scope, scope_id, updated_at)
-			VALUES ($1, $2, $3, $4, NOW())
-			ON CONFLICT (key, scope, COALESCE(scope_id, 0)) 
-			DO UPDATE SET value = $2, updated_at = NOW()
-		`
+		query = common.MustGetSQL("settings/upsert_with_scope_id")
 		args = []interface{}{key, value, scope, *scopeID}
 	}
 
@@ -1184,11 +1169,8 @@ func (s *SettingsService) UpdateSetting(key, value, scope string, scopeID *int) 
 
 // GetAllSettings retrieves all settings
 func (s *SettingsService) GetAllSettings() ([]Setting, error) {
-	rows, err := s.db.Query(`
-		SELECT id, key, value, description, scope, scope_id, updated_at 
-		FROM ai.settings 
-		ORDER BY key
-	`)
+	query := common.MustGetSQL("settings/list_all")
+	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}

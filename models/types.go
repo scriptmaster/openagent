@@ -44,4 +44,19 @@ type PageData struct {
 	SystemHealth   interface{}   // System health information for admin dashboard
 }
 
+// Page represents a project-specific page
+type Page struct {
+	ID              int    `json:"id" db:"id"`
+	ProjectID       int    `json:"project_id" db:"project_id"`
+	Title           string `json:"title" db:"title"`
+	Slug            string `json:"slug" db:"slug"`
+	HTMLContent     string `json:"html_content" db:"html_content"`
+	IsLanding       bool   `json:"is_landing" db:"is_landing"`
+	IsActive        bool   `json:"is_active" db:"is_active"`
+	MetaTitle       string `json:"meta_title" db:"meta_title"`
+	MetaDescription string `json:"meta_description" db:"meta_description"`
+	CreatedAt       string `json:"created_at" db:"created_at"`
+	UpdatedAt       string `json:"updated_at" db:"updated_at"`
+}
+
 // Add other shared model structs here

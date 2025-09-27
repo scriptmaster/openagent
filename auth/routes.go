@@ -9,6 +9,14 @@ import (
 
 // RegisterAuthRoutes registers all authentication-related routes using named handlers
 func RegisterAuthRoutes(router *http.ServeMux, templates types.TemplateEngineInterface, userService UserServicer) {
+	if userService == nil {
+		// Handle auth routes gracefully if userService is nil
+		log.Println("Auth routes disabled: userService is nil (DB connection likely failed)")
+		router.HandleFunc("/login", HandleNilService)
+		router.HandleFunc("/auth/", HandleNilService)
+		return
+	}
+
 	// Initialize templates for auth handlers
 	InitAuthTemplates(templates)
 
@@ -19,17 +27,9 @@ func RegisterAuthRoutes(router *http.ServeMux, templates types.TemplateEngineInt
 	router.HandleFunc("/logout", HandleLogout)
 
 	// Auth API endpoints
-	router.HandleFunc("/auth/request-otp", func(w http.ResponseWriter, r *http.Request) {
-		HandleRequestOTP(w, r, userService)
-	})
-	router.HandleFunc("/auth/verify-otp", func(w http.ResponseWriter, r *http.Request) {
-		HandleVerifyOTP(w, r, userService)
-	})
-
-	// Password Login
-	router.HandleFunc("/auth/password-login", func(w http.ResponseWriter, r *http.Request) {
-		HandlePasswordLogin(w, r, userService)
-	})
+	router.HandleFunc("/auth/request-otp", CreateRequestOTPHandler(userService))
+	router.HandleFunc("/auth/verify-otp", CreateVerifyOTPHandler(userService))
+	router.HandleFunc("/auth/password-login", CreatePasswordLoginHandler(userService))
 }
 
 // AdminMiddleware checks if a user is an admin

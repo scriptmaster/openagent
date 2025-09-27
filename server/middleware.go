@@ -28,11 +28,13 @@ func HostProjectMiddleware(next http.Handler, projectService projects.ProjectSer
 			return
 		}
 
-		// Check if the path is exempt
-		for prefix := range exemptPaths {
-			if strings.HasPrefix(r.URL.Path, prefix) {
-				next.ServeHTTP(w, r) // Serve the original request directly
-				return
+		// Check if the path is exempt, but skip this check for the root path "/"
+		if r.URL.Path != "/" {
+			for prefix := range exemptPaths {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					next.ServeHTTP(w, r) // Serve the original request directly
+					return
+				}
 			}
 		}
 

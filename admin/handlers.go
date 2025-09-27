@@ -19,6 +19,7 @@ import (
 
 // HandleAdmin displays the admin dashboard
 func HandleAdmin(w http.ResponseWriter, r *http.Request, templates types.TemplateEngineInterface) {
+	log.Printf("\t → \t → 6.6 Registering admin routes")
 	// Get user from context (set by auth middleware)
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
@@ -584,5 +585,137 @@ func Handle404(w http.ResponseWriter, r *http.Request, templates types.TemplateE
 	w.WriteHeader(http.StatusNotFound)
 	if err := templates.ExecuteTemplate(w, "error_404.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// CreateAdminHandler creates a handler for the admin dashboard
+func CreateAdminHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB, getAdminStats func(*sql.DB) (*models.AdminStats, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get user from context (set by auth middleware)
+		user := auth.GetUserFromContext(r.Context())
+		if user == nil {
+			http.Error(w, "User not found in context", http.StatusInternalServerError)
+			return
+		}
+
+		// Get database connection and fetch stats
+		db := getDB()
+		var stats *models.AdminStats
+		if db != nil {
+			var err error
+			stats, err = getAdminStats(db)
+			if err != nil {
+				log.Printf("Error fetching admin stats: %v", err)
+				stats = &models.AdminStats{}
+			}
+		} else {
+			stats = &models.AdminStats{}
+		}
+
+		data := models.PageData{
+			AppName:        "OpenAgent",
+			PageTitle:      "Admin Dashboard - OpenAgent",
+			User:           user,
+			AdminEmail:     common.GetEnv("SYSADMIN_EMAIL"),
+			AppVersion:     common.GetEnv("APP_VERSION"),
+			Stats:          stats,
+			RecentActivity: []interface{}{},                             // Empty for now, can be populated later
+			SystemHealth:   map[string]interface{}{"status": "healthy"}, // Basic system health info
+		}
+
+		if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+// CreateMaintenanceAuthHandler creates a handler for maintenance auth
+func CreateMaintenanceAuthHandler(sessionSalt string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleMaintenanceAuth(w, r, sessionSalt)
+	}
+}
+
+// CreateMaintenanceConfigHandler creates a handler for maintenance config
+func CreateMaintenanceConfigHandler(templates types.TemplateEngineInterface, isMaintenanceAuthenticated func(r *http.Request) bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleMaintenanceConfig(w, r, templates, isMaintenanceAuthenticated)
+	}
+}
+
+// CreateMaintenanceConfigureHandler creates a handler for maintenance configure
+func CreateMaintenanceConfigureHandler(templates types.TemplateEngineInterface, isMaintenanceAuthenticated func(r *http.Request) bool, updateDatabaseConfig func(host, port, user, password, dbname string) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleMaintenanceConfigure(w, r, templates, isMaintenanceAuthenticated, updateDatabaseConfig)
+	}
+}
+
+// CreateInitializeSchemaHandler creates a handler for schema initialization
+func CreateInitializeSchemaHandler(isMaintenanceAuthenticated func(r *http.Request) bool, initDB func() (*sql.DB, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleInitializeSchema(w, r, isMaintenanceAuthenticated, initDB)
+	}
+}
+
+// CreateAdminCLIHandler creates a handler for admin CLI
+func CreateAdminCLIHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleAdminCLI(w, r, templates, getDB)
+	}
+}
+
+// CreateCLIQueriesAPIHandler creates a handler for CLI queries API
+func CreateCLIQueriesAPIHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleCLIQueriesAPI(w, r)
+	}
+}
+
+// CreateCLIExecuteAPIHandler creates a handler for CLI execute API
+func CreateCLIExecuteAPIHandler(getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleCLIExecuteAPI(w, r, getDB)
+	}
+}
+
+// CreateAdminConnectionsHandler creates a handler for admin connections
+func CreateAdminConnectionsHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleAdminConnections(w, r, templates, getDB)
+	}
+}
+
+// CreateAdminTablesHandler creates a handler for admin tables
+func CreateAdminTablesHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleAdminTables(w, r, templates, getDB)
+	}
+}
+
+// CreateAdminSettingsHandler creates a handler for admin settings
+func CreateAdminSettingsHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleAdminSettings(w, r, templates, getDB)
+	}
+}
+
+// CreateConnectionsHandler creates a handler for connections
+func CreateConnectionsHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleConnections(w, r, templates, getDB)
+	}
+}
+
+// CreateTablesHandler creates a handler for tables
+func CreateTablesHandler(templates types.TemplateEngineInterface, getDB func() *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleTables(w, r, templates, getDB)
+	}
+}
+
+// CreateProfileHandler creates a handler for profile
+func CreateProfileHandler(templates types.TemplateEngineInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleProfile(w, r, templates)
 	}
 }

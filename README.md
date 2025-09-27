@@ -1,6 +1,14 @@
-# OpenAgent Template System
+# OpenAgent
 
+## Features:
 
+## Stories:
+
+### Story 001: Landing page routing.
+[ ] Task: If the landing page
+[ ] Task: Implement host-based project routing - check for project by host, serve landing page from database (is_landing=true) or fallback to index.html 
+
+## OpenAgent Template System
 
 ## 🚀 Functional Features
 

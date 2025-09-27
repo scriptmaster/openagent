@@ -18,6 +18,74 @@ import (
 
 // --- Interfaces (to avoid import cycles) ---
 
+// HandleNilService handles project routes when services are nil (DB unavailable)
+func HandleNilService(w http.ResponseWriter, r *http.Request) {
+	log.Printf("\t → \t → 6.5 Registering project routes")
+	http.Redirect(w, r, "/config?error=db_unavailable", http.StatusSeeOther)
+}
+
+// HandleNilServiceAPI handles project API routes when services are nil (DB unavailable)
+func HandleNilServiceAPI(w http.ResponseWriter, r *http.Request) {
+	common.JSONError(w, "Service unavailable: Database not configured or connection failed.", http.StatusServiceUnavailable)
+}
+
+// CreateProjectsHandler creates a handler for the projects page
+func CreateProjectsHandler(templates types.TemplateEngineInterface, projectService ProjectService, userService auth.UserServicer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleProjectsRoute(w, r, templates, projectService, userService)
+	}
+}
+
+// CreateProjectsAPIHandler creates a handler for the projects API
+func CreateProjectsAPIHandler(templates types.TemplateEngineInterface, projectService ProjectService, projectDBService common.ProjectDBService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.GetUserFromContext(r.Context())
+		if user == nil {
+			common.JSONError(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Basic routing based on method and path structure
+		path := r.URL.Path
+
+		// Handle specific /dbconfig path FIRST
+		dbConfigPrefix := "/api/projects/"
+		dbConfigSuffix := "/dbconfig"
+		if strings.HasPrefix(path, dbConfigPrefix) && strings.HasSuffix(path, dbConfigSuffix) {
+			if r.Method == http.MethodPut {
+				// Pass projectService AND projectDBService here
+				HandleUpdateProjectDBConfigAPI(w, r, projectService, projectDBService)
+			} else {
+				common.JSONError(w, "Method not allowed for /dbconfig", http.StatusMethodNotAllowed)
+			}
+			return // Handled
+		}
+
+		// Handle other /api/projects/... paths
+		if path == "/api/projects" || path == "/api/projects/" {
+			switch r.Method {
+			case http.MethodGet:
+				HandleListProjectsAPI(w, r, projectService)
+			case http.MethodPost:
+				HandleCreateProjectAPI(w, r, projectService, user)
+			default:
+				common.JSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		} else if strings.HasPrefix(path, "/api/projects/") {
+			switch r.Method {
+			case http.MethodPut:
+				HandleUpdateProjectAPI(w, r, projectService)
+			case http.MethodDelete:
+				HandleDeleteProjectAPI(w, r, projectService)
+			default:
+				common.JSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+		} else {
+			common.Handle404(w, r, templates) // Or JSON 404?
+		}
+	}
+}
+
 // HandleProjectsAPI handles the /api/projects endpoint
 func HandleProjectsAPI(w http.ResponseWriter, r *http.Request, service ProjectService) {
 	if r.Method == http.MethodGet {

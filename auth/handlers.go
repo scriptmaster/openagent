@@ -19,6 +19,33 @@ func InitAuthTemplates(t types.TemplateEngineInterface) {
 	authTemplates = t
 }
 
+// HandleNilService handles auth routes when userService is nil (DB unavailable)
+func HandleNilService(w http.ResponseWriter, r *http.Request) {
+	log.Printf("\t → \t → 6.4 Registering auth routes")
+	http.Redirect(w, r, "/config?error=db_unavailable", http.StatusSeeOther)
+}
+
+// CreateRequestOTPHandler creates a handler for OTP requests
+func CreateRequestOTPHandler(userService UserServicer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleRequestOTP(w, r, userService)
+	}
+}
+
+// CreateVerifyOTPHandler creates a handler for OTP verification
+func CreateVerifyOTPHandler(userService UserServicer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandleVerifyOTP(w, r, userService)
+	}
+}
+
+// CreatePasswordLoginHandler creates a handler for password login
+func CreatePasswordLoginHandler(userService UserServicer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		HandlePasswordLogin(w, r, userService)
+	}
+}
+
 // HandleLogin displays the login page
 func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	// Ensure templates are initialized

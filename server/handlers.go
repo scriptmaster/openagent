@@ -1,13 +1,14 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-
-	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/scriptmaster/openagent/admin"
 	"github.com/scriptmaster/openagent/auth"
 	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
@@ -113,6 +114,7 @@ func HandleAgentPage(w http.ResponseWriter, r *http.Request) {
 
 // HandleTestPage serves a test page to verify template system
 func HandleTestPage(w http.ResponseWriter, r *http.Request) {
+	// log.Printf("\t → \t → 6.20 Route: /test handler")
 	if globalTemplates == nil {
 		http.Error(w, "Templates not initialized", http.StatusInternalServerError)
 		return
@@ -276,23 +278,202 @@ func HandleConfigSubmit(w http.ResponseWriter, r *http.Request, userService auth
 	common.JSONResponse(w, map[string]string{"message": "Configuration successful! Please log in."})
 }
 
-// HandleIndexPage serves the default index page with "Welcome to OpenAgent" message
-func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
+// HandleVersion serves the application version information
+func HandleVersion(w http.ResponseWriter, r *http.Request) {
+	// log.Printf("\t → \t → 6.10 Route: /version handler")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"version": "%s", "timestamp": "%s"}`, AppVersion, time.Now().UTC().Format(time.RFC3339))
+}
+
+// Handle404 serves a custom 404 page
+func Handle404(w http.ResponseWriter, r *http.Request) {
+	if globalTemplates == nil {
+		http.Error(w, "Templates not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	// Set cache headers for the page
 	SetCacheHeaders(w, r, r.URL.Path)
 
-	// Create default page data
+	// Create 404 page data
 	pageData := models.PageData{
 		AppName:    "OpenAgent",
 		AppVersion: AppVersion,
-		PageTitle:  "Welcome to OpenAgent",
-		User:       nil, // No user context for landing page
+		PageTitle:  "Page Not Found",
+		User:       nil,
 	}
 
-	// Render the index template
-	if err := globalTemplates.ExecuteTemplate(w, "index.html", pageData); err != nil {
-		log.Printf("Error rendering index page: %v", err)
+	// Render the 404 template
+	if err := globalTemplates.ExecuteTemplate(w, "error_404.html", pageData); err != nil {
+		log.Printf("Error rendering 404 page: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+}
+
+// HandleFavicon serves the favicon
+func HandleFavicon(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "./static/favicon.ico")
+}
+
+// HandleTSXCSS serves generated CSS files with cache headers
+func HandleTSXCSS(w http.ResponseWriter, r *http.Request) {
+	// Set cache headers using our comprehensive cache system
+	SetCacheHeaders(w, r, r.URL.Path)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	// Extract filename from path
+	filename := strings.TrimPrefix(r.URL.Path, "/tsx/css/")
+	if filename == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Serve from generated/css directory
+	filePath := fmt.Sprintf("./tpl/generated/css/%s", filename)
+
+	// Generate ETag for the file
+	etag, err := GenerateETag(filePath)
+	if err == nil {
+		// Handle conditional request
+		if HandleConditionalRequest(w, r, etag) {
+			return // 304 Not Modified
+		}
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
+// HandleTSXJS serves generated JS files with cache headers
+func HandleTSXJS(w http.ResponseWriter, r *http.Request) {
+	// Set cache headers using our comprehensive cache system
+	SetCacheHeaders(w, r, r.URL.Path)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	// Extract filename from path
+	filename := strings.TrimPrefix(r.URL.Path, "/tsx/js/")
+	if filename == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Serve from generated/js directory
+	filePath := fmt.Sprintf("./tpl/generated/js/%s", filename)
+
+	// Generate ETag for the file
+	etag, err := GenerateETag(filePath)
+	if err == nil {
+		// Handle conditional request
+		if HandleConditionalRequest(w, r, etag) {
+			return // 304 Not Modified
+		}
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
+// HandleMaintenance serves the maintenance page
+func HandleMaintenance(w http.ResponseWriter, r *http.Request) {
+	// log.Printf("\t → \t → 6.3 Creating maintenance route: /maintenance")
+	admin.HandleMaintenance(w, r, globalTemplates, auth.IsMaintenanceAuthenticated)
+}
+
+// HandleConfig serves the configuration page
+func HandleConfig(w http.ResponseWriter, r *http.Request) {
+	// log.Printf("\t → \t → 6.3 Creating config route paths: /config and /config/save")
+	HandleConfigPage(w, r)
+}
+
+// HandleConfigSave handles configuration save requests
+func HandleConfigSave(w http.ResponseWriter, r *http.Request) {
+	// This will be handled by the inline function in routes.go
+	// since it needs access to userService and projectService
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
+}
+
+// CreateConfigSaveHandler creates a config save handler with the required services
+func CreateConfigSaveHandler(userService auth.UserServicer, projectService projects.ProjectService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if userService == nil || projectService == nil {
+			common.JSONError(w, "System not fully configured", http.StatusServiceUnavailable)
+			return
+		}
+		HandleConfigSubmit(w, r, userService, projectService)
+	}
+}
+
+// CreateFaviconHandler creates a favicon handler
+func CreateFaviconHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.2.1 Route: /favicon.ico")
+	return HandleFavicon
+}
+
+// CreateTSXCSSHandler creates a TSX CSS handler
+func CreateTSXCSSHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.2.2 Route: /tsx/css/")
+	return HandleTSXCSS
+}
+
+// CreateTSXJSHandler creates a TSX JS handler
+func CreateTSXJSHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.2.2 Route: /tsx/js/")
+	return HandleTSXJS
+}
+
+// CreateVoiceHandler creates a voice handler
+func CreateVoiceHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.8 Setting /voice handler with Auth")
+	return HandleVoicePage
+}
+
+// CreateAgentHandler creates an agent handler
+func CreateAgentHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.9 Setting /agent handler with Auth")
+	return HandleAgentPage
+}
+
+// CreateVersionHandler creates a version handler
+func CreateVersionHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.10 Route: /version handler")
+	return HandleVersion
+}
+
+// CreateTestHandler creates a test handler
+func CreateTestHandler() http.HandlerFunc {
+	log.Printf("\t → \t → 6.20 Route: /test handler")
+	return HandleTestPage
+}
+
+// CreateDashboardHandler creates a dashboard handler with the required services
+func CreateDashboardHandler(projectService projects.ProjectService) http.HandlerFunc {
+	log.Printf("\t → \t → 6.7 Setting /dashboard handler with Auth")
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.GetUserFromContext(r.Context())
+		if user != nil && user.IsAdmin {
+			// Admin users get redirected to admin dashboard
+			http.Redirect(w, r, "/admin", http.StatusSeeOther)
+			return
+		}
+
+		if projectService == nil {
+			http.Error(w, "Project service not available", http.StatusInternalServerError)
+			return
+		}
+		HandleDashboard(w, r, projectService)
+	}
+}
+
+// HandleDashboardWithAuth handles dashboard with admin redirect logic
+func HandleDashboardWithAuth(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUserFromContext(r.Context())
+	if user != nil && user.IsAdmin {
+		// Admin users get redirected to admin dashboard
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
+	// Get projectService from context or global variable
+	// For now, we'll handle this in the route definition
+	http.Error(w, "Project service not available", http.StatusInternalServerError)
 }
