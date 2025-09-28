@@ -17,7 +17,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query perf rperf perf2
 
 all: stop start
 
@@ -288,3 +288,45 @@ help:
 	@echo "  make reset-password EMAIL=user@example.com PASSWORD=newpassword - Reset user password"
 	@echo "  make list-users - List all users in database"
 	@echo "  make query [query-name] [param1] [param2] - Execute SQL query from data/sql/postgres"
+	@echo "  make perf - Run performance test using wrk (localhost)"
+	@echo "  make rperf - Run performance test using wrk (remote server)"
+	@echo "  make perf2 - Alias for rperf (remote performance test)"
+
+# Performance test using wrk
+perf:
+	@echo "🚀 Running performance test on localhost:8800..."
+	@echo "📊 First, let's verify the server is running and check version..."
+	@VERSION=$$(curl -s http://localhost:8800/ | grep -o 'Version [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1); \
+	if [ -z "$$VERSION" ]; then \
+		echo "❌ Server not responding or version not found. Please start server first with 'make start' or 'go run . server &'"; \
+		exit 1; \
+	fi; \
+	echo "✅ Server is running with $$VERSION"
+	@echo "📏 Response size: $$(curl -s http://localhost:8800/ | wc -c) bytes"
+	@echo ""
+	@echo "🔥 Running wrk performance test (12 threads, 400 connections, 30 seconds)..."
+	@echo "=========================================="
+	@wrk -t12 -c400 -d30s http://localhost:8800/
+	@echo "=========================================="
+	@echo "✅ Performance test completed!"
+
+# Remote performance test using wrk on production server
+rperf:
+	@echo "🚀 Running remote performance test on $(REMOTE_HOST)..."
+	@echo "📊 First, let's verify the server is running and check version..."
+	@VERSION=$$(ssh $(REMOTE_USER)@$(REMOTE_HOST) "curl -s http://localhost:8800/ | grep -o 'Version [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1"); \
+	if [ -z "$$VERSION" ]; then \
+		echo "❌ Remote server not responding or version not found"; \
+		exit 1; \
+	fi; \
+	echo "✅ Remote server is running with $$VERSION"
+	@echo "📏 Response size: $$(ssh $(REMOTE_USER)@$(REMOTE_HOST) 'curl -s http://localhost:8800/ | wc -c') bytes"
+	@echo ""
+	@echo "🔥 Running wrk performance test on remote server (12 threads, 400 connections, 30 seconds)..."
+	@echo "=========================================="
+	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "wrk -t12 -c400 -d30s http://localhost:8800/"
+	@echo "=========================================="
+	@echo "✅ Remote performance test completed!"
+
+# Alias for remote performance test
+perf2: rperf
