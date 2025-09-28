@@ -33,7 +33,7 @@
 .theme-glass {
   background-attachment: fixed;
   min-height: 100vh;
-  color: #000000; /* Black text by default */
+  color: #ffffff; /* White text by default */
   position: relative;
 }
 
