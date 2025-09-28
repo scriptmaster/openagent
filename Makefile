@@ -17,7 +17,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query perf rperf perf2
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query perf rperf perf2 revision
 
 all: stop start
 
@@ -31,6 +31,11 @@ test-psql:
 build: test-psql
 	@echo "Building $(BINARY_NAME)..."
 	go build -o $(BINARY_NAME) .
+
+# Increment the 4th digit of the version (revision number)
+revision:
+	@echo "Incrementing revision number..."
+	@go run . cli increment-version
 
 # Manually apply database migrations (Original Method)
 migrations:
@@ -47,7 +52,8 @@ migrations:
 # Run tests (includes running migrations first if needed)
 test:
 	$(MAKE) stop-port # Ensure no server is running on the test port
-	$(MAKE) build     # Build the application binary
+	$(MAKE) revision   # Increment revision number for cache busting
+	$(MAKE) build      # Build the application binary
 	$(MAKE) migrations # Apply database migrations (if tests depend on schema)
 	@echo "Running go mod tidy..."
 	go mod tidy

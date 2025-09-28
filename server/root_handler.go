@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/scriptmaster/openagent/auth"
+	"github.com/scriptmaster/openagent/common"
 	"github.com/scriptmaster/openagent/models"
 	"github.com/scriptmaster/openagent/projects"
 )
@@ -102,11 +103,11 @@ func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
 	// Prepare template data
 	templateData := map[string]interface{}{
 		"AppName":    "OpenAgent",
-		"AppVersion": AppVersion,
+		"AppVersion": common.AppVersion,
 		"User":       user,
 	}
 
-	// Execute the index template
+	// Execute the index template with glass layout
 	err := globalTemplates.ExecuteTemplate(w, "index.html", templateData)
 	if err != nil {
 		log.Printf("Error executing index template: %v", err)

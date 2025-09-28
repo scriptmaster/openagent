@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/scriptmaster/openagent/common"
 )
 
 // Configuration constants (can be overridden by environment variables)
@@ -479,7 +481,7 @@ func HandleAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Get the current app version
-	appVersion := AppVersion
+	appVersion := common.AppVersion
 
 	// Create template data with version
 	data := struct {

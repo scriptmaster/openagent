@@ -39,5 +39,11 @@ func RegisterRoutes(router *http.ServeMux, userService auth.UserServicer, salt s
 	// Public routes
 	router.HandleFunc("/version", CreateVersionHandler())
 	router.HandleFunc("/test", CreateTestHandler())
+
+	// Health check endpoints for Kubernetes
+	router.HandleFunc("/livez", HandleLivez)
+	router.HandleFunc("/readyz", HandleReadyz)
+	router.HandleFunc("/healthz", HandleHealthz) // Legacy endpoint (disabled)
+
 	router.HandleFunc("/", CreateRootHandler())
 }

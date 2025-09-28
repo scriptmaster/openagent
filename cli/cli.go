@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -23,9 +26,9 @@ var (
 	db *sql.DB
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "openagent-cli",
+// RootCmd represents the base command when called without any subcommands
+var RootCmd = &cobra.Command{
+	Use:   "cli",
 	Short: "OpenAgent CLI tool for password management",
 	Long:  `OpenAgent CLI tool provides commands for managing user passwords and other administrative tasks.`,
 }
@@ -213,6 +216,40 @@ If no query name is provided, lists all available queries.`,
 	},
 }
 
+// incrementVersionCmd represents the increment-version command
+var incrementVersionCmd = &cobra.Command{
+	Use:   "increment-version",
+	Short: "Increment the 4th digit of the application version",
+	Long:  `Increment the 4th digit (revision number) of the application version in common/app_version.go.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		versionFile := "common/app_version.go"
+
+		// Read the current version
+		currentVersion, err := readCurrentVersion(versionFile)
+		if err != nil {
+			log.Fatalf("Error reading current version: %v", err)
+		}
+
+		fmt.Printf("Current version: %s\n", currentVersion)
+
+		// Increment the 4th digit
+		newVersion, err := incrementRevision(currentVersion)
+		if err != nil {
+			log.Fatalf("Error incrementing version: %v", err)
+		}
+
+		fmt.Printf("New version: %s\n", newVersion)
+
+		// Update the version in the file
+		err = updateVersionInFile(versionFile, newVersion)
+		if err != nil {
+			log.Fatalf("Error updating version in file: %v", err)
+		}
+
+		fmt.Printf("Version updated to: %s\n", newVersion)
+	},
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	// Load environment variables from .env file
@@ -220,7 +257,7 @@ func Execute() {
 		log.Printf("Warning: Could not load .env file: %v", err)
 	}
 
-	err := rootCmd.Execute()
+	err := RootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -228,10 +265,11 @@ func Execute() {
 
 func init() {
 	// Add subcommands
-	rootCmd.AddCommand(generateHashCmd)
-	rootCmd.AddCommand(resetPasswordCmd)
-	rootCmd.AddCommand(listUsersCmd)
-	rootCmd.AddCommand(queryCmd)
+	RootCmd.AddCommand(generateHashCmd)
+	RootCmd.AddCommand(resetPasswordCmd)
+	RootCmd.AddCommand(listUsersCmd)
+	RootCmd.AddCommand(queryCmd)
+	RootCmd.AddCommand(incrementVersionCmd)
 }
 
 // initDB initializes the database connection
@@ -363,4 +401,71 @@ func listAvailableQueries() {
 
 	fmt.Printf("\nTotal: %d queries available\n", totalQueries)
 	fmt.Println("\nUsage: openagent-cli query <query-name> [param1] [param2] ...")
+}
+
+// readCurrentVersion reads the current version from the app_version.go file
+func readCurrentVersion(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "const AppVersion = ") {
+			// Extract version from line like: const AppVersion = "1.3.1.0"
+			re := regexp.MustCompile(`"([^"]+)"`)
+			matches := re.FindStringSubmatch(line)
+			if len(matches) > 1 {
+				return matches[1], nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("version not found in file")
+}
+
+// incrementRevision increments the 4th digit of the version
+func incrementRevision(version string) (string, error) {
+	parts := strings.Split(version, ".")
+	if len(parts) != 4 {
+		return "", fmt.Errorf("invalid version format: %s (expected x.y.z.w)", version)
+	}
+
+	// Parse the 4th digit (revision)
+	revision, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return "", fmt.Errorf("invalid revision number: %s", parts[3])
+	}
+
+	// Increment revision
+	newRevision := revision + 1
+
+	// Reconstruct version
+	newVersion := fmt.Sprintf("%s.%s.%s.%d", parts[0], parts[1], parts[2], newRevision)
+
+	return newVersion, nil
+}
+
+// updateVersionInFile updates the version in the app_version.go file
+func updateVersionInFile(filename, newVersion string) error {
+	// Read the entire file
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	// Replace the version in the content
+	re := regexp.MustCompile(`const AppVersion = "[^"]*"`)
+	newContent := re.ReplaceAllString(string(content), fmt.Sprintf(`const AppVersion = "%s"`, newVersion))
+
+	// Write back to file
+	err = os.WriteFile(filename, []byte(newContent), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

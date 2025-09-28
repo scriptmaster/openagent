@@ -40,8 +40,8 @@ func processComponentImports(htmlContent, inputPath string) (string, []string, e
 		fmt.Printf("DEBUG: Processing component imports for: %s\n", inputPath)
 	}
 
-	// Use regex for initial component div replacement (more reliable for this specific case)
-	componentPattern := regexp.MustCompile(`<div\s+id="component[-_](\w+)"[^>]*>\s*</div>`)
+	// Use regex for initial component template replacement (more reliable for this specific case)
+	componentPattern := regexp.MustCompile(`<template\s+id="component[-_](\w+)"[^>]*>\s*</template>`)
 
 	var importedComponents []string
 
@@ -311,10 +311,10 @@ func findComponentJSFiles(htmlContent string) []string {
 		return componentFiles
 	}
 
-	// Walk through the HTML to find component divs
+	// Walk through the HTML to find component templates
 	var walker func(*html.Node)
 	walker = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "div" {
+		if n.Type == html.ElementNode && n.Data == "template" {
 			// Check for component ID attributes
 			for _, attr := range n.Attr {
 				if attr.Key == "id" && (strings.HasPrefix(attr.Val, "component-") || strings.HasPrefix(attr.Val, "component_")) {

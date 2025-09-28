@@ -126,7 +126,7 @@ func HandleTestPage(w http.ResponseWriter, r *http.Request) {
 	data := models.PageData{
 		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "Test Page",
-		AppVersion: AppVersion,
+		AppVersion: common.AppVersion,
 	}
 
 	err := globalTemplates.ExecuteTemplate(w, "test.html", data)
@@ -153,7 +153,7 @@ func HandleConfigPage(w http.ResponseWriter, r *http.Request) {
 		AppName:    common.GetEnv("APP_NAME"),
 		PageTitle:  "System Configuration",
 		User:       user, // Pass user info if available
-		AppVersion: AppVersion,
+		AppVersion: common.AppVersion,
 		// Add any specific flags or data needed for config page
 		// e.g., pass the current host?
 		CurrentHost: strings.Split(r.Host, ":")[0],
@@ -283,7 +283,54 @@ func HandleVersion(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("\t → \t → 6.10 Route: /version handler")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"version": "%s", "timestamp": "%s"}`, AppVersion, time.Now().UTC().Format(time.RFC3339))
+	fmt.Fprintf(w, `{"version": "%s", "timestamp": "%s"}`, common.AppVersion, time.Now().UTC().Format(time.RFC3339))
+}
+
+// HandleLivez serves Kubernetes liveness probe endpoint
+func HandleLivez(w http.ResponseWriter, r *http.Request) {
+	// Simple liveness check - server is running
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, "OK")
+}
+
+// HandleReadyz serves Kubernetes readiness probe endpoint
+func HandleReadyz(w http.ResponseWriter, r *http.Request) {
+	// Readiness check - server is ready to accept traffic
+	// Check if templates are loaded and database is accessible
+	if globalTemplates == nil {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "Service Unavailable: Templates not loaded")
+		return
+	}
+
+	// Check database connection if available
+	db := GetDB()
+	if db != nil {
+		if err := db.Ping(); err != nil {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, "Service Unavailable: Database connection failed")
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, "OK")
+}
+
+// HandleHealthz serves legacy health check endpoint (disabled by default)
+func HandleHealthz(w http.ResponseWriter, r *http.Request) {
+	// Legacy health endpoint - disabled by default
+	// Uncomment the following lines to enable:
+	// w.Header().Set("Content-Type", "text/plain")
+	// w.WriteHeader(http.StatusOK)
+	// fmt.Fprint(w, "OK")
+
+	// For now, return 404 to indicate it's disabled
+	http.NotFound(w, r)
 }
 
 // Handle404 serves a custom 404 page
@@ -299,7 +346,7 @@ func Handle404(w http.ResponseWriter, r *http.Request) {
 	// Create 404 page data
 	pageData := models.PageData{
 		AppName:    "OpenAgent",
-		AppVersion: AppVersion,
+		AppVersion: common.AppVersion,
 		PageTitle:  "Page Not Found",
 		User:       nil,
 	}
@@ -317,7 +364,7 @@ func HandleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "./static/favicon.ico")
 }
 
-// HandleTSXCSS serves generated CSS files with cache headers
+// HandleTSXCSS serves generated CSS files with cache headers and version busting
 func HandleTSXCSS(w http.ResponseWriter, r *http.Request) {
 	// Set cache headers using our comprehensive cache system
 	SetCacheHeaders(w, r, r.URL.Path)
@@ -330,8 +377,12 @@ func HandleTSXCSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle cache busting for page-specific CSS files
+	// Strip version parameter if present for file serving
+	actualFilename := strings.Split(filename, "?")[0]
+
 	// Serve from generated/css directory
-	filePath := fmt.Sprintf("./tpl/generated/css/%s", filename)
+	filePath := fmt.Sprintf("./tpl/generated/css/%s", actualFilename)
 
 	// Generate ETag for the file
 	etag, err := GenerateETag(filePath)
@@ -345,7 +396,7 @@ func HandleTSXCSS(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
-// HandleTSXJS serves generated JS files with cache headers
+// HandleTSXJS serves generated JS files with cache headers and version busting
 func HandleTSXJS(w http.ResponseWriter, r *http.Request) {
 	// Set cache headers using our comprehensive cache system
 	SetCacheHeaders(w, r, r.URL.Path)
@@ -358,8 +409,12 @@ func HandleTSXJS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle cache busting for _common.js and pages_*.js files
+	// Strip version parameter if present for file serving
+	actualFilename := strings.Split(filename, "?")[0]
+
 	// Serve from generated/js directory
-	filePath := fmt.Sprintf("./tpl/generated/js/%s", filename)
+	filePath := fmt.Sprintf("./tpl/generated/js/%s", actualFilename)
 
 	// Generate ETag for the file
 	etag, err := GenerateETag(filePath)

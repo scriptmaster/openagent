@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/scriptmaster/openagent/cli"
 	"github.com/spf13/cobra"
 )
 
@@ -24,5 +25,7 @@ that can perform various tasks and workflows.`,
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
+	// Add CLI commands
+	RootCmd.AddCommand(cli.RootCmd)
 	return RootCmd.Execute()
 }
