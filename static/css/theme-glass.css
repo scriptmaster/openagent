@@ -33,7 +33,7 @@
 .theme-glass {
   background-attachment: fixed;
   min-height: 100vh;
-  color: #ffffff; /* White text by default */
+  color: #000000; /* Black text by default */
   position: relative;
 }
 
@@ -45,6 +45,15 @@
 .theme-glass a.nav-link {
   margin: 0 6px;
   padding: 8px 16px; /* Restore nav-link padding */
+}
+
+/* Remove hover effects from nav links */
+.theme-glass .nav-link:hover,
+.theme-glass .navbar a:hover {
+  background: none !important;
+  color: inherit !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Animation Layer Classes */

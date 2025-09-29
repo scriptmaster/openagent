@@ -1,8 +1,10 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -107,11 +109,27 @@ func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
 		"User":       user,
 	}
 
-	// Execute the index template with glass layout
-	err := globalTemplates.ExecuteTemplate(w, "index.html", templateData)
+	// Determine which template to use based on LANDING_INDEX environment variable
+	templateName := "index.html"
+	
+	// Check LANDING_INDEX environment variable
+	if landingIndex := os.Getenv("LANDING_INDEX"); landingIndex != "" && landingIndex != "0" {
+		// Try to use numbered versions
+		templateName = fmt.Sprintf("index%s.html", landingIndex)
+	}
+
+	// Execute the index template (fallback to default if numbered version doesn't exist)
+	err := globalTemplates.ExecuteTemplate(w, templateName, templateData)
 	if err != nil {
-		log.Printf("Error executing index template: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		// If numbered template fails, fallback to default
+		if templateName != "index.html" {
+			log.Printf("Error executing %s template, falling back to index.html: %v", templateName, err)
+			err = globalTemplates.ExecuteTemplate(w, "index.html", templateData)
+		}
+		if err != nil {
+			log.Printf("Error executing index template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 	}
 }
 

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{page.PageTitle? page.PageTitle + ' - ' + page.AppName: page.AppName}</title>
+    
+    {page.contentMeta && page.contentMeta.map((meta: any) => (
+        <meta name={meta.name} content={meta.content} />
+    ))}
+    
+    <meta property="og:type" content="website" />
+    {page.propMeta && page.propMeta.map((meta: any) => (
+        <meta property={meta.property} content={meta.content} />
+    ))}
+
+    <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/static/img/icon.svg" />
+    <link rel="icon" href="/static/favicon.ico" />
+
+    <link rel="stylesheet" href="/static/css/tabler.min.css" />
+    <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
+
+    <link rel="stylesheet" href="/static/css/theme-glass.css?v=1.3.1.14">
+    
+    {linkPaths && linkPaths.split(',').map((link: string, index: any) => (
+        <link rel="stylesheet" href={link} />
+    ))}
+</head>
+<body class="theme-glass anim-1">
+    <div className="page">
+        <div className="page-wrapper">
+            <!-- Glass Header -->
+            <header class="navbar navbar-expand-md navbar-light d-print-none navbar-glass">
+                <div class="container-xl">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
+                        <a href="/">
+                            <img src="/static/img/logo.svg" height="36" alt="{page.AppName}"/>
+                        </a>
+                    </h1>
+                    <div class="navbar-nav flex-row order-md-last">
+                        {page.User ? (
+                            <>
+                                {/* User is logged in */}
+                                <div class="nav-item dropdown">
+                                    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
+                                        <span class="avatar avatar-sm" style="background-image: url(/static/img/default-avatar.png)"></span>
+                                        <div class="d-none d-xl-block ps-2">
+                                            <div>{page.User.Email}</div>
+                                            <div class="mt-1 small text-muted">{page.User.IsAdmin ? 'Admin' : 'User'}</div>
+                                        </div>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                                        <a href="#" class="dropdown-item">Profile</a>
+                                        <div class="dropdown-divider"></div>
+                                        <a href="/logout" class="dropdown-item">Logout</a>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* User is not logged in */}
+                                <div class="nav-item">
+                                    <a href="/login" class="btn btn-glass btn-op2">
+                                        <i class="ti ti-login me-1"></i>Login
+                                    </a>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div class="collapse navbar-collapse" id="navbar-menu">
+                        <div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
+                            <ul class="navbar-nav">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/dashboard">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-dashboard"></i>
+                                        </span>
+                                        <span class="nav-link-title">Dashboard</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/projects">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-briefcase"></i>
+                                        </span>
+                                        <span class="nav-link-title">Projects</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <div className="page-body">
+                <div className="container-xl">
+                    <div className="row row-cards">
+                        <div className="col-12">
+                            <main>
+                                {children}
+                            </main>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Glass Footer -->
+            <footer class="footer footer-transparent d-print-none footer-glass">
+                <div class="container-xl">
+                    <div class="row text-center align-items-center flex-row-reverse">
+                        <div class="col-lg-auto ms-lg-auto">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    <a href="/about" class="link-secondary">About</a>
+                                </li>
+                                <li class="list-inline-item">
+                                    <a href="/contact" class="link-secondary">Contact</a>
+                                </li>
+                                <li class="list-inline-item">
+                                    <a href="/privacy" class="link-secondary">Privacy</a>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                            <ul class="list-inline list-inline-dots mb-0">
+                                <li class="list-inline-item">
+                                    Copyright © {new Date().getFullYear()} &nbsp;
+                                    <a href="/" class="link-secondary">{page.AppName}</a>. All rights reserved!
+                                </li>
+                                <li class="list-inline-item">
+                                    <a href="#" class="link-secondary" rel="noopener">Version {page.AppVersion}</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <!-- JavaScript Files -->
+    {scriptPaths && scriptPaths.split(',').map((script: string, index: any) => (
+        <script type="text/javascript" src={script} />
+    ))}
+</body>
+</html>
