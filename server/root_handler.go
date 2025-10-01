@@ -154,3 +154,36 @@ func CreateRootHandler() http.HandlerFunc {
 
 	return HandleRoot
 }
+
+// HandleIndex1Page renders the experimental index1 variant directly
+func HandleIndex1Page(w http.ResponseWriter, r *http.Request) {
+    SetCacheHeaders(w, r, r.URL.Path)
+
+    if globalTemplates == nil {
+        http.Error(w, "Templates not initialized", http.StatusInternalServerError)
+        return
+    }
+
+    user := auth.GetUserFromContext(r.Context())
+    templateData := map[string]interface{}{
+        "AppName":    "OpenAgent",
+        "AppVersion": common.AppVersion,
+        "User":       user,
+    }
+
+    // Try index1.html first, fallback to index.html
+    if err := globalTemplates.ExecuteTemplate(w, "index1.html", templateData); err != nil {
+        log.Printf("Error executing index1 template: %v -- falling back to index.html", err)
+        if err2 := globalTemplates.ExecuteTemplate(w, "index.html", templateData); err2 != nil {
+            log.Printf("Error executing fallback index template: %v", err2)
+            http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+            return
+        }
+    }
+}
+
+// CreateIndex1Handler creates a handler for /index1
+func CreateIndex1Handler() http.HandlerFunc {
+    log.Printf("\t → 6.101 Route: /index1 Index Variant Handler")
+    return HandleIndex1Page
+}

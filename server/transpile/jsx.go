@@ -707,8 +707,6 @@ func createReactJSContent(originalJS, componentName string) string {
 
 	titledComponentName := getTitleCase(componentName)
 
-	// componentJS = wrapJSFunction(componentJS, titledComponentName)
-
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: actualComponentName = '%s'\n", titledComponentName)
 	}
