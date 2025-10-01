@@ -22,13 +22,13 @@
     <link rel="stylesheet" href="/static/css/tabler.min.css" />
     <link rel="stylesheet" href="/static/css/tabler-icons.min.css" />
 
-    <link rel="stylesheet" href="/static/css/theme-glass.css?v=1.3.1.14">
+    <link rel="stylesheet" href={"/static/css/theme-glass.css?v=" + page.AppVersion}>
     
     {linkPaths && linkPaths.split(',').map((link: string, index: any) => (
         <link rel="stylesheet" href={link} />
     ))}
 </head>
-<body class="theme-glass anim-1">
+<body class="theme-glass anim-1 anim-2 anim-3 anim-5">
     <div className="page">
         <div className="page-wrapper">
             <!-- Glass Header -->
