@@ -111,7 +111,7 @@ func HandleIndexPage(w http.ResponseWriter, r *http.Request) {
 
 	// Determine which template to use based on LANDING_INDEX environment variable
 	templateName := "index.html"
-	
+
 	// Check LANDING_INDEX environment variable
 	if landingIndex := os.Getenv("LANDING_INDEX"); landingIndex != "" && landingIndex != "0" {
 		// Try to use numbered versions

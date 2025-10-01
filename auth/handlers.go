@@ -79,7 +79,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  "Login - " + common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		AdminEmail: os.Getenv("SYSADMIN_EMAIL"),
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.AppVersion,
 		Error:      errorMessage,
 		User:       nil,
 	}

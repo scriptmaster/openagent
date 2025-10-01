@@ -36,7 +36,7 @@ func HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  "User Profile",
 		User:       user,
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.AppVersion,
 		Error:      r.URL.Query().Get("error"),
 		Success:    r.URL.Query().Get("success"),
 	}

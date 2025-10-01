@@ -194,7 +194,7 @@ func HandleProjects(w http.ResponseWriter, r *http.Request, templates types.Temp
 		PageTitle:  "Projects",
 		User:       *user,
 		Projects:   projects,
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.AppVersion,
 	}
 
 	// Execute the template
@@ -219,7 +219,7 @@ func HandleIndex(w http.ResponseWriter, r *http.Request, templates types.Templat
 	data := models.PageData{
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  "Welcome to OpenAgent",
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.AppVersion,
 	}
 
 	// Try to get project based on host
@@ -278,7 +278,7 @@ func HandleProjectPageRoute(w http.ResponseWriter, r *http.Request, templates ty
 	data := models.PageData{
 		AppName:    common.GetEnvOrDefault("APP_NAME", "OpenAgent"),
 		PageTitle:  project.Name,
-		AppVersion: common.GetEnvOrDefault("APP_VERSION", "1.0.0.0"),
+		AppVersion: common.AppVersion,
 		Project:    project,
 		User:       user,
 	}
