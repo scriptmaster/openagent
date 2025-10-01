@@ -1,22 +1,89 @@
 <!-- Hero Section -->
-<div className="hero-section">
+<div className="hero-section py-5">
     <div className="container-xl">
-        <div className="row align-items-center">
+        <div className="row align-items-center min-vh-50">
             <div className="col-lg-6">
-                <h1 className="display-4 fw-bold mb-4">
-                    Welcome to OpenAgent
+                <h1 className="display-3 fw-bold mb-4 text-primary">
+                    Build the Future with AI
                 </h1>
-                <p className="lead mb-4">
-                    Your AI-powered development platform for modern web applications
+                <p className="lead mb-4 fs-4">
+                    OpenAgent is your AI-powered development platform that accelerates web application creation with intelligent automation and modern best practices.
                 </p>
-                <div className="d-flex gap-3">
-                    <a href="/login" className="btn btn-primary btn-lg">Get Started</a>
-                    <a href="/config" className="btn btn-outline-primary btn-lg">Learn More</a>
+                <p className="text-muted mb-4">
+                    From concept to deployment in minutes, not hours. Join thousands of developers building the next generation of web applications.
+                </p>
+                <div className="d-flex gap-3 flex-wrap">
+                    <a href="/login" className="btn btn-primary btn-lg px-4">
+                        <i className="ti ti-rocket me-2"></i>
+                        Get Started Free
+                    </a>
+                    <a href="/config" className="btn btn-outline-primary btn-lg px-4">
+                        <i className="ti ti-play me-2"></i>
+                        Watch Demo
+                    </a>
+                </div>
+                <div className="mt-4">
+                    <small className="text-muted">
+                        <i className="ti ti-shield-check me-1"></i>
+                        No credit card required • Free forever plan available
+                    </small>
                 </div>
             </div>
             <div className="col-lg-6">
                 <div className="text-center">
-                    <img src="/static/img/logo.svg" alt="OpenAgent Screenshot" className="img-fluid" style="max-height: 400px;" />
+                    <!-- Abstract SVG illustration representing AI development -->
+                    <svg width="100%" height="400" viewBox="0 0 400 300" className="img-fluid">
+                        <!-- Background gradient -->
+                        <defs>
+                            <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                            </linearGradient>
+                            <linearGradient id="codeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Background -->
+                        <rect width="100%" height="100%" fill="url(#bgGradient)" rx="20"/>
+                        
+                        <!-- Floating code blocks -->
+                        <g transform="translate(50, 50)">
+                            <rect x="0" y="0" width="80" height="60" fill="rgba(255,255,255,0.1)" rx="8"/>
+                            <text x="10" y="20" fill="white" font-family="monospace" font-size="10">function</text>
+                            <text x="10" y="35" fill="white" font-family="monospace" font-size="10">buildApp()</text>
+                        </g>
+                        
+                        <g transform="translate(200, 80)">
+                            <rect x="0" y="0" width="100" height="70" fill="rgba(255,255,255,0.1)" rx="8"/>
+                            <text x="10" y="20" fill="white" font-family="monospace" font-size="10">const app =</text>
+                            <text x="10" y="35" fill="white" font-family="monospace" font-size="10">new OpenAgent()</text>
+                        </g>
+                        
+                        <g transform="translate(100, 180)">
+                            <rect x="0" y="0" width="90" height="50" fill="rgba(255,255,255,0.1)" rx="8"/>
+                            <text x="10" y="20" fill="white" font-family="monospace" font-size="10">AI.assist()</text>
+                        </g>
+                        
+                        <!-- Central AI brain icon -->
+                        <g transform="translate(150, 100)">
+                            <circle cx="50" cy="50" r="40" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2"/>
+                            <circle cx="50" cy="50" r="25" fill="rgba(255,255,255,0.3)"/>
+                            <text x="50" y="55" fill="white" font-family="Arial" font-size="20" text-anchor="middle">AI</text>
+                        </g>
+                        
+                        <!-- Connection lines -->
+                        <path d="M 130 110 Q 150 90 170 110" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+                        <path d="M 200 120 Q 220 100 240 120" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+                        <path d="M 120 200 Q 140 180 160 200" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+                        
+                        <!-- Floating particles -->
+                        <circle cx="80" cy="40" r="3" fill="white" opacity="0.7"/>
+                        <circle cx="320" cy="60" r="2" fill="white" opacity="0.5"/>
+                        <circle cx="60" cy="250" r="2" fill="white" opacity="0.6"/>
+                        <circle cx="340" cy="200" r="3" fill="white" opacity="0.4"/>
+                    </svg>
                 </div>
             </div>
         </div>
