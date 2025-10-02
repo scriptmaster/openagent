@@ -61,10 +61,9 @@ func createDualFunctionComponent(componentName, jsContent, componentHTML string)
 	componentNameCamel := convertToCamelCase(componentName)
 	jsxFunctionName := componentNameCamel + "JSX"
 
+	// For TSX files, we want clean JSX without script content
+	// The script content will be handled in the JS file generation
 	return fmt.Sprintf(`export default function %s() {
-    // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
-%s
-    
     // Call the JSX function with props and state
     return %s(typeof props != 'undefined' ? props : {}, typeof state != 'undefined' ? state : {});
 }
@@ -73,7 +72,7 @@ function %s(props, state) {
     return (
         %s
     );
-}`, componentNameCamel, jsContent, jsxFunctionName, jsxFunctionName, componentHTML)
+}`, componentNameCamel, jsxFunctionName, jsxFunctionName, componentHTML)
 }
 
 // processComponentImports processes component divs and imports component files
@@ -210,14 +209,12 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 		// Create dual function pattern: Main function with script logic + JSX function
 		componentTSX = createDualFunctionComponent(componentName, jsContent, componentHTML)
 	} else {
-		// Use original single function pattern
+		// Use original single function pattern - clean JSX without script content
 		componentTSX = fmt.Sprintf(`export default function %s() {
-    // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
-%s
     return (
         %s
     );
-}`, convertToCamelCase(componentName), jsContent, componentHTML)
+}`, convertToCamelCase(componentName), componentHTML)
 	}
 
 	if err := os.WriteFile(componentTSXPath, []byte(componentTSX), 0644); err != nil {

@@ -59,6 +59,20 @@ var (
 	jsxTagPattern = regexp.MustCompile(`(?s)<main(?:\s+[^>]*)?>(.*?)</main>`)
 )
 
+// convertTSXToJS contains the original TSX2JS logic without circular dependency
+func convertTSXToJS(tsxStr string) string {
+	// Extract JSX content from <main> tags if present
+	matches := jsxTagPattern.FindStringSubmatch(tsxStr)
+	if len(matches) > 1 {
+		// JSX content is inside <main> tags
+		jsxContent := matches[1]
+		return convertJSXToReactCreateElement(jsxContent)
+	}
+	
+	// No <main> tags, treat the entire string as JSX content
+	return convertJSXToReactCreateElement(tsxStr)
+}
+
 // TSX2JS converts TSX to JavaScript
 func TSX2JS(tsxStr string) string {
 	return TSX2JSWithOptions(tsxStr, false)
@@ -68,24 +82,16 @@ func TSX2JS(tsxStr string) string {
 func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 	// Check if this is a component TSX (containing: export default function)
 	if !strings.Contains(strings.TrimSpace(tsxStr), "export default function") {
-		// Fallback to original TSX2JS for non-component TSX
-		return TSX2JS(tsxStr)
+		// Fallback to original TSX2JS logic for non-component TSX
+		return convertTSXToJS(tsxStr)
 	}
 
-	// Use environment variable to determine pattern
-	useDualFunctionPattern := !getWaxForkSettingForTranspile()
-	
+	// Always use dual function pattern - simpler and more consistent
 	if isDebugTranspile() {
-		fmt.Printf("DEBUG: TSX2JSWithOptions - useDualFunctionPattern: %v\n", useDualFunctionPattern)
+		fmt.Printf("DEBUG: TSX2JSWithOptions - using dual function pattern\n")
 	}
 
-	if useDualFunctionPattern {
-		// Dual function pattern: Extract and convert both functions
-		return convertDualFunctionPattern(tsxStr)
-	} else {
-		// Single function pattern: Extract JSX and wrap in function
-		return convertSingleFunctionPattern(tsxStr, isInnerComponent)
-	}
+	return convertDualFunctionPattern(tsxStr)
 }
 
 // convertDualFunctionPattern handles the dual function pattern (WAX_FORK=0 or unset)
@@ -100,15 +106,24 @@ func convertDualFunctionPattern(tsxStr string) string {
 	}
 
 	// Find the JSX function (function TestJSX)
-	jsxFuncStart := strings.Index(tsxStr[mainFuncStart:], "function ")
+	// Look for the second "function " after the main function
+	searchStart := mainFuncStart + 10 // Skip past the main function
+	jsxFuncStart := strings.Index(tsxStr[searchStart:], "function ")
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: convertDualFunctionPattern - mainFuncStart: %d, searching for 'function ' in: %s\n", mainFuncStart, tsxStr[mainFuncStart:min(mainFuncStart+100, len(tsxStr))])
+		fmt.Printf("DEBUG: convertDualFunctionPattern - jsxFuncStart: %d\n", jsxFuncStart)
+	}
 	if jsxFuncStart == -1 {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: convertDualFunctionPattern - JSX function not found, falling back to TSX2JS\n")
+		}
 		return TSX2JS(tsxStr) // Fallback
 	}
-	jsxFuncStart += mainFuncStart
+	jsxFuncStart += searchStart
 
 	// Extract main function content (before JSX function)
 	mainFuncContent := tsxStr[mainFuncStart:jsxFuncStart]
-	
+
 	// Extract JSX function content
 	jsxFuncContent := tsxStr[jsxFuncStart:]
 
@@ -156,6 +171,8 @@ func convertDualFunctionPattern(tsxStr string) string {
 }
 
 // convertSingleFunctionPattern handles the single function pattern (WAX_FORK=1)
+// COMMENTED OUT - Always using dual function pattern for simplicity
+/*
 func convertSingleFunctionPattern(tsxStr string, isInnerComponent bool) string {
 	// Extract JSX from the return statement
 	returnStart := strings.Index(tsxStr, "return (")
@@ -192,19 +209,20 @@ func convertSingleFunctionPattern(tsxStr string, isInnerComponent bool) string {
 
 	return jsxStr
 }
+*/
 
 // extractScriptFromMainFunction extracts script content from the main function body
 func extractScriptFromMainFunction(mainFuncContent string) string {
 	// Find the opening brace and return statement
 	braceStart := strings.Index(mainFuncContent, "{")
 	returnStart := strings.Index(mainFuncContent, "return ")
-	
+
 	if braceStart == -1 || returnStart == -1 {
 		return ""
 	}
 
 	// Extract content between opening brace and return statement
-	scriptContent := mainFuncContent[braceStart+1:returnStart]
+	scriptContent := mainFuncContent[braceStart+1 : returnStart]
 	scriptContent = strings.TrimSpace(scriptContent)
 
 	// Remove comment headers
@@ -949,7 +967,7 @@ func createReactJSContent(originalJS, componentName string) string {
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: createReactJSContent reading TSX content: %s\n", string(componentTsxContent)[:min(200, len(componentTsxContent))])
 	}
-	componentJS := TSX2JSWithOptions(string(componentTsxContent), true)
+	componentJS := TSX2JSWithOptions(string(componentTsxContent), false)
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: createReactJSContent converted JS: %s\n", componentJS[:min(200, len(componentJS))])
 	}
@@ -963,7 +981,7 @@ func createReactJSContent(originalJS, componentName string) string {
 		fmt.Printf("DEBUG: actualComponentName = '%s'\n", titledComponentName)
 	}
 
-	// Create the main component JS content (already converted from TSX, no extra wrapping needed)
+	// For main component, don't wrap - use componentJS as-is
 	mainComponentJS := fmt.Sprintf(`
 // ╔══ ⚛️  MAIN COMPONENT JS (TSX → JS) ⚛️ ══
 %s
