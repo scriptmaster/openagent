@@ -667,6 +667,20 @@ func fixCustomJSXSelfClosingTags(htmlContent string) string {
 		fmt.Printf("DEBUG: fixCustomJSXSelfClosingTags input: %s\n", htmlContent[:min(200, len(htmlContent))])
 	}
 
+	// First, fix already self-closing custom components to be HTML-parser friendly
+	// Convert <Component /> to <Component></Component> so HTML parser treats it as self-contained
+	selfClosingPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s+([^>]*?)\s*/>`)
+	htmlContent = selfClosingPattern.ReplaceAllStringFunc(htmlContent, func(match string) string {
+		submatches := selfClosingPattern.FindStringSubmatch(match)
+		if len(submatches) >= 3 {
+			componentName := submatches[1]
+			attributes := strings.TrimSpace(submatches[2])
+			// Convert to opening and closing tags so HTML parser treats it as self-contained
+			return fmt.Sprintf("<%s %s></%s>", componentName, attributes, componentName)
+		}
+		return match
+	})
+
 	// Pattern to match custom JSX components that are NOT self-closing but should be
 	nonSelfClosingPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s+([^>]*?)\s*>`)
 
@@ -694,7 +708,7 @@ func fixCustomJSXSelfClosingTags(htmlContent string) string {
 				if attributes != "" && !strings.HasPrefix(attributes, " ") {
 					attributes = " " + attributes
 				}
-				return fmt.Sprintf("<%s%s />", componentName, attributes)
+				return fmt.Sprintf("<%s%s></%s>", componentName, attributes, componentName)
 			}
 		}
 		return match

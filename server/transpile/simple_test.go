@@ -37,7 +37,7 @@ func TestTSXToJSConversion(t *testing.T) {
 		{
 			name:           "MixedHTMLAndComponents",
 			tsxContent:     `<div className="container"><Simple suppressHydrationWarning={true} /><span>Text</span></div>`,
-			expectedOutput: `React.createElement('div', {className: "container"}, React.createElement(Simple, {suppressHydrationWarning: true}, React.createElement('span', null, 'Text')))`,
+			expectedOutput: `React.createElement('div', {className: "container"}, React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement('span', null, 'Text'))`,
 			description:    "Mixed HTML elements and custom components",
 		},
 		{
@@ -55,8 +55,8 @@ func TestTSXToJSConversion(t *testing.T) {
 		{
 			name:           "ElementBesideComponent",
 			tsxContent:     `<div className="container-xl"><div className="card-body"><Simple suppressHydrationWarning={true} /><span>Element beside a component.</span></div></div>`,
-			expectedOutput: `React.createElement('div', {className: "container-xl"}, React.createElement('div', {className: "card-body"}, React.createElement(Simple, {suppressHydrationWarning: true}, React.createElement('span', null, 'Element beside a component.'))))`,
-			description:    "HTML element beside custom component (current parser behavior)",
+			expectedOutput: `React.createElement('div', {className: "container-xl"}, React.createElement('div', {className: "card-body"}, React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement('span', null, 'Element beside a component.')))`,
+			description:    "HTML element should be sibling to custom component, not child",
 		},
 	}
 
