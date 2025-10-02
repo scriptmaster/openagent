@@ -9,10 +9,10 @@ import (
 
 func TestDualFunctionPatternInGeneratedFiles(t *testing.T) {
 	tests := []struct {
-		name           string
-		envValue       string
-		expectDual     bool
-		description    string
+		name        string
+		envValue    string
+		expectDual  bool
+		description string
 	}{
 		{
 			name:        "WAX_FORK_Unset_DualFunction",
@@ -212,7 +212,7 @@ func TestSingleFunctionPatternStructure(t *testing.T) {
 // createSingleFunctionComponent creates a component with single function pattern for testing
 func createSingleFunctionComponent(componentName, jsContent, componentHTML string) string {
 	componentNameCamel := convertToCamelCase(componentName)
-	
+
 	return fmt.Sprintf(`export default function %s() {
     // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
 %s
@@ -221,4 +221,3 @@ func createSingleFunctionComponent(componentName, jsContent, componentHTML strin
     );
 }`, componentNameCamel, jsContent, componentHTML)
 }
-

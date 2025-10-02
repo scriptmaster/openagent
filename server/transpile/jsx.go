@@ -72,50 +72,105 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 
 	// Check if this is a component TSX (containing: export default function)
 	if strings.Contains(strings.TrimSpace(tsxStr), "export default function") {
-		// This is a component TSX file, extract JSX from the return statement
-		returnStart := strings.Index(tsxStr, "return (")
-		returnEnd := strings.LastIndex(tsxStr, ");")
-		if returnStart != -1 && returnEnd != -1 {
-			returnStart += 8 // Length of "return ("
-			mainContent := tsxStr[returnStart:returnEnd]
+	// Check if this is a dual function pattern (contains JSX function call)
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: TSX2JSWithOptions checking for JSX( in: %s\n", tsxStr[:min(200, len(tsxStr))])
+		fmt.Printf("DEBUG: Contains JSX(: %v\n", strings.Contains(tsxStr, "JSX("))
+	}
+	if strings.Contains(tsxStr, "JSX(") {
+			// This is a dual function pattern, extract JSX from the JSX function
+			
+			// Find the JSX function's return statement
+			jsxReturnStart := strings.Index(tsxStr, "return (")
+			jsxReturnEnd := strings.LastIndex(tsxStr, ");")
+			if jsxReturnStart != -1 && jsxReturnEnd != -1 {
+				jsxReturnStart += 8 // Length of "return ("
+				mainContent := tsxStr[jsxReturnStart:jsxReturnEnd]
 
-			// Convert JSX to React.createElement calls using the full pipeline
-			jsxStr := parseJSXWithHTMLParser(mainContent)
+				// Convert JSX to React.createElement calls using the full pipeline
+				jsxStr := parseJSXWithHTMLParser(mainContent)
 
-			// Fix attribute case issues
-			jsxStr = fixAttributeCases(jsxStr)
+				// Fix attribute case issues
+				jsxStr = fixAttributeCases(jsxStr)
 
-			// Clean up extra whitespace
-			jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
-			jsxStr = strings.TrimSpace(jsxStr)
+				// Clean up extra whitespace
+				jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
+				jsxStr = strings.TrimSpace(jsxStr)
 
-			// Extract script content from the function body (before return statement) - only for inner components
-			var scriptContent string
-			if isInnerComponent {
-				scriptContent = extractScriptContentFromTSX(tsxStr)
+				// Extract script content from the main function body (before JSX call) - only for inner components
+				var scriptContent string
+				if isInnerComponent {
+					scriptContent = extractScriptContentFromTSX(tsxStr)
 
-				if isDebugTranspile() {
-					fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
-				}
+					if isDebugTranspile() {
+						fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
+					}
 
-				// Combine script content with JSX in a proper function structure (only for inner components)
-				if scriptContent != "" {
-					// Extract component name from TSX
-					componentName := extractComponentNameFromTSX(tsxStr)
-					jsxStr = fmt.Sprintf(`function %s({page}) {
+					// Combine script content with JSX in a proper function structure (only for inner components)
+					if scriptContent != "" {
+						// Extract component name from TSX
+						componentName := extractComponentNameFromTSX(tsxStr)
+						jsxStr = fmt.Sprintf(`function %s({page}) {
     %s
     return (
         %s
     );
 }`, componentName, scriptContent, jsxStr)
+					}
 				}
-			}
 
-			if isDebugTranspile() {
-				fmt.Printf("DEBUG: TSX2JS result: %s\n", jsxStr[:min(200, len(jsxStr))])
-			}
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: TSX2JS result (dual function): %s\n", jsxStr[:min(200, len(jsxStr))])
+				}
 
-			return jsxStr
+				return jsxStr
+			}
+		} else {
+			// This is a single function pattern, extract JSX from the return statement
+			returnStart := strings.Index(tsxStr, "return (")
+			returnEnd := strings.LastIndex(tsxStr, ");")
+			if returnStart != -1 && returnEnd != -1 {
+				returnStart += 8 // Length of "return ("
+				mainContent := tsxStr[returnStart:returnEnd]
+
+				// Convert JSX to React.createElement calls using the full pipeline
+				jsxStr := parseJSXWithHTMLParser(mainContent)
+
+				// Fix attribute case issues
+				jsxStr = fixAttributeCases(jsxStr)
+
+				// Clean up extra whitespace
+				jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
+				jsxStr = strings.TrimSpace(jsxStr)
+
+				// Extract script content from the function body (before return statement) - only for inner components
+				var scriptContent string
+				if isInnerComponent {
+					scriptContent = extractScriptContentFromTSX(tsxStr)
+
+					if isDebugTranspile() {
+						fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
+					}
+
+					// Combine script content with JSX in a proper function structure (only for inner components)
+					if scriptContent != "" {
+						// Extract component name from TSX
+						componentName := extractComponentNameFromTSX(tsxStr)
+						jsxStr = fmt.Sprintf(`function %s({page}) {
+    %s
+    return (
+        %s
+    );
+}`, componentName, scriptContent, jsxStr)
+					}
+				}
+
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: TSX2JS result (single function): %s\n", jsxStr[:min(200, len(jsxStr))])
+				}
+
+				return jsxStr
+			}
 		}
 	}
 
@@ -876,8 +931,14 @@ func createReactJSContent(originalJS, componentName string) string {
 		componentTsxContent = tsxContent
 	}
 
-	// Convert component TSX to JS
-	componentJS := TSX2JS(string(componentTsxContent))
+	// Convert component TSX to JS with dual function pattern support
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: createReactJSContent reading TSX content: %s\n", string(componentTsxContent)[:min(200, len(componentTsxContent))])
+	}
+	componentJS := TSX2JSWithOptions(string(componentTsxContent), true)
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: createReactJSContent converted JS: %s\n", componentJS[:min(200, len(componentJS))])
+	}
 
 	// Component replacement is now handled at TSX level with imports
 	// actualComponentName := getActualComponentName(componentJS, componentName)

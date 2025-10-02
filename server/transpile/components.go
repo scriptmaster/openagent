@@ -24,15 +24,16 @@ func getWaxForkSettingForTranspile() bool {
 		// Default to false (use original Wax with dual function pattern)
 		return false
 	}
-	
+
 	useFork, err := strconv.ParseBool(waxForkEnv)
 	if err != nil {
 		// Default to false (use original Wax with dual function pattern)
 		return false
 	}
-	
+
 	return useFork
 }
+
 //
 // Function List:
 // - processComponentImports(htmlContent, inputPath string) (string, []string, error)

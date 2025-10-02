@@ -157,7 +157,7 @@ func startFileWatcher() {
 	} else {
 		log.Printf("WAX_FORK environment variable: %s", waxForkEnv)
 	}
-	
+
 	log.Println("File watcher started - watching tpl/ directory (excluding tpl/generated/)")
 
 	// Debounce timer

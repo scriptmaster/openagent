@@ -12,10 +12,10 @@ import (
 func TestDualFunctionPatternIntegration(t *testing.T) {
 	// Test both WAX_FORK scenarios
 	tests := []struct {
-		name           string
-		envValue       string
-		expectDual     bool
-		description    string
+		name        string
+		envValue    string
+		expectDual  bool
+		description string
 	}{
 		{
 			name:        "WAX_FORK_Unset_DualFunction",
@@ -24,14 +24,14 @@ func TestDualFunctionPatternIntegration(t *testing.T) {
 			description: "Should generate dual function pattern when WAX_FORK is unset",
 		},
 		{
-			name:        "WAX_FORK_0_DualFunction", 
+			name:        "WAX_FORK_0_DualFunction",
 			envValue:    "0",
 			expectDual:  true,
 			description: "Should generate dual function pattern when WAX_FORK=0",
 		},
 		{
 			name:        "WAX_FORK_1_SingleFunction",
-			envValue:    "1", 
+			envValue:    "1",
 			expectDual:  false,
 			description: "Should generate single function pattern when WAX_FORK=1",
 		},
@@ -60,7 +60,7 @@ func TestDualFunctionPatternIntegration(t *testing.T) {
 
 			// Test the generated JavaScript
 			jsContent := fetchTestPageJS(t)
-			
+
 			if tt.expectDual {
 				// Should contain dual function pattern elements
 				dualPatternElements := []string{
@@ -70,14 +70,14 @@ func TestDualFunctionPatternIntegration(t *testing.T) {
 					"typeof props != 'undefined'",
 					"typeof state != 'undefined'",
 				}
-				
+
 				for _, element := range dualPatternElements {
 					if !strings.Contains(jsContent, element) {
 						t.Errorf("Dual function pattern missing element: %s", element)
 						t.Logf("Generated JS content:\n%s", jsContent)
 					}
 				}
-				
+
 				// Should NOT contain single function pattern
 				if strings.Contains(jsContent, "return (") && !strings.Contains(jsContent, "TestJSX(") {
 					t.Errorf("Should not have single function pattern when dual is expected")
@@ -88,14 +88,14 @@ func TestDualFunctionPatternIntegration(t *testing.T) {
 					"function Test({page})",
 					"return (",
 				}
-				
+
 				for _, element := range singlePatternElements {
 					if !strings.Contains(jsContent, element) {
 						t.Errorf("Single function pattern missing element: %s", element)
 						t.Logf("Generated JS content:\n%s", jsContent)
 					}
 				}
-				
+
 				// Should NOT contain dual function pattern
 				if strings.Contains(jsContent, "TestJSX(") {
 					t.Errorf("Should not have dual function pattern when single is expected")
@@ -110,7 +110,7 @@ func TestDualFunctionPatternIntegration(t *testing.T) {
 func TestCounterComponentDualFunctionPattern(t *testing.T) {
 	// Test that counter component has dual function pattern
 	os.Unsetenv("WAX_FORK") // Ensure dual function pattern
-	
+
 	// Start server if not running
 	serverRunning := checkServerRunning()
 	if !serverRunning {
@@ -124,7 +124,7 @@ func TestCounterComponentDualFunctionPattern(t *testing.T) {
 
 	// Test the generated JavaScript
 	jsContent := fetchTestPageJS(t)
-	
+
 	// Check for counter component dual function pattern
 	counterDualElements := []string{
 		"function Counter({page})",
@@ -134,7 +134,7 @@ func TestCounterComponentDualFunctionPattern(t *testing.T) {
 		"const state = {",
 		"count: 55",
 	}
-	
+
 	for _, element := range counterDualElements {
 		if !strings.Contains(jsContent, element) {
 			t.Errorf("Counter dual function pattern missing element: %s", element)
@@ -215,7 +215,7 @@ function TestJSX(props, state) {
 
 	// Convert TSX to JS
 	jsContent := TSX2JSWithOptions(dualFunctionTSX, true)
-	
+
 	// Check that it contains the dual function pattern
 	expectedElements := []string{
 		"function Test({page})",
@@ -225,7 +225,7 @@ function TestJSX(props, state) {
 		"function TestJSX(props, state)",
 		"Counter: ' + (state.count) + '",
 	}
-	
+
 	for _, element := range expectedElements {
 		if !strings.Contains(jsContent, element) {
 			t.Errorf("TSX to JS conversion missing element: %s", element)
