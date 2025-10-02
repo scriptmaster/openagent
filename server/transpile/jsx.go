@@ -143,14 +143,17 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 				jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
 				jsxStr = strings.TrimSpace(jsxStr)
 
-				// For single function pattern, just return the converted JSX
-				// Script content is handled separately in the main transpilation process
-				if isDebugTranspile() {
-					fmt.Printf("DEBUG: Single function pattern - returning converted JSX: %s\n", jsxStr[:min(200, len(jsxStr))])
-				}
+				// For single function pattern, wrap the converted JSX in a function declaration
+				// Extract component name from TSX
+				componentName := extractComponentNameFromTSX(tsxStr)
+				jsxStr = fmt.Sprintf(`function %s({page}) {
+    return (
+        %s
+    );
+}`, componentName, jsxStr)
 
 				if isDebugTranspile() {
-					fmt.Printf("DEBUG: TSX2JS result (single function): %s\n", jsxStr[:min(200, len(jsxStr))])
+					fmt.Printf("DEBUG: Single function pattern - returning wrapped JSX: %s\n", jsxStr[:min(200, len(jsxStr))])
 				}
 
 				return jsxStr
