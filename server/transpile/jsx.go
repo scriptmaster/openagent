@@ -1113,8 +1113,14 @@ func parseTextInterpolation(text string) []TextPart {
 		// Add string part before the interpolation
 		if match[0] > lastIndex {
 			stringPart := text[lastIndex:match[0]]
-			if strings.TrimSpace(stringPart) != "" {
-				parts = append(parts, TextPart{Type: "string", Value: stringPart})
+			// Normalize whitespace using the dedicated function
+			trimmedPart := normalizeWhitespace(stringPart)
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: parseTextInterpolation - stringPart: '%s', trimmedPart: '%s'\n", stringPart, trimmedPart)
+				fmt.Printf("DEBUG: normalizeWhitespace test: '%s' -> '%s'\n", stringPart, normalizeWhitespace(stringPart))
+			}
+			if trimmedPart != "" {
+				parts = append(parts, TextPart{Type: "string", Value: trimmedPart})
 			}
 		}
 
@@ -1128,8 +1134,13 @@ func parseTextInterpolation(text string) []TextPart {
 	// Add remaining string part
 	if lastIndex < len(text) {
 		stringPart := text[lastIndex:]
+		// Normalize whitespace using the dedicated function
+		trimmedPart := normalizeWhitespace(stringPart)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: parseTextInterpolation - remaining stringPart: '%s', trimmedPart: '%s'\n", stringPart, trimmedPart)
+		}
 		// Always add the remaining part, even if it's empty (for proper concatenation)
-		parts = append(parts, TextPart{Type: "string", Value: stringPart})
+		parts = append(parts, TextPart{Type: "string", Value: trimmedPart})
 	} else if len(matches) > 0 {
 		// If we had interpolations but no remaining text, add an empty string part
 		parts = append(parts, TextPart{Type: "string", Value: ""})
@@ -1193,6 +1204,40 @@ func processJSXInterpolations(jsxContent string) string {
 	}
 
 	return result
+}
+
+// trimWhiteSpace removes all whitespace characters from a string
+func trimWhiteSpace(s string) string {
+	// Remove all types of whitespace: spaces, tabs, newlines, carriage returns, non-breaking spaces
+	result := strings.ReplaceAll(s, " ", "")
+	result = strings.ReplaceAll(result, "\t", "")
+	result = strings.ReplaceAll(result, "\n", "")
+	result = strings.ReplaceAll(result, "\r", "")
+	result = strings.ReplaceAll(result, "\u00A0", "") // non-breaking space
+	result = strings.ReplaceAll(result, "\u2000", "") // en quad
+	result = strings.ReplaceAll(result, "\u2001", "") // em quad
+	result = strings.ReplaceAll(result, "\u2002", "") // en space
+	result = strings.ReplaceAll(result, "\u2003", "") // em space
+	result = strings.ReplaceAll(result, "\u2004", "") // three-per-em space
+	result = strings.ReplaceAll(result, "\u2005", "") // four-per-em space
+	result = strings.ReplaceAll(result, "\u2006", "") // six-per-em space
+	result = strings.ReplaceAll(result, "\u2007", "") // figure space
+	result = strings.ReplaceAll(result, "\u2008", "") // punctuation space
+	result = strings.ReplaceAll(result, "\u2009", "") // thin space
+	result = strings.ReplaceAll(result, "\u200A", "") // hair space
+	result = strings.ReplaceAll(result, "\u202F", "") // narrow no-break space
+	result = strings.ReplaceAll(result, "\u205F", "") // medium mathematical space
+	result = strings.ReplaceAll(result, "\u3000", "") // ideographic space
+	return result
+}
+
+// normalizeWhitespace removes leading/trailing whitespace and normalizes internal whitespace
+func normalizeWhitespace(s string) string {
+	// First handle literal \n characters (not actual newlines)
+	result := strings.ReplaceAll(s, "\\n", " ")
+	// Then replace all whitespace sequences with single spaces
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	return strings.TrimSpace(result)
 }
 
 // extractComponentNameFromTSX extracts the component name from TSX content

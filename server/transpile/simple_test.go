@@ -9,6 +9,112 @@ func TestSimple(t *testing.T) {
 	t.Log("Simple test is running!")
 }
 
+func TestTrimWhiteSpace(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "BasicWhitespace",
+			input:    "  hello  world  ",
+			expected: "helloworld",
+		},
+		{
+			name:     "NewlinesAndTabs",
+			input:    "\n    Counter: {count}",
+			expected: "Counter:{count}",
+		},
+		{
+			name:     "CounterScenario",
+			input:    "\n    Counter: ",
+			expected: "Counter:",
+		},
+		{
+			name:     "MixedWhitespace",
+			input:    "\t\n  \r  text  \t\n  ",
+			expected: "text",
+		},
+		{
+			name:     "NonBreakingSpace",
+			input:    "hello\u00A0world",
+			expected: "helloworld",
+		},
+		{
+			name:     "EmptyString",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "OnlyWhitespace",
+			input:    "   \n\t  ",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := trimWhiteSpace(tt.input)
+			if result != tt.expected {
+				t.Errorf("trimWhiteSpace(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNormalizeWhitespace(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "BasicWhitespace",
+			input:    "  hello  world  ",
+			expected: "hello world",
+		},
+		{
+			name:     "NewlinesAndTabs",
+			input:    "\n    Counter: {count}",
+			expected: "Counter: {count}",
+		},
+		{
+			name:     "CounterScenario",
+			input:    "\n    Counter: ",
+			expected: "Counter:",
+		},
+		{
+			name:     "MixedWhitespace",
+			input:    "\t\n  \r  text  \t\n  ",
+			expected: "text",
+		},
+		{
+			name:     "EmptyString",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "OnlyWhitespace",
+			input:    "   \n\t  ",
+			expected: "",
+		},
+		{
+			name:     "LiteralNewline",
+			input:    "\\n    Counter: ",
+			expected: "Counter:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeWhitespace(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeWhitespace(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTSXToJSConversion(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -25,7 +131,7 @@ func TestTSXToJSConversion(t *testing.T) {
 		{
 			name:           "TextInterpolation",
 			tsxContent:     `<div>Counter: {count}</div>`,
-			expectedOutput: `React.createElement('div', null, 'Counter: ' + (count) + '')`,
+			expectedOutput: `React.createElement('div', null, 'Counter:' + (count) + '')`,
 			description:    "Text content with JSX interpolation",
 		},
 		{
@@ -57,6 +163,12 @@ func TestTSXToJSConversion(t *testing.T) {
 			tsxContent:     `<div className="container-xl"><div className="card-body"><Simple suppressHydrationWarning={true} /><span>Element beside a component.</span></div></div>`,
 			expectedOutput: `React.createElement('div', {className: "container-xl"}, React.createElement('div', {className: "card-body"}, React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement('span', null, 'Element beside a component.')))`,
 			description:    "HTML element should be sibling to custom component, not child",
+		},
+		{
+			name:           "WhitespaceInComponent",
+			tsxContent:     `<div>\n    Counter: {count}</div>`,
+			expectedOutput: `React.createElement('div', null, 'Counter:' + (count) + '')`,
+			description:    "Whitespace and newlines in component content should be filtered out",
 		},
 	}
 
