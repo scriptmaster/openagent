@@ -17,7 +17,7 @@ func TestProcessComponentImports(t *testing.T) {
 			name: "Simple component with sibling element",
 			inputHTML: `<div class="container-xl">
     <div class="card-body">
-        <div id="component-simple"></div>
+        <template id="component-simple"></template>
         <span>Element beside a component.</span>
     </div>
 </div>`,
@@ -28,14 +28,14 @@ func TestProcessComponentImports(t *testing.T) {
     </div>
 </div>`,
 			expectedComponents: []string{"Simple"},
-			description:        "Component div should be replaced with Simple component, sibling span should remain as sibling",
+			description:        "Component template should be replaced with Simple component, sibling span should remain as sibling",
 		},
 		{
 			name: "Multiple components with siblings",
 			inputHTML: `<div class="container">
-    <div id="component-simple"></div>
+    <template id="component-simple"></template>
     <p>Text after Simple</p>
-    <div id="component-counter"></div>
+    <template id="component-counter"></template>
     <span>Text after Counter</span>
 </div>`,
 			expectedOutput: `<div class="container">
@@ -51,7 +51,7 @@ func TestProcessComponentImports(t *testing.T) {
 			name: "Component with nested siblings",
 			inputHTML: `<div class="wrapper">
     <div class="inner">
-        <div id="component-simple"></div>
+        <template id="component-simple"></template>
         <div class="sibling">
             <span>Nested sibling content</span>
         </div>
@@ -71,7 +71,7 @@ func TestProcessComponentImports(t *testing.T) {
 		{
 			name: "Component with underscore naming",
 			inputHTML: `<div class="container">
-    <div id="component_my_component"></div>
+    <template id="component_my_component"></template>
     <p>Sibling paragraph</p>
 </div>`,
 			expectedOutput: `<div class="container">
@@ -97,7 +97,7 @@ func TestProcessComponentImports(t *testing.T) {
 		{
 			name: "Component with attributes",
 			inputHTML: `<div class="container">
-    <div id="component-simple" class="my-class" data-test="value"></div>
+    <template id="component-simple" class="my-class" data-test="value"></template>
     <span>Sibling element</span>
 </div>`,
 			expectedOutput: `<div class="container">
@@ -173,7 +173,7 @@ func TestProcessComponentImports_EdgeCases(t *testing.T) {
 		{
 			name: "Empty component div",
 			inputHTML: `<div class="container">
-    <div id="component-simple"></div>
+    <template id="component-simple"></template>
 </div>`,
 			expectedOutput: `<div class="container">
     <Simple suppressHydrationWarning={true} />
@@ -183,7 +183,7 @@ func TestProcessComponentImports_EdgeCases(t *testing.T) {
 		{
 			name: "Component div with whitespace",
 			inputHTML: `<div class="container">
-    <div id="component-simple">   </div>
+    <template id="component-simple">   </template>
     <span>Sibling</span>
 </div>`,
 			expectedOutput: `<div class="container">
@@ -195,8 +195,8 @@ func TestProcessComponentImports_EdgeCases(t *testing.T) {
 		{
 			name: "Multiple same components",
 			inputHTML: `<div class="container">
-    <div id="component-simple"></div>
-    <div id="component-simple"></div>
+    <template id="component-simple"></template>
+    <template id="component-simple"></template>
     <span>Between components</span>
 </div>`,
 			expectedOutput: `<div class="container">
