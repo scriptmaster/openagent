@@ -150,6 +150,14 @@ func startFileWatcher() {
 		return
 	}
 
+	// Print WAX_FORK environment variable before starting file watcher
+	waxForkEnv := os.Getenv("WAX_FORK")
+	if waxForkEnv == "" {
+		log.Printf("WAX_FORK environment variable: (unset) - will use dual function pattern")
+	} else {
+		log.Printf("WAX_FORK environment variable: %s", waxForkEnv)
+	}
+	
 	log.Println("File watcher started - watching tpl/ directory (excluding tpl/generated/)")
 
 	// Debounce timer
