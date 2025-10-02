@@ -72,16 +72,16 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 
 	// Check if this is a component TSX (containing: export default function)
 	if strings.Contains(strings.TrimSpace(tsxStr), "export default function") {
-	// Check if this is a dual function pattern (contains JSX function call)
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: TSX2JSWithOptions checking for JSX( in: %s\n", tsxStr[:min(200, len(tsxStr))])
-		fmt.Printf("DEBUG: Contains JSX(: %v\n", strings.Contains(tsxStr, "JSX("))
-	}
-	if strings.Contains(tsxStr, "JSX(") {
+		// Check if this is a dual function pattern (contains JSX function call)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: TSX2JSWithOptions checking for JSX( in: %s\n", tsxStr[:min(200, len(tsxStr))])
+			fmt.Printf("DEBUG: Contains JSX(: %v\n", strings.Contains(tsxStr, "JSX("))
+		}
+		if strings.Contains(tsxStr, "JSX(") {
 			// This is a dual function pattern, extract JSX from the JSX function
-			
-			// Find the JSX function's return statement
-			jsxReturnStart := strings.Index(tsxStr, "return (")
+
+			// Find the JSX function's return statement (look for the last return statement)
+			jsxReturnStart := strings.LastIndex(tsxStr, "return (")
 			jsxReturnEnd := strings.LastIndex(tsxStr, ");")
 			if jsxReturnStart != -1 && jsxReturnEnd != -1 {
 				jsxReturnStart += 8 // Length of "return ("
@@ -143,26 +143,10 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 				jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
 				jsxStr = strings.TrimSpace(jsxStr)
 
-				// Extract script content from the function body (before return statement) - only for inner components
-				var scriptContent string
-				if isInnerComponent {
-					scriptContent = extractScriptContentFromTSX(tsxStr)
-
-					if isDebugTranspile() {
-						fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
-					}
-
-					// Combine script content with JSX in a proper function structure (only for inner components)
-					if scriptContent != "" {
-						// Extract component name from TSX
-						componentName := extractComponentNameFromTSX(tsxStr)
-						jsxStr = fmt.Sprintf(`function %s({page}) {
-    %s
-    return (
-        %s
-    );
-}`, componentName, scriptContent, jsxStr)
-					}
+				// For single function pattern, just return the converted JSX
+				// Script content is handled separately in the main transpilation process
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: Single function pattern - returning converted JSX: %s\n", jsxStr[:min(200, len(jsxStr))])
 				}
 
 				if isDebugTranspile() {
