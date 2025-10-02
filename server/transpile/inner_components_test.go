@@ -161,7 +161,7 @@ func createTestComponentFiles(t *testing.T) {
 	if err := os.MkdirAll("tpl/components", 0755); err != nil {
 		t.Fatalf("Failed to create components directory: %v", err)
 	}
-	
+
 	// Create generated directories
 	if err := os.MkdirAll("tpl/generated/pages", 0755); err != nil {
 		t.Fatalf("Failed to create generated pages directory: %v", err)
@@ -216,4 +216,3 @@ func createTestComponentFiles(t *testing.T) {
 		t.Fatalf("Failed to create counter.html: %v", err)
 	}
 }
-

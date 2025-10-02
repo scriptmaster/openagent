@@ -280,12 +280,12 @@ func TestTSX2JS_EdgeCases(t *testing.T) {
 		{
 			name:     "Attributes with special characters",
 			input:    `<main><div data-test="value with spaces" data-id="123" className="test-class"></div></main>`,
-			contains: []string{"data-test: \"value with spaces\"", "data-id: \"123\"", "className: \"test-class\""},
+			contains: []string{"\"data-test\": \"value with spaces\"", "\"data-id\": \"123\"", "className: \"test-class\""},
 		},
 		{
 			name:     "Boolean attributes",
 			input:    `<main><input type="checkbox" checked disabled /></main>`,
-			contains: []string{"type: \"checkbox\"", "checked: \"\"", "disabled: \"\""},
+			contains: []string{"type: \"checkbox\"", "checked: true", "disabled: true"},
 		},
 	}
 

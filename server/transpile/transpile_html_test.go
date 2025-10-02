@@ -2,6 +2,7 @@ package transpile
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -240,11 +241,11 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 				<div className="app">
 					<header className="app-header">
 						<h1>Complex App</h1>
-						<div id="component-simple"></div>
+						<template id="component-simple"></template>
 					</header>
 					<main className="app-main">
 						<div className="sidebar">
-							<div id="component-counter"></div>
+							<template id="component-counter"></template>
 							<nav>
 								<ul>
 									<li><a href="/dashboard">Dashboard</a></li>
@@ -253,7 +254,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 							</nav>
 						</div>
 						<div className="content">
-							<div id="component-chart"></div>
+							<template id="component-chart"></template>
 							<section>
 								<h2>Main Content</h2>
 								<p>This is the main content area with multiple components.</p>
@@ -261,7 +262,7 @@ func TestTranspileHtmlToTsx(t *testing.T) {
 						</div>
 					</main>
 					<footer className="app-footer">
-						<div id="component-footer"></div>
+						<template id="component-footer"></template>
 						<p>&copy; 2024 My App</p>
 					</footer>
 				</div>
@@ -764,8 +765,10 @@ func TestCSSFileGeneration(t *testing.T) {
 			}
 
 			// Check that CSS file was created in the correct location (./tpl/generated/css/)
-			cssPath := strings.Replace(outputPath, ".tsx", ".css", 1)
-			cssPath = strings.Replace(cssPath, "tpl/generated/pages/", "tpl/generated/css/", 1)
+			// The function creates pages_filename.css for pages directory
+			filename := filepath.Base(outputPath)
+			filename = strings.TrimSuffix(filename, ".tsx")
+			cssPath := "tpl/generated/css/pages_" + filename + ".css"
 			if _, err := os.Stat(cssPath); os.IsNotExist(err) {
 				t.Errorf("CSS file was not created: %s", cssPath)
 			} else {

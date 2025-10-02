@@ -587,6 +587,8 @@ func isCustomReactComponentCaseInsensitive(componentName string) bool {
 		"card":    true,
 		"list":    true,
 		"item":    true,
+		"footer":  true,
+		"chart":   true,
 	}
 
 	// Check if it's a known custom component

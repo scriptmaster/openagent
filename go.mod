@@ -13,6 +13,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/michal-laskowski/wax v0.0.0-20250708193110-33912a7cbc2d
+	github.com/scriptmaster/wax-tsx v0.0.0-20250102000000-000000000000
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.39.0
 	golang.org/x/net v0.41.0
@@ -34,3 +35,5 @@ require (
 	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
+
+replace github.com/scriptmaster/wax-tsx => ./wax-tsx-fork

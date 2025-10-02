@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/scriptmaster/openagent/common"
@@ -13,7 +14,25 @@ import (
 // ============================================================================
 // COMPONENT TRANSPILATION FUNCTIONS
 // ============================================================================
-// This file contains functions for transpiling and managing React components
+
+// getWaxForkSettingForTranspile reads the WAX_FORK environment variable for transpilation
+// Returns true if we should use the Wax fork (single function pattern)
+// Returns false if we should use original Wax (dual function pattern)
+func getWaxForkSettingForTranspile() bool {
+	waxForkEnv := os.Getenv("WAX_FORK")
+	if waxForkEnv == "" {
+		// Default to false (use original Wax with dual function pattern)
+		return false
+	}
+	
+	useFork, err := strconv.ParseBool(waxForkEnv)
+	if err != nil {
+		// Default to false (use original Wax with dual function pattern)
+		return false
+	}
+	
+	return useFork
+}
 //
 // Function List:
 // - processComponentImports(htmlContent, inputPath string) (string, []string, error)
@@ -33,6 +52,28 @@ import (
 // - isBuiltInComponent(componentName string) bool
 //   Checks if a component name is a built-in React component or HTML element
 // ============================================================================
+
+// createDualFunctionComponent creates a component with two functions:
+// 1. Main function with script logic that calls JSX function
+// 2. JSX function that returns pure JSX without script logic
+func createDualFunctionComponent(componentName, jsContent, componentHTML string) string {
+	componentNameCamel := convertToCamelCase(componentName)
+	jsxFunctionName := componentNameCamel + "JSX"
+
+	return fmt.Sprintf(`export default function %s() {
+    // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
+%s
+    
+    // Call the JSX function with props and state
+    return %s(typeof props != 'undefined' ? props : {}, typeof state != 'undefined' ? state : {});
+}
+
+function %s(props, state) {
+    return (
+        %s
+    );
+}`, componentNameCamel, jsContent, jsxFunctionName, jsxFunctionName, componentHTML)
+}
 
 // processComponentImports processes component divs and imports component files
 func processComponentImports(htmlContent, inputPath string) (string, []string, error) {
@@ -160,14 +201,23 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 	preserveWhitespace := os.Getenv("HTML_WHITESPACE_NOHYDRATE") == "1"
 	componentHTML = common.MinifyHTML(componentHTML, preserveWhitespace)
 
-	// Write component TSX with embedded script content
-	componentTSX := fmt.Sprintf(`export default function %s() {
+	// Check if we should use the dual function pattern (WAX_FORK=0 or unset)
+	useDualFunctionPattern := !getWaxForkSettingForTranspile()
+
+	var componentTSX string
+	if useDualFunctionPattern {
+		// Create dual function pattern: Main function with script logic + JSX function
+		componentTSX = createDualFunctionComponent(componentName, jsContent, componentHTML)
+	} else {
+		// Use original single function pattern
+		componentTSX = fmt.Sprintf(`export default function %s() {
     // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
 %s
     return (
         %s
     );
 }`, convertToCamelCase(componentName), jsContent, componentHTML)
+	}
 
 	if err := os.WriteFile(componentTSXPath, []byte(componentTSX), 0644); err != nil {
 		return "", fmt.Errorf("failed to write component TSX: %v", err)

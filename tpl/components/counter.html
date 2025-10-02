@@ -1,6 +1,16 @@
 <div>
-    Counter: {count}</div>
+    <button onClick={state.dec}>-</button>
+    Counter: {state.count}
+    <button onClick={state.inc}>+</button>
+</div>
 
 <script>
-    let count = 0;
+    let count = 99; // Math.round(Math.random() * 100, 0);
+
+    const state = {
+        count: 55,
+        // inc: () => { return 56; }
+        // dec: () => this.count--
+    };
+
 </script>

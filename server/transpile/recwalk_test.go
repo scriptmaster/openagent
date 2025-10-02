@@ -113,7 +113,7 @@ func TestRecWalkHTMLNodeWithCustomComponents(t *testing.T) {
 		{
 			name:           "AdjacentComponents",
 			htmlContent:    `<div><Simple suppressHydrationWarning={true} /><Counter suppressHydrationWarning={true} /></div>`,
-			expectedOutput: `React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement(Counter, {suppressHydrationWarning: true})`,
+			expectedOutput: `React.createElement('div', null, React.createElement(Simple, {suppressHydrationWarning: true}), React.createElement(Counter, {suppressHydrationWarning: true}))`,
 			description:    "Adjacent custom components should have commas between them",
 		},
 		{
