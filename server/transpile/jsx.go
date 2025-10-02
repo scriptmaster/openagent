@@ -13,6 +13,14 @@ import (
 // ============================================================================
 // JSX TRANSPILATION FUNCTIONS
 // ============================================================================
+
+// TextPart represents a part of text content - either a string or an expression
+type TextPart struct {
+	Type  string // "string" or "expression"
+	Value string
+}
+
+// ============================================================================
 // This file contains functions for converting JSX to React.createElement calls
 //
 // Function List:
@@ -53,6 +61,11 @@ var (
 
 // TSX2JS converts TSX to JavaScript
 func TSX2JS(tsxStr string) string {
+	return TSX2JSWithOptions(tsxStr, false)
+}
+
+// TSX2JSWithOptions converts TSX to JavaScript with options
+func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: TSX2JS called with: %s\n", tsxStr[:min(200, len(tsxStr))])
 	}
@@ -66,11 +79,8 @@ func TSX2JS(tsxStr string) string {
 			returnStart += 8 // Length of "return ("
 			mainContent := tsxStr[returnStart:returnEnd]
 
-			// Fix self-closing tags before parsing
-			mainContent = fixCustomJSXSelfClosingTags(mainContent)
-
-			// Convert JSX to React.createElement calls
-			jsxStr := convertJSXToReactCreateElement(mainContent)
+			// Convert JSX to React.createElement calls using the full pipeline
+			jsxStr := parseJSXWithHTMLParser(mainContent)
 
 			// Fix attribute case issues
 			jsxStr = fixAttributeCases(jsxStr)
@@ -78,6 +88,28 @@ func TSX2JS(tsxStr string) string {
 			// Clean up extra whitespace
 			jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
 			jsxStr = strings.TrimSpace(jsxStr)
+
+			// Extract script content from the function body (before return statement) - only for inner components
+			var scriptContent string
+			if isInnerComponent {
+				scriptContent = extractScriptContentFromTSX(tsxStr)
+
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
+				}
+
+				// Combine script content with JSX in a proper function structure (only for inner components)
+				if scriptContent != "" {
+					// Extract component name from TSX
+					componentName := extractComponentNameFromTSX(tsxStr)
+					jsxStr = fmt.Sprintf(`function %s({page}) {
+    %s
+    return (
+        %s
+    );
+}`, componentName, scriptContent, jsxStr)
+				}
+			}
 
 			if isDebugTranspile() {
 				fmt.Printf("DEBUG: TSX2JS result: %s\n", jsxStr[:min(200, len(jsxStr))])
@@ -124,18 +156,6 @@ func TSX2JS(tsxStr string) string {
 }
 
 // convertJSXToReactCreateElement converts JSX syntax to React.createElement calls using HTML parser
-func convertJSXToReactCreateElement(jsContent string) string {
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: convertJSXToReactCreateElement called with: %s\n", jsContent[:min(200, len(jsContent))])
-	}
-
-	// Use the JSX parser with HTML parser
-	result := parseJSXWithHTMLParser(jsContent)
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: convertJSXToReactCreateElement result: %s\n", result[:min(200, len(result))])
-	}
-	return result
-}
 
 // parseJSXWithHTMLParser uses HTML parser to parse JSX and convert to React.createElement
 func parseJSXWithHTMLParser(jsxContent string) string {
@@ -159,101 +179,29 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 	// Fix custom JSX self-closing tags before parsing
 	jsxContent = fixCustomJSXSelfClosingTags(jsxContent)
 
-	// Convert JSX self-closing custom components to React.createElement calls directly
-	// This bypasses the HTML parser issues with custom components
-	jsxContent = convertJSXComponentsToReactCreateElement(jsxContent)
-
-	// Now convert the remaining HTML elements to React.createElement calls
-	// This will handle the div and span elements properly
-
-	// Extract custom component names to preserve their case
-	customComponents := extractCustomComponentNames(jsxContent)
+	// Preprocess JSX expressions to make them HTML-parser friendly
 	if isDebugTranspile() {
-		fmt.Printf("DEBUG: Found custom components: %v\n", customComponents)
-		fmt.Printf("DEBUG: JSX content: %s\n", jsxContent[:min(200, len(jsxContent))])
+		fmt.Printf("DEBUG: Before preprocessJSXExpressions: %s\n", jsxContent[:min(100, len(jsxContent))])
 	}
-
-	// Parse the HTML
-	doc, err := html.Parse(strings.NewReader(jsxContent))
-	if err != nil {
-		if isDebugTranspile() {
-			fmt.Printf("DEBUG: html.Parse error: %v\n", err)
-		}
-		// If parsing fails, return the original content
-		return jsxContent
-	}
-
-	// Find the body element (HTML parser adds html/head/body structure)
-	var bodyNode *html.Node
-	var findBody func(*html.Node)
-	findBody = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "body" {
-			bodyNode = n
-			return
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			findBody(c)
-		}
-	}
-	findBody(doc)
-
-	// Walk through the parsed HTML and convert to React.createElement
-	var result strings.Builder
-
-	// If we found a body node, process only its children
-	if bodyNode != nil {
-		for c := bodyNode.FirstChild; c != nil; c = c.NextSibling {
-			recWalkHTMLNodeWithCustomComponents(c, &result, customComponents)
-		}
-	} else {
-		// Check if the document has html/head/body structure
-		var htmlNode *html.Node
-		for c := doc.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.ElementNode && c.Data == "html" {
-				htmlNode = c
-				break
-			}
-		}
-
-		if htmlNode != nil {
-			// Process children of html node, skipping head
-			for c := htmlNode.FirstChild; c != nil; c = c.NextSibling {
-				if c.Type == html.ElementNode && c.Data == "body" {
-					// Process body children
-					for bodyChild := c.FirstChild; bodyChild != nil; bodyChild = bodyChild.NextSibling {
-						recWalkHTMLNodeWithCustomComponents(bodyChild, &result, customComponents)
-					}
-				} else if c.Type == html.ElementNode && c.Data != "head" {
-					// Process non-head elements directly
-					recWalkHTMLNodeWithCustomComponents(c, &result, customComponents)
-				}
-			}
-		} else {
-			// Fallback: process the entire document
-			recWalkHTMLNodeWithCustomComponents(doc, &result, customComponents)
-		}
-	}
-
+	jsxContent = preprocessJSXExpressions(jsxContent)
 	if isDebugTranspile() {
-		fmt.Printf("DEBUG: parseJSXWithHTMLParser result: %s\n", result.String()[:min(100, len(result.String()))])
+		fmt.Printf("DEBUG: After preprocessJSXExpressions: %s\n", jsxContent[:min(100, len(jsxContent))])
 	}
 
-	// Fix className case after HTML parsing (HTML parser converts to lowercase)
-	originalResult := result.String()
-	finalResult := strings.ReplaceAll(originalResult, "{classname:", "{className:")
+	// Convert ALL JSX elements (HTML + custom components) to React.createElement calls
+	// This processes the complete structure using HTML parser and node walker
+	jsxContent = convertJSXToReactCreateElement(jsxContent)
 
-	// Also try replacing without the curly brace
-	finalResult = strings.ReplaceAll(finalResult, "classname:", "className:")
-
-	if isDebugTranspile() {
-		fmt.Printf("DEBUG: Final result after className fix: %s\n", finalResult[:min(100, len(finalResult))])
-	}
-
-	return finalResult
+	// All processing is now done in convertJSXToReactCreateElement
+	return jsxContent
 }
 
 // recWalkHTMLNodeWithCustomComponents walks through HTML nodes and converts them to React.createElement calls
 func recWalkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, customComponents map[string]string) {
+	if n == nil {
+		return
+	}
+
 	switch n.Type {
 	case html.ElementNode:
 		// Convert element to React.createElement
@@ -261,17 +209,35 @@ func recWalkHTMLNodeWithCustomComponents(n *html.Node, result *strings.Builder, 
 	case html.TextNode:
 		// Convert text node - preserve meaningful whitespace to avoid hydration mismatch
 		text := n.Data // strings.TrimSpace(n.Data)
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: TextNode content: '%s'\n", text)
+		}
 		// Only preserve whitespace if it's not just indentation (tabs/spaces at start of line)
-		if text != "" && !isOnlyIndentation(n.Data) {
+		if text != "" && !isOnlyIndentation(n.Data) && strings.TrimSpace(text) != "" {
 			// Check if this text is a React.createElement call (from our conversion)
 			trimmedText := strings.TrimSpace(text)
 			if strings.HasPrefix(trimmedText, "React.createElement(") {
 				// This is a React.createElement call, trim whitespace and don't wrap it in quotes
 				result.WriteString(trimmedText)
 			} else {
-				// This is regular text, escape it for JavaScript and wrap it in quotes
-				escapedText := escapeJSString(text)
-				result.WriteString(fmt.Sprintf("'%s'", escapedText))
+				// This is regular text, process JSX interpolations
+				processedText := processJSXInterpolations(text)
+				if isDebugTranspile() {
+					fmt.Printf("DEBUG: After processJSXInterpolations: '%s'\n", processedText)
+				}
+
+				// If the text contains interpolations, it's already properly formatted
+				if strings.Contains(processedText, " + ") {
+					// Text has interpolations, it's already properly formatted
+					result.WriteString(processedText)
+				} else {
+					// No interpolations, escape and wrap in quotes
+					escapedText := escapeJSString(processedText)
+					if isDebugTranspile() {
+						fmt.Printf("DEBUG: After escapeJSString: '%s'\n", escapedText)
+					}
+					result.WriteString(fmt.Sprintf("'%s'", escapedText))
+				}
 			}
 		}
 	case html.DocumentNode:
@@ -383,14 +349,26 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 		}
 	} else {
 		componentName = n.Data
-		isCustomComponent = isCustomReactComponent(n.Data)
+		isCustomComponent = isCustomReactComponentCaseInsensitive(n.Data)
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: No customComponents map, using isCustomReactComponent: %s -> %v\n", n.Data, isCustomComponent)
+			fmt.Printf("DEBUG: No customComponents map, using isCustomReactComponentCaseInsensitive: %s -> %v\n", n.Data, isCustomComponent)
+		}
+		// Capitalize component name for custom components
+		if isCustomComponent {
+			componentName = strings.Title(n.Data)
 		}
 	}
 
 	// Build props object
 	props := buildPropsObject(n)
+
+	// Ensure props object has braces if it's not "null"
+	if props != "null" && !strings.HasPrefix(props, "{") {
+		props = "{" + props + "}"
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Added braces to props: %s\n", props)
+		}
+	}
 
 	// Process children
 	var children strings.Builder
@@ -407,7 +385,33 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 		hasChildren = true
 	}
 
+	// For custom components, check if they should be self-closing
+	// If a custom component has children but they are actually siblings that got parsed incorrectly,
+	// we should treat it as self-closing
+	if isCustomComponent && hasChildren {
+		// Check if the children are actually siblings that got parsed incorrectly
+		// This happens when the HTML parser doesn't recognize self-closing custom components
+		childrenStr := children.String()
+		if strings.Contains(childrenStr, "React.createElement(") && !strings.Contains(childrenStr, ",") {
+			// This looks like a single child that should actually be a sibling
+			// Treat the component as self-closing
+			hasChildren = false
+		}
+	}
+
 	// Build React.createElement call
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: Building React.createElement for %s with props: %s\n", componentName, props)
+	}
+
+	// Ensure props are properly wrapped in braces
+	if props != "null" && !strings.HasPrefix(props, "{") {
+		props = "{" + props + "}"
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Fixed props braces: %s\n", props)
+		}
+	}
+
 	if isCustomComponent {
 		// Custom React component - use component name directly (no quotes)
 		result.WriteString(fmt.Sprintf("React.createElement(%s, %s", componentName, props))
@@ -426,6 +430,9 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 
 // buildPropsObject builds the props object for React.createElement
 func buildPropsObject(n *html.Node) string {
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: buildPropsObject called for %s with %d attributes\n", n.Data, len(n.Attr))
+	}
 	if len(n.Attr) == 0 {
 		return "null"
 	}
@@ -448,23 +455,95 @@ func buildPropsObject(n *html.Node) string {
 		// Keep original attribute name (don't convert to camelCase)
 		propName := attr.Key
 
-		// Handle special cases
-		if propName == "class" {
+		// Handle special cases and fix attribute names
+		if strings.HasPrefix(attr.Val, "__JSX_EXPR__") {
+			// This is a preprocessed JSX expression - extract the value
+			innerValue := strings.TrimPrefix(attr.Val, "__JSX_EXPR__")
+			if isDebugTranspile() {
+				fmt.Printf("DEBUG: Found JSX expression: %s -> %s\n", attr.Val, innerValue)
+			}
+			// Fix attribute name for JS expressions
+			fixedPropName := propName
+			if propName == "suppresshydrationwarning" {
+				fixedPropName = "suppressHydrationWarning"
+			} else if propName == "onclick" {
+				fixedPropName = "onClick"
+			} else if propName == "classname" {
+				fixedPropName = "className"
+			}
+			props.WriteString(fmt.Sprintf("%s: %s", fixedPropName, innerValue))
+		} else if propName == "class" {
 			props.WriteString(fmt.Sprintf("className: \"%s\"", attr.Val))
 		} else if propName == "for" {
 			props.WriteString(fmt.Sprintf("htmlFor: \"%s\"", attr.Val))
+		} else if propName == "suppresshydrationwarning" {
+			props.WriteString(fmt.Sprintf("suppressHydrationWarning: \"%s\"", attr.Val))
+		} else if propName == "onclick" {
+			props.WriteString(fmt.Sprintf("onClick: \"%s\"", attr.Val))
+		} else if propName == "classname" {
+			props.WriteString(fmt.Sprintf("className: \"%s\"", attr.Val))
 		} else if strings.HasPrefix(attr.Val, "{") && strings.HasSuffix(attr.Val, "}") {
 			// Already a JS expression - remove the braces since we're in a JS object
 			innerValue := strings.TrimPrefix(strings.TrimSuffix(attr.Val, "}"), "{")
-			props.WriteString(fmt.Sprintf("%s: %s", propName, innerValue))
+			// Fix attribute name for JS expressions too
+			fixedPropName := propName
+			if propName == "suppresshydrationwarning" {
+				fixedPropName = "suppressHydrationWarning"
+			} else if propName == "onclick" {
+				fixedPropName = "onClick"
+			} else if propName == "classname" {
+				fixedPropName = "className"
+			}
+			props.WriteString(fmt.Sprintf("%s: %s", fixedPropName, innerValue))
+		} else if (attr.Val == "true" || attr.Val == "false") && !strings.HasPrefix(propName, "aria-") {
+			// Boolean values (but not for ARIA attributes)
+			fixedPropName := propName
+			if propName == "suppresshydrationwarning" {
+				fixedPropName = "suppressHydrationWarning"
+			} else if propName == "onclick" {
+				fixedPropName = "onClick"
+			} else if propName == "classname" {
+				fixedPropName = "className"
+			}
+			props.WriteString(fmt.Sprintf("%s: %s", fixedPropName, attr.Val))
+		} else if propName == "checked" || propName == "disabled" {
+			// Boolean attributes - these should be treated as boolean values
+			props.WriteString(fmt.Sprintf("%s: true", propName))
 		} else {
-			// Regular string value
-			props.WriteString(fmt.Sprintf("%s: \"%s\"", propName, attr.Val))
+			// Regular string value - fix attribute name
+			fixedPropName := propName
+			if propName == "suppresshydrationwarning" {
+				fixedPropName = "suppressHydrationWarning"
+			} else if propName == "onclick" {
+				fixedPropName = "onClick"
+			} else if propName == "classname" {
+				fixedPropName = "className"
+			}
+
+			// Check if this is a kebab-case attribute (data-*, aria-*)
+			if strings.HasPrefix(propName, "data-") || strings.HasPrefix(propName, "aria-") {
+				props.WriteString(fmt.Sprintf("\"%s\": \"%s\"", fixedPropName, attr.Val))
+			} else {
+				props.WriteString(fmt.Sprintf("%s: \"%s\"", fixedPropName, attr.Val))
+			}
 		}
 	}
 
 	props.WriteString("}")
-	return props.String()
+	result := props.String()
+
+	// Ensure the result always has braces (double-check)
+	if result != "null" && !strings.HasPrefix(result, "{") {
+		result = "{" + result + "}"
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: buildPropsObject added missing braces: %s\n", result)
+		}
+	}
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: buildPropsObject returning: %s\n", result)
+	}
+	return result
 }
 
 // extractCustomComponentNames extracts custom component names to preserve their case
@@ -501,9 +580,28 @@ func isCustomReactComponent(componentName string) bool {
 	return firstChar >= 'A' && firstChar <= 'Z'
 }
 
+// isCustomReactComponentCaseInsensitive checks if a component name is a custom React component (case insensitive)
+func isCustomReactComponentCaseInsensitive(componentName string) bool {
+	// Known custom components (case insensitive) - only actual custom components, not HTML elements
+	customComponents := map[string]bool{
+		"simple":  true,
+		"counter": true,
+		"modal":   true,
+		"card":    true,
+		"list":    true,
+		"item":    true,
+	}
+
+	// Check if it's a known custom component
+	return customComponents[strings.ToLower(componentName)]
+}
+
 // isOnlyIndentation checks if text contains only indentation characters
 func isOnlyIndentation(text string) bool {
 	// Check if the text contains only whitespace characters
+	if text == "" {
+		return true
+	}
 	for _, char := range text {
 		if char != ' ' && char != '\t' && char != '\n' && char != '\r' {
 			return false
@@ -534,6 +632,33 @@ func escapeJSString(s string) string {
 		}
 	}
 	return result.String()
+}
+
+// preprocessJSXExpressions converts JSX expressions to HTML-parser friendly format
+func preprocessJSXExpressions(jsxContent string) string {
+	// Convert JSX expressions like {true} to a special format that HTML parser can handle
+	// We'll use a special attribute format that we can detect later
+	jsxExpressionPattern := regexp.MustCompile(`(\w+)=\{([^}]+)\}`)
+
+	result := jsxExpressionPattern.ReplaceAllStringFunc(jsxContent, func(match string) string {
+		// Extract attribute name and value
+		parts := jsxExpressionPattern.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+
+		attrName := parts[1]
+		attrValue := parts[2]
+
+		// Convert to a special format that we can detect in buildPropsObject
+		return fmt.Sprintf(`%s="__JSX_EXPR__%s"`, attrName, attrValue)
+	})
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: preprocessJSXExpressions result: %s\n", result[:min(100, len(result))])
+	}
+
+	return result
 }
 
 // fixCustomJSXSelfClosingTags fixes custom JSX components to be self-closing
@@ -614,73 +739,87 @@ func convertJSXSelfClosingToHTML(jsxContent string) string {
 	return jsxContent
 }
 
-// convertJSXComponentsToReactCreateElement converts JSX custom components to React.createElement calls
-func convertJSXComponentsToReactCreateElement(jsxContent string) string {
-	// Pattern to match JSX self-closing custom components: <ComponentName ... />
-	jsxComponentPattern := regexp.MustCompile(`<([A-Z][a-zA-Z0-9]*)\s*([^>]*?)\s*/>`)
-
-	jsxContent = jsxComponentPattern.ReplaceAllStringFunc(jsxContent, func(match string) string {
-		// Extract component name and attributes
-		submatches := jsxComponentPattern.FindStringSubmatch(match)
-		if len(submatches) >= 3 {
-			componentName := submatches[1]
-			attributes := strings.TrimSpace(submatches[2])
-
-			// Convert attributes to props object
-			props := "null"
-			if attributes != "" {
-				// Convert JSX attribute syntax to JavaScript object syntax
-				// Replace = with : for proper object syntax
-				jsAttributes := strings.ReplaceAll(attributes, "=", ": ")
-				// Remove curly braces from JSX values like {true} -> true
-				jsAttributes = strings.ReplaceAll(jsAttributes, "{", "")
-				jsAttributes = strings.ReplaceAll(jsAttributes, "}", "")
-				props = "{" + jsAttributes + "}"
-			}
-
-			return fmt.Sprintf("React.createElement(%s, %s)", componentName, props)
-		}
-		return match
-	})
-
-	// After converting components, handle multiple React.createElement calls on separate lines
-	// by putting them on the same line with commas
-	lines := strings.Split(jsxContent, "\n")
-	var resultLines []string
-	skipNext := false
-
-	for i, line := range lines {
-		if skipNext {
-			skipNext = false
-			continue
-		}
-
-		trimmedLine := strings.TrimSpace(line)
-
-		// If this line contains a React.createElement call
-		if strings.HasPrefix(trimmedLine, "React.createElement(") {
-			// Check if the next non-empty line also contains a React.createElement call
-			nextLineIndex := i + 1
-			for nextLineIndex < len(lines) && strings.TrimSpace(lines[nextLineIndex]) == "" {
-				nextLineIndex++
-			}
-
-			if nextLineIndex < len(lines) {
-				nextLine := strings.TrimSpace(lines[nextLineIndex])
-				if strings.HasPrefix(nextLine, "React.createElement(") {
-					// Combine the two React.createElement calls with a comma
-					resultLines = append(resultLines, trimmedLine+", "+nextLine)
-					// Skip the next line since we've already processed it
-					skipNext = true
-					continue
-				}
-			}
-		}
-
-		resultLines = append(resultLines, line)
+// convertJSXToReactCreateElement converts ALL JSX elements (HTML + custom components) to React.createElement calls
+// This function uses HTML parser and node walker for reliable parsing
+func convertJSXToReactCreateElement(jsxContent string) string {
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: convertJSXToReactCreateElement called with: %s\n", jsxContent[:min(100, len(jsxContent))])
 	}
 
-	return strings.Join(resultLines, "\n")
+	// Parse the JSX content as HTML
+	doc, err := html.Parse(strings.NewReader(jsxContent))
+	if err != nil {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: HTML parse error in convertJSXToReactCreateElement: %v\n", err)
+		}
+		// If parsing fails, return the original content
+		return jsxContent
+	}
+
+	// Process ALL elements (HTML + custom components) using the existing walker
+	var result strings.Builder
+	recWalkHTMLNodeWithCustomComponents(doc, &result, nil)
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: convertJSXToReactCreateElement result: %s\n", result.String()[:min(100, len(result.String()))])
+	}
+
+	return result.String()
+}
+
+// convertJSXComponentsWalkerWithArray walks through HTML nodes and collects custom components in an array
+func convertJSXComponentsWalkerWithArray(n *html.Node, components *[]string) {
+	if n == nil {
+		return
+	}
+
+	// Check if this is a custom component (starts with uppercase letter)
+	if n.Type == html.ElementNode && isCustomReactComponentCaseInsensitive(n.Data) {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Found custom component: %s\n", n.Data)
+		}
+
+		// Build props object using the same logic as buildPropsObject
+		props := buildPropsObject(n)
+
+		// Create React.createElement call - capitalize component name for custom components
+		componentName := strings.Title(n.Data)
+		reactCall := fmt.Sprintf("React.createElement(%s, %s)", componentName, props)
+		*components = append(*components, reactCall)
+	}
+
+	// Process children recursively for all nodes
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		convertJSXComponentsWalkerWithArray(c, components)
+	}
+}
+
+// convertJSXComponentsWalker walks through HTML nodes and converts custom components to React.createElement
+func convertJSXComponentsWalker(n *html.Node, result *strings.Builder) {
+	if n == nil {
+		return
+	}
+
+	// Check if this is a custom component (starts with uppercase letter)
+	if n.Type == html.ElementNode && isCustomReactComponentCaseInsensitive(n.Data) {
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Found custom component: %s\n", n.Data)
+		}
+
+		// Build props object using the same logic as buildPropsObject
+		props := buildPropsObject(n)
+
+		// Create React.createElement call - capitalize component name for custom components
+		componentName := strings.Title(n.Data)
+		reactCall := fmt.Sprintf("React.createElement(%s, %s)", componentName, props)
+		result.WriteString(reactCall)
+		// Don't return here - continue processing siblings
+	}
+
+	// Process children recursively for all nodes
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		convertJSXComponentsWalker(c, result)
+	}
 }
 
 // getTitleCase converts a string to title case by trimming, splitting by non-word characters,
@@ -840,6 +979,7 @@ func handleReactFragments(jsxContent string) string {
 
 // fixAttributeCases fixes attribute case issues caused by HTML parser
 func fixAttributeCases(jsContent string) string {
+	originalContent := jsContent
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: fixAttributeCases input: %s\n", jsContent[:min(200, len(jsContent))])
 	}
@@ -882,7 +1022,180 @@ func fixAttributeCases(jsContent string) string {
 
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: fixAttributeCases output: %s\n", jsContent[:min(200, len(jsContent))])
+		if originalContent != jsContent {
+			// Find what changed
+			for i := 0; i < min(len(originalContent), len(jsContent)); i++ {
+				if i >= len(originalContent) || i >= len(jsContent) || originalContent[i] != jsContent[i] {
+					fmt.Printf("DEBUG: First difference at position %d\n", i)
+					fmt.Printf("DEBUG: Original (20 chars): %s\n", originalContent[max(0, i-10):min(len(originalContent), i+10)])
+					fmt.Printf("DEBUG: Modified (20 chars): %s\n", jsContent[max(0, i-10):min(len(jsContent), i+10)])
+					break
+				}
+			}
+		}
 	}
 
 	return jsContent
+}
+
+// extractScriptContentFromTSX extracts script content from TSX function body
+func extractScriptContentFromTSX(tsxStr string) string {
+	// Find the function body content between the opening brace and return statement
+	funcStart := strings.Index(tsxStr, "function")
+	if funcStart == -1 {
+		return ""
+	}
+
+	// Find the opening brace of the function
+	braceStart := strings.Index(tsxStr[funcStart:], "{")
+	if braceStart == -1 {
+		return ""
+	}
+	braceStart += funcStart + 1
+
+	// Find the return statement
+	returnStart := strings.Index(tsxStr, "return (")
+	if returnStart == -1 {
+		return ""
+	}
+
+	// Extract content between opening brace and return statement
+	scriptContent := tsxStr[braceStart:returnStart]
+
+	// Clean up the script content
+	scriptContent = strings.TrimSpace(scriptContent)
+
+	// Remove the comment header if present
+	if strings.Contains(scriptContent, "COMPONENT <script> TAG CONTENTS") {
+		lines := strings.Split(scriptContent, "\n")
+		var cleanLines []string
+		inScript := false
+		for _, line := range lines {
+			if strings.Contains(line, "COMPONENT <script> TAG CONTENTS") {
+				inScript = true
+				continue
+			}
+			if inScript && strings.TrimSpace(line) != "" {
+				cleanLines = append(cleanLines, line)
+			}
+		}
+		scriptContent = strings.Join(cleanLines, "\n")
+	}
+
+	return strings.TrimSpace(scriptContent)
+}
+
+// parseTextInterpolation parses text content and returns an array of TextPart structs
+func parseTextInterpolation(text string) []TextPart {
+	var parts []TextPart
+
+	// Find all JSX interpolations like {variable}
+	interpolationPattern := regexp.MustCompile(`\{([^}]+)\}`)
+	lastIndex := 0
+
+	matches := interpolationPattern.FindAllStringSubmatchIndex(text, -1)
+
+	for _, match := range matches {
+		// Add string part before the interpolation
+		if match[0] > lastIndex {
+			stringPart := text[lastIndex:match[0]]
+			if strings.TrimSpace(stringPart) != "" {
+				parts = append(parts, TextPart{Type: "string", Value: stringPart})
+			}
+		}
+
+		// Add expression part
+		expression := text[match[2]:match[3]] // Extract content between { and }
+		parts = append(parts, TextPart{Type: "expression", Value: expression})
+
+		lastIndex = match[1] // End of the interpolation
+	}
+
+	// Add remaining string part
+	if lastIndex < len(text) {
+		stringPart := text[lastIndex:]
+		// Always add the remaining part, even if it's empty (for proper concatenation)
+		parts = append(parts, TextPart{Type: "string", Value: stringPart})
+	} else if len(matches) > 0 {
+		// If we had interpolations but no remaining text, add an empty string part
+		parts = append(parts, TextPart{Type: "string", Value: ""})
+	}
+
+	// If no interpolations found, treat the whole text as a string
+	if len(parts) == 0 && strings.TrimSpace(text) != "" {
+		parts = append(parts, TextPart{Type: "string", Value: text})
+	}
+
+	return parts
+}
+
+// buildTextConcatenation builds JavaScript string concatenation from TextPart array
+func buildTextConcatenation(parts []TextPart) string {
+	if len(parts) == 0 {
+		return ""
+	}
+
+	if len(parts) == 1 {
+		if parts[0].Type == "string" {
+			return fmt.Sprintf("'%s'", escapeJSString(parts[0].Value))
+		} else {
+			// Single expression - don't wrap in quotes, just return the expression
+			return parts[0].Value
+		}
+	}
+
+	var result strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			result.WriteString(" + ")
+		}
+
+		if part.Type == "string" {
+			result.WriteString(fmt.Sprintf("'%s'", escapeJSString(part.Value)))
+		} else {
+			result.WriteString(fmt.Sprintf("(%s)", part.Value))
+		}
+	}
+
+	return result.String()
+}
+
+// processJSXInterpolations processes JSX interpolations using the struct-based approach
+func processJSXInterpolations(jsxContent string) string {
+	// Check if the text contains interpolations
+	if !strings.Contains(jsxContent, "{") {
+		// No interpolations, return as-is (just escape for JavaScript)
+		return escapeJSString(jsxContent)
+	}
+
+	// Parse the text into parts
+	parts := parseTextInterpolation(jsxContent)
+
+	// Build the concatenation
+	result := buildTextConcatenation(parts)
+
+	if isDebugTranspile() {
+		fmt.Printf("DEBUG: processJSXInterpolations: '%s' -> '%s'\n", jsxContent, result)
+	}
+
+	return result
+}
+
+// extractComponentNameFromTSX extracts the component name from TSX content
+func extractComponentNameFromTSX(tsxStr string) string {
+	// Look for "export default function ComponentName(" pattern
+	pattern := regexp.MustCompile(`export default function (\w+)\s*\(`)
+	matches := pattern.FindStringSubmatch(tsxStr)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
+	// Fallback: look for "function ComponentName(" pattern
+	pattern = regexp.MustCompile(`function (\w+)\s*\(`)
+	matches = pattern.FindStringSubmatch(tsxStr)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
+	return "Component" // fallback
 }

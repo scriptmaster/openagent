@@ -1,7 +1,7 @@
 package common
 
 // AppVersion is the current application version - hardcoded for deployment tracking
-const AppVersion = "1.3.1.58"
+const AppVersion = "1.3.1.95"
 
 // GetAppVersion returns the current application version
 func GetAppVersion() string {

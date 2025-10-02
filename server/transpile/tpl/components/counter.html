@@ -1,0 +1,18 @@
+<div className="counter-component">
+		<h2>Counter: {this.value}</h2>
+		<button onClick={increment}>+</button>
+		<button onClick={decrement}>-</button>
+	</div>
+	<script>
+		Counter.prototype.increment = function() {
+			this.value++;
+		};
+		
+		Counter.prototype.decrement = function() {
+			this.value--;
+		};
+		
+		Counter.prototype.init = function() {
+			this.value = 0;
+		};
+	</script>

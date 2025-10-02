@@ -160,9 +160,14 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 	preserveWhitespace := os.Getenv("HTML_WHITESPACE_NOHYDRATE") == "1"
 	componentHTML = common.MinifyHTML(componentHTML, preserveWhitespace)
 
-	// Write component TSX
-	componentTSX := fmt.Sprintf("export default function %s() {\n    return (\n        %s\n    );\n}",
-		convertToCamelCase(componentName), componentHTML)
+	// Write component TSX with embedded script content
+	componentTSX := fmt.Sprintf(`export default function %s() {
+    // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
+%s
+    return (
+        %s
+    );
+}`, convertToCamelCase(componentName), jsContent, componentHTML)
 
 	if err := os.WriteFile(componentTSXPath, []byte(componentTSX), 0644); err != nil {
 		return "", fmt.Errorf("failed to write component TSX: %v", err)
@@ -180,11 +185,8 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 		fmt.Printf("DEBUG: Component JS content: %s\n", componentJS[:min(200, len(componentJS))])
 	}
 
-	// Add the script content (prototype methods) with ASCII art
-	componentJS += "\n\n// ╔══════════════════════════════════════════════════════════════════════════════\n"
-	componentJS += "// ║                        🔧 COMPONENT PROTOTYPE METHODS 🔧                        \n"
-	componentJS += "// ╚══════════════════════════════════════════════════════════════════════════════\n\n"
-	componentJS += jsContent
+	// Script content is now embedded directly in the TSX function, not added here
+	// componentJS += jsContent // REMOVED - script is embedded in TSX
 
 	// Write component JS to file for later embedding
 	componentJSFile := fmt.Sprintf("tpl/generated/js/component_%s.js", componentName)
