@@ -1113,14 +1113,11 @@ func parseTextInterpolation(text string) []TextPart {
 		// Add string part before the interpolation
 		if match[0] > lastIndex {
 			stringPart := text[lastIndex:match[0]]
-			// Normalize whitespace using the dedicated function
-			trimmedPart := normalizeWhitespace(stringPart)
 			if isDebugTranspile() {
-				fmt.Printf("DEBUG: parseTextInterpolation - stringPart: '%s', trimmedPart: '%s'\n", stringPart, trimmedPart)
-				fmt.Printf("DEBUG: normalizeWhitespace test: '%s' -> '%s'\n", stringPart, normalizeWhitespace(stringPart))
+				fmt.Printf("DEBUG: parseTextInterpolation - stringPart: '%s'\n", stringPart)
 			}
-			if trimmedPart != "" {
-				parts = append(parts, TextPart{Type: "string", Value: trimmedPart})
+			if stringPart != "" {
+				parts = append(parts, TextPart{Type: "string", Value: stringPart})
 			}
 		}
 
@@ -1134,13 +1131,11 @@ func parseTextInterpolation(text string) []TextPart {
 	// Add remaining string part
 	if lastIndex < len(text) {
 		stringPart := text[lastIndex:]
-		// Normalize whitespace using the dedicated function
-		trimmedPart := normalizeWhitespace(stringPart)
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: parseTextInterpolation - remaining stringPart: '%s', trimmedPart: '%s'\n", stringPart, trimmedPart)
+			fmt.Printf("DEBUG: parseTextInterpolation - remaining stringPart: '%s'\n", stringPart)
 		}
 		// Always add the remaining part, even if it's empty (for proper concatenation)
-		parts = append(parts, TextPart{Type: "string", Value: trimmedPart})
+		parts = append(parts, TextPart{Type: "string", Value: stringPart})
 	} else if len(matches) > 0 {
 		// If we had interpolations but no remaining text, add an empty string part
 		parts = append(parts, TextPart{Type: "string", Value: ""})
@@ -1187,14 +1182,17 @@ func buildTextConcatenation(parts []TextPart) string {
 
 // processJSXInterpolations processes JSX interpolations using the struct-based approach
 func processJSXInterpolations(jsxContent string) string {
+	// First normalize whitespace on the entire content
+	normalizedContent := normalizeWhitespace(jsxContent)
+	
 	// Check if the text contains interpolations
-	if !strings.Contains(jsxContent, "{") {
+	if !strings.Contains(normalizedContent, "{") {
 		// No interpolations, return as-is (just escape for JavaScript)
-		return escapeJSString(jsxContent)
+		return escapeJSString(normalizedContent)
 	}
 
 	// Parse the text into parts
-	parts := parseTextInterpolation(jsxContent)
+	parts := parseTextInterpolation(normalizedContent)
 
 	// Build the concatenation
 	result := buildTextConcatenation(parts)
@@ -1235,8 +1233,9 @@ func trimWhiteSpace(s string) string {
 func normalizeWhitespace(s string) string {
 	// First handle literal \n characters (not actual newlines)
 	result := strings.ReplaceAll(s, "\\n", " ")
-	// Then replace all whitespace sequences with single spaces
+	// Replace multiple consecutive whitespace characters with single spaces
 	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	// Trim leading and trailing whitespace
 	return strings.TrimSpace(result)
 }
 

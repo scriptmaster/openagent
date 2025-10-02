@@ -131,7 +131,7 @@ func TestTSXToJSConversion(t *testing.T) {
 		{
 			name:           "TextInterpolation",
 			tsxContent:     `<div>Counter: {count}</div>`,
-			expectedOutput: `React.createElement('div', null, 'Counter:' + (count) + '')`,
+			expectedOutput: `React.createElement('div', null, 'Counter: ' + (count) + '')`,
 			description:    "Text content with JSX interpolation",
 		},
 		{
@@ -167,7 +167,7 @@ func TestTSXToJSConversion(t *testing.T) {
 		{
 			name:           "WhitespaceInComponent",
 			tsxContent:     `<div>\n    Counter: {count}</div>`,
-			expectedOutput: `React.createElement('div', null, 'Counter:' + (count) + '')`,
+			expectedOutput: `React.createElement('div', null, 'Counter: ' + (count) + '')`,
 			description:    "Whitespace and newlines in component content should be filtered out",
 		},
 	}
