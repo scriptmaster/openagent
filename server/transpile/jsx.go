@@ -320,7 +320,7 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 	}
 
 	// Check if this is a React Fragment (HTML parser converts to lowercase)
-	if n.Data == "react.fragment" {
+	if strings.ToLower(n.Data) == "react.fragment" {
 		// Handle React Fragment - just process children without wrapper
 		var children strings.Builder
 		hasChildren := false
