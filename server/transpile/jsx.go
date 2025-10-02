@@ -1179,14 +1179,15 @@ func buildTextConcatenation(parts []TextPart) string {
 
 // processJSXInterpolations processes JSX interpolations using the struct-based approach
 func processJSXInterpolations(jsxContent string) string {
-	// First normalize whitespace on the entire content
-	normalizedContent := normalizeWhitespace(jsxContent)
-
-	// Check if the text contains interpolations
-	if !strings.Contains(normalizedContent, "{") {
-		// No interpolations, return as-is (just escape for JavaScript)
-		return escapeJSString(normalizedContent)
+	// Check if the text contains interpolations first
+	if !strings.Contains(jsxContent, "{") {
+		// No interpolations, return as-is (preserve whitespace for text content)
+		// Only escape quotes and backslashes, not whitespace
+		return escapeJSStringMinimal(jsxContent)
 	}
+
+	// Only normalize whitespace when there are interpolations
+	normalizedContent := normalizeWhitespace(jsxContent)
 
 	// Parse the text into parts
 	parts := parseTextInterpolation(normalizedContent)
@@ -1199,6 +1200,24 @@ func processJSXInterpolations(jsxContent string) string {
 	}
 
 	return result
+}
+
+// escapeJSStringMinimal escapes only quotes and backslashes, preserving whitespace
+func escapeJSStringMinimal(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+		switch r {
+		case '\\':
+			result.WriteString("\\\\")
+		case '"':
+			result.WriteString("\\\"")
+		case '\'':
+			result.WriteString("\\'")
+		default:
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
 // trimWhiteSpace removes all whitespace characters from a string
