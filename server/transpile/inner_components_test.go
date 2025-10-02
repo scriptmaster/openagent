@@ -27,7 +27,7 @@ func TestInnerComponentEmbedding(t *testing.T) {
 			htmlContent: `<main>
 				<div className="container">
 					<h1>Test Page</h1>
-					<div id="component-simple"></div>
+					<template id="component-simple"></template>
 				</div>
 				<script>
 					function initPage() {
@@ -70,8 +70,8 @@ func TestInnerComponentEmbedding(t *testing.T) {
 			htmlContent: `<main>
 				<div className="container">
 					<h1>Multi Component Page</h1>
-					<div id="component-simple"></div>
-					<div id="component-counter"></div>
+					<template id="component-simple"></template>
+					<template id="component-counter"></template>
 				</div>
 				<script>
 					function initPage() {
@@ -161,6 +161,17 @@ func createTestComponentFiles(t *testing.T) {
 	if err := os.MkdirAll("tpl/components", 0755); err != nil {
 		t.Fatalf("Failed to create components directory: %v", err)
 	}
+	
+	// Create generated directories
+	if err := os.MkdirAll("tpl/generated/pages", 0755); err != nil {
+		t.Fatalf("Failed to create generated pages directory: %v", err)
+	}
+	if err := os.MkdirAll("tpl/generated/js", 0755); err != nil {
+		t.Fatalf("Failed to create generated js directory: %v", err)
+	}
+	if err := os.MkdirAll("tpl/generated/css", 0755); err != nil {
+		t.Fatalf("Failed to create generated css directory: %v", err)
+	}
 
 	// Simple component
 	simpleHTML := `<div className="simple-component">
@@ -205,3 +216,4 @@ func createTestComponentFiles(t *testing.T) {
 		t.Fatalf("Failed to create counter.html: %v", err)
 	}
 }
+
