@@ -153,6 +153,9 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 		}
 	}
 
+	// Handle React Fragments before HTML parsing
+	jsxContent = handleReactFragments(jsxContent)
+
 	// Fix custom JSX self-closing tags before parsing
 	jsxContent = fixCustomJSXSelfClosingTags(jsxContent)
 
@@ -312,6 +315,28 @@ func recConvertElementToReactWithCustomComponents(n *html.Node, result *strings.
 		// Process children
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			recWalkHTMLNodeWithCustomComponents(c, result, customComponents)
+		}
+		return
+	}
+
+	// Check if this is a React Fragment (HTML parser converts to lowercase)
+	if n.Data == "react.fragment" {
+		// Handle React Fragment - just process children without wrapper
+		var children strings.Builder
+		hasChildren := false
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			// Skip completely empty text nodes and indentation-only nodes
+			if c.Type == html.TextNode && (c.Data == "" || isOnlyIndentation(c.Data)) {
+				continue
+			}
+			if hasChildren {
+				children.WriteString(", ")
+			}
+			recWalkHTMLNodeWithCustomComponents(c, &children, customComponents)
+			hasChildren = true
+		}
+		if hasChildren {
+			result.WriteString(children.String())
 		}
 		return
 	}
@@ -797,6 +822,20 @@ func removeTypeScriptTypes(tsxContent string) string {
 	tsxContent = regexp.MustCompile(`type\s+\w+\s*=\s*[^;]+;`).ReplaceAllString(tsxContent, "")
 
 	return tsxContent
+}
+
+// handleReactFragments converts React Fragment syntax to React.Fragment
+func handleReactFragments(jsxContent string) string {
+	// Replace React Fragment syntax <>...</> with <React.Fragment>...</React.Fragment>
+	// This makes it easier for the HTML parser to handle
+
+	// First, replace opening fragments
+	jsxContent = regexp.MustCompile(`<>`).ReplaceAllString(jsxContent, `<React.Fragment>`)
+
+	// Then, replace closing fragments
+	jsxContent = regexp.MustCompile(`</>`).ReplaceAllString(jsxContent, `</React.Fragment>`)
+
+	return jsxContent
 }
 
 // fixAttributeCases fixes attribute case issues caused by HTML parser
