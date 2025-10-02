@@ -135,11 +135,8 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 		mainContent = tsxStr
 	}
 
-	// Fix self-closing tags before parsing
-	mainContent = fixCustomJSXSelfClosingTags(mainContent)
-
-	// Convert JSX to React.createElement calls
-	jsxStr := convertJSXToReactCreateElement(mainContent)
+	// Convert JSX to React.createElement calls using the full pipeline
+	jsxStr := parseJSXWithHTMLParser(mainContent)
 
 	// Fix attribute case issues (HTML parser converts to camelCase)
 	jsxStr = fixAttributeCases(jsxStr)
@@ -176,9 +173,6 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 	// Handle React Fragments before HTML parsing
 	jsxContent = handleReactFragments(jsxContent)
 
-	// Fix custom JSX self-closing tags before parsing
-	jsxContent = fixCustomJSXSelfClosingTags(jsxContent)
-
 	// Preprocess JSX expressions to make them HTML-parser friendly
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: Before preprocessJSXExpressions: %s\n", jsxContent[:min(100, len(jsxContent))])
@@ -187,6 +181,9 @@ func parseJSXWithHTMLParser(jsxContent string) string {
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: After preprocessJSXExpressions: %s\n", jsxContent[:min(100, len(jsxContent))])
 	}
+
+	// Fix custom JSX self-closing tags before parsing
+	jsxContent = fixCustomJSXSelfClosingTags(jsxContent)
 
 	// Convert ALL JSX elements (HTML + custom components) to React.createElement calls
 	// This processes the complete structure using HTML parser and node walker
@@ -1184,7 +1181,7 @@ func buildTextConcatenation(parts []TextPart) string {
 func processJSXInterpolations(jsxContent string) string {
 	// First normalize whitespace on the entire content
 	normalizedContent := normalizeWhitespace(jsxContent)
-	
+
 	// Check if the text contains interpolations
 	if !strings.Contains(normalizedContent, "{") {
 		// No interpolations, return as-is (just escape for JavaScript)
