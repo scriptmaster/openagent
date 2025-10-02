@@ -77,53 +77,91 @@ func TSX2JSWithOptions(tsxStr string, isInnerComponent bool) string {
 			fmt.Printf("DEBUG: TSX2JSWithOptions checking for JSX( in: %s\n", tsxStr[:min(200, len(tsxStr))])
 			fmt.Printf("DEBUG: Contains JSX(: %v\n", strings.Contains(tsxStr, "JSX("))
 		}
-		if strings.Contains(tsxStr, "JSX(") {
-			// This is a dual function pattern, extract JSX from the JSX function
+		// Check if this is a dual function pattern
+		isDualFunction := strings.Contains(tsxStr, "JSX(") || (strings.Contains(tsxStr, "function ") && strings.Contains(tsxStr, "JSX("))
+		
+		if isDualFunction {
+			// For dual function pattern, we need to convert both functions
+			// Extract the main function (Test) and JSX function (TestJSX)
+			
+			// Find the main function
+			mainFuncStart := strings.Index(tsxStr, "export default function")
+			if mainFuncStart == -1 {
+				mainFuncStart = strings.Index(tsxStr, "function")
+			}
+			
+			// Find the JSX function
+			jsxFuncStart := -1
+			if mainFuncStart != -1 {
+				jsxFuncStart = strings.Index(tsxStr[mainFuncStart+10:], "function ")
+				if jsxFuncStart != -1 {
+					jsxFuncStart += mainFuncStart + 10
+				}
+			}
+			
+			if jsxFuncStart != -1 {
+				// Extract the main function content (before JSX function)
+				mainFuncContent := tsxStr[mainFuncStart:jsxFuncStart]
+				
+				// Extract the JSX function content
+				jsxFuncContent := tsxStr[jsxFuncStart:]
+				
+				// Convert the JSX function's JSX content to React.createElement
+				jsxReturnStart := strings.Index(jsxFuncContent, "return (")
+				jsxReturnEnd := strings.LastIndex(jsxFuncContent, ");")
+				if jsxReturnStart != -1 && jsxReturnEnd != -1 {
+					jsxReturnStart += 8 // Length of "return ("
+					jsxContent := jsxFuncContent[jsxReturnStart:jsxReturnEnd]
 
-			// Find the JSX function's return statement (look for the last return statement)
-			jsxReturnStart := strings.LastIndex(tsxStr, "return (")
-			jsxReturnEnd := strings.LastIndex(tsxStr, ");")
-			if jsxReturnStart != -1 && jsxReturnEnd != -1 {
-				jsxReturnStart += 8 // Length of "return ("
-				mainContent := tsxStr[jsxReturnStart:jsxReturnEnd]
+					// Convert JSX to React.createElement calls
+					convertedJSX := parseJSXWithHTMLParser(jsxContent)
+					convertedJSX = fixAttributeCases(convertedJSX)
+					convertedJSX = strings.TrimSpace(convertedJSX)
 
-				// Convert JSX to React.createElement calls using the full pipeline
-				jsxStr := parseJSXWithHTMLParser(mainContent)
-
-				// Fix attribute case issues
-				jsxStr = fixAttributeCases(jsxStr)
-
-				// Clean up extra whitespace
-				jsxStr = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(jsxStr, "\n")
-				jsxStr = strings.TrimSpace(jsxStr)
-
-				// Extract script content from the main function body (before JSX call) - only for inner components
-				var scriptContent string
-				if isInnerComponent {
-					scriptContent = extractScriptContentFromTSX(tsxStr)
-
-					if isDebugTranspile() {
-						fmt.Printf("DEBUG: extractScriptContentFromTSX result: '%s'\n", scriptContent)
-					}
-
-					// Combine script content with JSX in a proper function structure (only for inner components)
-					if scriptContent != "" {
-						// Extract component name from TSX
-						componentName := extractComponentNameFromTSX(tsxStr)
-						jsxStr = fmt.Sprintf(`function %s({page}) {
-    %s
+					// Reconstruct the JSX function with converted JSX
+					jsxFuncName := extractFunctionName(jsxFuncContent)
+					convertedJSXFunc := fmt.Sprintf(`function %s(props, state) {
     return (
         %s
     );
-}`, componentName, scriptContent, jsxStr)
+}`, jsxFuncName, convertedJSX)
+
+					// Extract and clean the main function
+					componentName := extractComponentNameFromTSX(tsxStr)
+					
+					// Extract script content from main function (between opening brace and return statement)
+					mainFuncBodyStart := strings.Index(mainFuncContent, "{")
+					mainFuncBodyEnd := strings.Index(mainFuncContent, "return ")
+					if mainFuncBodyStart != -1 && mainFuncBodyEnd != -1 {
+						scriptContent := mainFuncContent[mainFuncBodyStart+1:mainFuncBodyEnd]
+						scriptContent = strings.TrimSpace(scriptContent)
+						
+						// Remove comment headers
+						lines := strings.Split(scriptContent, "\n")
+						var cleanLines []string
+						for _, line := range lines {
+							if !strings.Contains(line, "╔══") && !strings.Contains(line, "══╝") {
+								cleanLines = append(cleanLines, line)
+							}
+						}
+						scriptContent = strings.Join(cleanLines, "\n")
+						scriptContent = strings.TrimSpace(scriptContent)
+						
+						// Reconstruct the main function
+						mainFunc := fmt.Sprintf(`function %s() {
+%s
+    return %s(typeof props != 'undefined' ? props : {}, typeof state != 'undefined' ? state : {});
+}`, componentName, scriptContent, jsxFuncName)
+
+						result := mainFunc + "\n" + convertedJSXFunc
+
+						if isDebugTranspile() {
+							fmt.Printf("DEBUG: TSX2JS result (dual function): %s\n", result[:min(200, len(result))])
+						}
+
+						return result
 					}
 				}
-
-				if isDebugTranspile() {
-					fmt.Printf("DEBUG: TSX2JS result (dual function): %s\n", jsxStr[:min(200, len(jsxStr))])
-				}
-
-				return jsxStr
 			}
 		} else {
 			// This is a single function pattern, extract JSX from the return statement
@@ -936,16 +974,14 @@ func createReactJSContent(originalJS, componentName string) string {
 		fmt.Printf("DEBUG: actualComponentName = '%s'\n", titledComponentName)
 	}
 
-	// Create the main component JS content first, wrapped in a function
+	// Create the main component JS content (already converted from TSX, no extra wrapping needed)
 	mainComponentJS := fmt.Sprintf(`
 // ╔══ ⚛️  MAIN COMPONENT JS (TSX → JS) ⚛️ ══
-function %s() {
 %s
-}
 
 // ╔══ 📜 ORIGINAL JS CONTENT 📜 ══
 %s
-`, componentJS, titledComponentName, originalJS)
+`, componentJS, originalJS)
 
 	// Embed component JS content into the main JS file
 	embeddedJS := embedComponentJS(mainComponentJS)
@@ -1100,6 +1136,17 @@ func fixAttributeCases(jsContent string) string {
 }
 
 // extractScriptContentFromTSX extracts script content from TSX function body
+// extractFunctionName extracts the function name from a function declaration
+func extractFunctionName(funcStr string) string {
+	// Look for "function FunctionName("
+	funcPattern := regexp.MustCompile(`function\s+([A-Za-z0-9_]+)\s*\(`)
+	matches := funcPattern.FindStringSubmatch(funcStr)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return "UnknownFunction"
+}
+
 func extractScriptContentFromTSX(tsxStr string) string {
 	// Find the function body content between the opening brace and return statement
 	funcStart := strings.Index(tsxStr, "function")

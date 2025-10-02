@@ -44,26 +44,26 @@ function TestJSX(props, state) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Convert TSX to JS
 			jsContent := TSX2JSWithOptions(tt.tsxContent, true)
-			
+
 			// Check for duplicate function declarations
 			functionCount := strings.Count(jsContent, "function Test({page})")
 			if functionCount > 1 {
 				t.Errorf("Found %d duplicate function declarations in %s", functionCount, tt.description)
 				t.Logf("Generated JS content:\n%s", jsContent)
 			}
-			
+
 			// Check for malformed syntax
 			if strings.Contains(jsContent, "function Test({page}) {\n    return (\nfunction Test({page}) {") {
 				t.Errorf("Found malformed nested function syntax in %s", tt.description)
 				t.Logf("Generated JS content:\n%s", jsContent)
 			}
-			
+
 			// Check for proper function structure
 			if !strings.Contains(jsContent, "function Test({page}) {") {
 				t.Errorf("Missing main function declaration in %s", tt.description)
 				t.Logf("Generated JS content:\n%s", jsContent)
 			}
-			
+
 			// For dual function pattern, check for TestJSX function
 			if strings.Contains(tt.tsxContent, "TestJSX(") {
 				if !strings.Contains(jsContent, "function TestJSX(") {
@@ -71,7 +71,7 @@ function TestJSX(props, state) {
 					t.Logf("Generated JS content:\n%s", jsContent)
 				}
 			}
-			
+
 			t.Logf("✅ %s: No duplicate function declarations found", tt.description)
 		})
 	}
@@ -86,20 +86,20 @@ func TestTSXToJSConversionStructure(t *testing.T) {
 }`
 
 	jsContent := TSX2JSWithOptions(tsxContent, true)
-	
+
 	// Check that we have exactly one function declaration
 	functionCount := strings.Count(jsContent, "function Test({page})")
 	if functionCount != 1 {
 		t.Errorf("Expected exactly 1 function declaration, got %d", functionCount)
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	// Check that the function structure is correct
 	if !strings.Contains(jsContent, "React.createElement('div', null, 'Hello World')") {
 		t.Errorf("Generated JS does not contain expected React.createElement structure")
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	t.Logf("✅ TSX to JS conversion structure is correct")
 }
 
@@ -121,31 +121,31 @@ function TestJSX(props, state) {
 }`
 
 	jsContent := TSX2JSWithOptions(tsxContent, true)
-	
+
 	// Check for main function
 	if !strings.Contains(jsContent, "function Test({page})") {
 		t.Errorf("Missing main Test function")
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	// Check for JSX function
 	if !strings.Contains(jsContent, "function TestJSX(") {
 		t.Errorf("Missing TestJSX function")
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	// Check for proper return statement
 	if !strings.Contains(jsContent, "return TestJSX(") {
 		t.Errorf("Missing TestJSX call in main function")
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	// Check for no duplicate main functions
 	mainFunctionCount := strings.Count(jsContent, "function Test({page})")
 	if mainFunctionCount != 1 {
 		t.Errorf("Expected exactly 1 main function, got %d", mainFunctionCount)
 		t.Logf("Generated JS content:\n%s", jsContent)
 	}
-	
+
 	t.Logf("✅ Dual function pattern structure is correct")
 }
