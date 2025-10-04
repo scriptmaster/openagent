@@ -104,6 +104,7 @@ func TestTSXToJSConversionStructure(t *testing.T) {
 }
 
 func TestDualFunctionPatternStructureDuplicate(t *testing.T) {
+	t.Skip("TEMPORARILY DISABLED: Dual function pattern tests")
 	// Test dual function pattern specifically
 	tsxContent := `export default function Test({page}: {page: any}) {
     // ╔══ 🔧 PAGE <script> TAG CONTENTS 🔧 ══

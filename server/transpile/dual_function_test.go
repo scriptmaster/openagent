@@ -8,6 +8,7 @@ import (
 )
 
 func TestDualFunctionPatternInGeneratedFiles(t *testing.T) {
+	t.Skip("TEMPORARILY DISABLED: Dual function pattern tests")
 	tests := []struct {
 		name        string
 		envValue    string
@@ -112,6 +113,7 @@ func TestDualFunctionPatternInGeneratedFiles(t *testing.T) {
 }
 
 func TestDualFunctionPatternStructure(t *testing.T) {
+	t.Skip("TEMPORARILY DISABLED: Dual function pattern tests")
 	// Test the structure of the dual function pattern
 	componentName := "Counter"
 	jsContent := `

@@ -226,7 +226,23 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 	}
 
 	// Store component JS content for later embedding
-	componentJS := convertComponentTSXToJS(componentTSX)
+	var componentJS string
+	if strings.Contains(componentTSX, "function ") && strings.Contains(componentTSX, "typeof props") {
+		// Component TSX already contains the dual function pattern, use it as-is
+		if isDebugTranspile() {
+			fmt.Printf("DEBUG: Component TSX already contains dual function pattern, using as-is\n")
+		}
+		componentJS = componentTSX
+	} else {
+		// Component TSX needs conversion
+		componentJS = convertComponentTSXToJS(componentTSX)
+		// Wrap component JS in function
+		componentJS = fmt.Sprintf(`function %s() {
+    return (
+        %s
+    );
+}`, convertToCamelCase(componentName), componentJS)
+	}
 
 	if isDebugTranspile() {
 		fmt.Printf("DEBUG: Converted TSX to JS: %d bytes\n", len(componentJS))
