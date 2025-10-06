@@ -17,7 +17,7 @@ BINARY_NAME := openagent
 include .env
 export
 
-.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query perf rperf perf2 revision
+.PHONY: all test build clean deploy deploy-git deploy-scp test-psql fix-remote stop migrations cli-build generate-hash reset-password list-users query perf rperf perf2 revision esgo
 
 all: stop start
 
@@ -336,3 +336,19 @@ rperf:
 
 # Alias for remote performance test
 perf2: rperf
+
+# ESBuild + Goja test server
+esgo:
+	@echo "🚀 Starting ESBuild + Goja test server..."
+	@lsof -ti:8801 | xargs kill -9 2>/dev/null || true
+	@cd tests/esgo && go run main.go &
+	@echo "✅ ESBuild + Goja test server started on port 8801"
+	@echo "📝 Test endpoint: http://localhost:8801/test"
+	@echo "❤️  Health check: http://localhost:8801/health"
+	@echo "🌐 Test page: http://localhost:8801/test.html"
+
+# ESBuild + Goja test server (foreground)
+esgo2:
+	@echo "🚀 Starting ESBuild + Goja test server (foreground)..."
+	@lsof -ti:8801 | xargs kill -9 2>/dev/null || true
+	@cd tests/esgo && go run main.go

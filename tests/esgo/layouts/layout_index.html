@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{(props && props.siteTitle) || 'Home'}</title>
+  </head>
+  <body>
+    <div class="layout-index">
+      <header><h1>{(props && props.siteTitle) || 'Home'}</h1></header>
+      <main>
+        {children}
+      </main>
+      <footer><small>Index Footer</small></footer>
+    </div>
+    <script src="/static/common_client.js"></script>
+    <script src="/static/pages_index.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+<button className="btn" onclick="inc()">Count: 3</button>

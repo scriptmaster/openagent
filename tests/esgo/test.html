@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESBuild + Goja Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-result { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .code { background: #f0f0f0; padding: 10px; border-radius: 4px; font-family: monospace; }
+        textarea { width: 100%; min-height: 160px; font-family: monospace; }
+        main#preview { border: 1px solid #ddd; padding: 12px; border-radius: 6px; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ESBuild + Goja Architecture Test</h1>
+        <p>This demonstrates the new architecture:</p>
+        <ol>
+            <li><strong>HTML → TSX</strong>: Convert HTML templates to TSX</li>
+            <li><strong>TSX → JS</strong>: Transform TSX to JS using esbuild</li>
+            <li><strong>JS Execution</strong>: Execute JS using goja runtime</li>
+            <li><strong>Server-side Rendering</strong>: Render components on the server</li>
+        </ol>
+        
+        <div class="test-result">
+            <h3>Test Results:</h3>
+            <div id="results">Loading...</div>
+            <h4>Result JSON (raw)</h4>
+            <textarea id="resultJson" readonly>Loading...</textarea>
+            <h4>Preview</h4>
+            <main id="preview"></main>
+        </div>
+        
+        <div class="code">
+            <h4>Sample TSX Input:</h4>
+            <pre>
+export default function Test() {
+    return (
+        &lt;div className="container"&gt;
+            &lt;h1&gt;Hello from ESBuild + Goja!&lt;/h1&gt;
+            &lt;p&gt;This is rendered server-side&lt;/p&gt;
+        &lt;/div&gt;
+    );
+}
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        // Test the endpoints
+        async function runTests() {
+            const resultsDiv = document.getElementById('results');
+            const resultJson = document.getElementById('resultJson');
+            const preview = document.getElementById('preview');
+            
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch('/health');
+                const healthData = await healthResponse.json();
+                
+                // Test component rendering (get raw text first)
+                const testResponse = await fetch('/test');
+                const testText = await testResponse.text();
+
+                // Show raw JSON/text exactly as returned by the server
+                resultJson.value = testText;
+
+                // Attempt to parse and preview
+                let testData = null;
+                try {
+                    testData = JSON.parse(testText);
+                } catch (parseErr) {
+                    console.warn('Failed to parse /test JSON:', parseErr);
+                }
+                
+                resultsDiv.innerHTML = `
+                    <h4>✅ Health Check:</h4>
+                    <pre>${JSON.stringify(healthData, null, 2)}</pre>
+                `;
+
+                if (testData && typeof testData.result === 'string') {
+                    preview.innerHTML = testData.result;
+                } else {
+                    preview.textContent = 'No valid JSON parsed from /test; see raw response above.';
+                }
+
+                // Attempt client mount if window.Counter is available
+                try {
+                    if (window.Counter) {
+                        const mountPoint = document.getElementById('preview');
+                        // re-render from client too (demonstration)
+                        const el = window.Counter({ count: (testData && testData.state && testData.state.count) || 0 });
+                        // naive client-side: replace preview with client element HTML
+                        // (in a real app you'd hydrate)
+                        mountPoint.innerHTML = '';
+                        mountPoint.appendChild(document.createElement('div')).innerHTML = testData.result;
+                    }
+                } catch (e) {
+                    console.warn('Client mount failed:', e);
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h4>❌ Error:</h4>
+                    <pre>${error.message}</pre>
+                `;
+                if (!resultJson.value) resultJson.value = 'Error while fetching: ' + error.message;
+                preview.textContent = '';
+            }
+        }
+        
+        // Run tests when page loads
+        runTests();
+    </script>
+    <script src="/static/common_client.js"></script>
+    <script type="module">
+      import Counter from '/static/pages_test.js';
+      window.Counter = Counter;
+    </script>
+</body>
+</html>
+

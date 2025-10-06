@@ -1,0 +1,14 @@
+<script>
+let siteTitle = (props && props.siteTitle) || 'My Site';
+</script>
+<div class="layout">
+  <header>
+    <h1>{siteTitle}</h1>
+  </header>
+  <main>
+    {children}
+  </main>
+  <footer>
+    <small>Footer</small>
+  </footer>
+</div>

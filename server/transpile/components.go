@@ -61,9 +61,10 @@ func createDualFunctionComponent(componentName, jsContent, componentHTML string)
 	componentNameCamel := convertToCamelCase(componentName)
 	jsxFunctionName := componentNameCamel + "JSX"
 
-	// For TSX files, we want clean JSX without script content
-	// The script content will be handled in the JS file generation
+	// Embed script content in the main function
 	return fmt.Sprintf(`export default function %s() {
+    // ╔══ 🔧 COMPONENT <script> TAG CONTENTS 🔧 ══
+%s
     // Call the JSX function with props and state
     return %s(typeof props != 'undefined' ? props : {}, typeof state != 'undefined' ? state : {});
 }
@@ -72,7 +73,7 @@ function %s(props, state) {
     return (
         %s
     );
-}`, componentNameCamel, jsxFunctionName, jsxFunctionName, componentHTML)
+}`, componentNameCamel, jsContent, jsxFunctionName, jsxFunctionName, componentHTML)
 }
 
 // processComponentImports processes component divs and imports component files
@@ -228,11 +229,11 @@ func importAndTranspileComponent(componentName, inputPath string) (string, error
 	// Store component JS content for later embedding
 	var componentJS string
 	if strings.Contains(componentTSX, "function ") && strings.Contains(componentTSX, "typeof props") {
-		// Component TSX already contains the dual function pattern, use it as-is
+		// Component TSX already contains the dual function pattern, convert it to JS
 		if isDebugTranspile() {
-			fmt.Printf("DEBUG: Component TSX already contains dual function pattern, using as-is\n")
+			fmt.Printf("DEBUG: Component TSX contains dual function pattern, converting to JS\n")
 		}
-		componentJS = componentTSX
+		componentJS = TSX2JSWithOptions(componentTSX, true)
 	} else {
 		// Component TSX needs conversion
 		componentJS = convertComponentTSXToJS(componentTSX)
